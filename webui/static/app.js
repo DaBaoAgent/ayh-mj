@@ -15,6 +15,8 @@ const state = {
     },
 };
 
+let chatStreaming = false;  // 聊天流式读取中标记
+
 // DOM 元素
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -190,17 +192,72 @@ function setupEventListeners() {
     });
 }
 
-// 发送聊天
+// 发送聊天（接入 Hermes 内核）
 async function sendChat() {
     const input = $('#chatInput');
     const text = input.value.trim();
     if (!text) return;
-    
+
+    if (chatStreaming) {
+        addMessage('system', '上一条消息还在处理中...');
+        return;
+    }
+
     addMessage('user', text);
     input.value = '';
-    
-    // TODO: 接入 Hermes API
-    addMessage('assistant', '收到指令，正在处理...');
+
+    // 创建 assistant 气泡（流式填充）
+    const messages = $('#consoleMessages');
+    const bubble = document.createElement('div');
+    bubble.className = 'message assistant';
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.textContent = '正在处理...';
+    bubble.appendChild(content);
+    messages.appendChild(bubble);
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+        const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text }),
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+            content.textContent = `发送失败: ${data.error || '未知错误'}`;
+            return;
+        }
+    } catch (e) {
+        content.textContent = `发送失败: ${e.message}`;
+        return;
+    }
+
+    // 启动流式读取
+    chatStreaming = true;
+    let buffer = '';
+    const es = new EventSource('/api/chat/stream');
+    es.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'chat') {
+                buffer += data.text;
+                content.textContent = buffer;
+                messages.scrollTop = messages.scrollHeight;
+            } else if (data.type === 'chat_end') {
+                es.close();
+                chatStreaming = false;
+                if (!buffer) content.textContent = '(无输出)';
+            }
+        } catch (e) {
+            console.error('chat stream 解析失败:', e);
+        }
+    };
+    es.onerror = () => {
+        es.close();
+        chatStreaming = false;
+        if (!buffer) content.textContent = '(连接中断)';
+    };
 }
 
 // 添加消息

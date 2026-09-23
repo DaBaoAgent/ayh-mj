@@ -139,6 +139,120 @@ async def api_start():
 
     return {"ok": True, "message": "已启动全流程"}
 
+
+# ============ Hermes 对话（接入 hermes 内核） ============
+
+CHAT_STATE_FILE = STATE_DIR / "chat_session.json"
+CHAT_LOG_DIR = STATE_DIR / "logs"
+CHAT_LOG_DIR.mkdir(parents=True, exist_ok=True)
+CHAT_HISTORY_FILE = STATE_DIR / "chat.json"
+CHAT_LOG_FILE = CHAT_LOG_DIR / "chat_current.log"
+
+
+def _load_chat_session() -> dict:
+    if CHAT_STATE_FILE.exists():
+        return json.loads(CHAT_STATE_FILE.read_text(encoding="utf-8"))
+    return {"session_id": None}
+
+
+def _save_chat_session(data: dict):
+    CHAT_STATE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _append_chat_history(role: str, content: str):
+    history = []
+    if CHAT_HISTORY_FILE.exists():
+        try:
+            history = json.loads(CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            history = []
+    history.append({"role": role, "content": content,
+                    "time": datetime.now().isoformat()})
+    CHAT_HISTORY_FILE.write_text(json.dumps(history[-100:], ensure_ascii=False, indent=1),
+                                 encoding="utf-8")
+
+
+@app.post("/api/chat")
+async def api_chat(request: Request):
+    """向 Hermes 内核发一条消息（子进程输出重定向到日志文件，SSE 读它）"""
+    import subprocess
+
+    data = await request.json()
+    message = (data.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"error": "消息为空"}, status_code=400)
+
+    session = _load_chat_session()
+    sid = session.get("session_id")
+
+    # 组装 hermes chat 命令
+    cmd = ["hermes", "chat", "-q", message, "--yolo", "--no-restore-cwd",
+           "--source", "webui"]
+    if sid:
+        cmd += ["--resume", sid]
+
+    # 清空当前日志（前端从0开始读）
+    CHAT_LOG_FILE.write_text("", encoding="utf-8")
+    _append_chat_history("user", message)
+
+    # 起子进程，输出重定向到文件（不用管道，避免 EPIPE）
+    log_fh = open(CHAT_LOG_FILE, "a", encoding="utf-8")
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(Path(__file__).parent.parent),
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+    )
+
+    return {"ok": True, "pid": proc.pid, "session_id": sid, "resumed": bool(sid)}
+
+
+@app.get("/api/chat/stream")
+async def api_chat_stream():
+    """SSE：推送 hermes 子进程输出"""
+    async def generate():
+        pos = 0
+        idle_rounds = 0
+        while idle_rounds < 600:  # 最长 10 分钟无输出自动断
+            await asyncio.sleep(0.8)
+            if CHAT_LOG_FILE.exists():
+                with open(CHAT_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                    f.seek(pos)
+                    new = f.read()
+                    pos = f.tell()
+                if new:
+                    idle_rounds = 0
+                    # 抓会话 ID（hermes 输出里 "session: <id>" 之类）
+                    import re
+                    m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", new)
+                    if m:
+                        session = _load_chat_session()
+                        if session.get("session_id") != m.group(1):
+                            session["session_id"] = m.group(1)
+                            _save_chat_session(session)
+                    payload = json.dumps({"type": "chat", "text": new}, ensure_ascii=False)
+                    yield f"data: {payload}\n\n"
+                else:
+                    idle_rounds += 1
+        yield f"data: {json.dumps({'type': 'chat_end'})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@app.get("/api/chat/history")
+async def api_chat_history():
+    """历史对话"""
+    if CHAT_HISTORY_FILE.exists():
+        try:
+            return json.loads(CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return []
+
 @app.post("/api/stop")
 async def api_stop():
     """停止运行"""

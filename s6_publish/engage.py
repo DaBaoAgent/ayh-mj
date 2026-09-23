@@ -27,7 +27,7 @@ from lib.state import connect
 RED_LINES = {
     "price": ["价格", "多少钱", "优惠", "折扣", "便宜", "发票", "购买", "链接", "下单",
               "price", "cost", "buy", "discount", "order"],
-    "medical": ["治疗", "治好", "康复", "病症", "医用", "疗效", "病人能用吗",
+    "medical": ["治", "康复", "病症", "医用", "疗效", "病人能用吗", "治疗",
                 "treat", "cure", "medical", "therapy"],
     "complaint": ["投诉", "退款", "退货", "差评", "骗子", "举报",
                   "refund", "complaint", "scam", "cheat"],
