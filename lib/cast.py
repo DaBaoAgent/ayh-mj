@@ -85,6 +85,105 @@ def load_library_roles() -> dict:
 
 LIBRARY_ROLES = load_library_roles()
 
+# ── 选角槽位（同质可替换角色池，轮换避免每集同一张脸）────────────
+CAST_SLOTS = {
+    # 老年男性（60-75，可演邻居/大爷/外籍爷爷）
+    "@elder_male": ["elder", "city_grandpa_75", "city_retired_professor_70", "western_grandpa_70"],
+    # 老年女性
+    "@elder_female": ["mother", "city_grandma_70", "city_grandma_maternal_65"],
+    # 中老年男性（40-55）
+    "@mid_male": ["son", "city_dad_50", "city_security_guard_45", "western_dad_45"],
+    # 中老年女性（40-55）
+    "@mid_female": ["mother", "city_mom_45", "city_teacher_woman_42", "city_neighbor_aunt_55", "western_mom_40"],
+    # 青年男性（25-38，可演路人/快递/女婿）
+    "@young_male": ["city_son_in_law_38", "city_young_man_30", "city_delivery_rider_28", "western_young_man_30"],
+    # 青年女性（25-38）
+    "@young_female": ["city_daughter_35", "city_daughter_in_law_32", "city_nurse_28", "city_young_woman_26", "western_young_woman_28"],
+    # 少年/儿童
+    "@teen_boy": ["city_son_teen_16"],
+    "@child": ["city_boy_10", "city_girl_8", "city_toddler_girl_5"],
+    # 职业配角
+    "@courier": ["city_delivery_rider_28", "courier", "city_young_man_30"],
+    "@neighbor_any": ["elder", "city_neighbor_aunt_55", "city_grandpa_75", "city_retired_professor_70"],
+    # 欧美角色
+    "@western_elder": ["western_grandpa_70"],
+    "@western_adult": ["western_dad_45", "western_mom_40"],
+    "@western_young": ["western_young_man_30", "western_young_woman_28"],
+}
+
+CASTING_STATE = ROOT / "state" / "casting_history.json"
+
+
+def _casting_history() -> dict:
+    if CASTING_STATE.exists():
+        import json
+        return json.loads(CASTING_STATE.read_text(encoding="utf-8"))
+    return {}
+
+
+def _pick_from_slot(slot: str, job_key: str = "") -> str:
+    """从槽位池轮换选角（避开上次用过的；同一 job 内同槽位保持一致）"""
+    pool = [r for r in CAST_SLOTS.get(slot, [])]
+    if not pool:
+        raise KeyError(f"未知选角槽位: {slot}（可用: {list(CAST_SLOTS)}）")
+    import json
+    hist = _casting_history()
+    # job 级缓存：同一条视频内同槽位保持同一角色
+    jobs = hist.setdefault("_jobs", {})
+    job_hist = jobs.setdefault(job_key or "_adhoc", {})
+    if slot in job_hist:
+        return job_hist[slot]
+    last = hist.get(slot)
+    # 核心卡司优先保持稳定；库角色轮换
+    if slot in ("@elder_female", "@mid_female", "@mid_male") and last in (None, "son", "mother"):
+        pick = pool[0]
+    else:
+        idx = (pool.index(last) + 1) % len(pool) if last in pool else 0
+        pick = pool[idx]
+    hist[slot] = pick
+    job_hist[slot] = pick
+    # 历史只留最近 20 个 job
+    if len(jobs) > 20:
+        for k in list(jobs)[:-20]:
+            jobs.pop(k, None)
+    CASTING_STATE.parent.mkdir(parents=True, exist_ok=True)
+    CASTING_STATE.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+    return pick
+
+
+def cast_shot(shot: dict, job_key: str = "") -> dict:
+    """为单个镜头做选角：@slot → 具体角色（轮换），cast_refs 与 speaker 同步替换
+
+    job_key：同一条视频的标识（同 job 内同槽位选同一角色）。
+    返回替换后的新 shot（不修改原对象）。
+    """
+    import copy
+    import re
+    out = copy.deepcopy(shot)
+    mapping: dict[str, str] = {}
+
+    def _resolve(slot: str) -> str:
+        if slot not in mapping:
+            mapping[slot] = _pick_from_slot(slot, job_key)
+        return mapping[slot]
+
+    # cast_refs 里的 @slot
+    new_refs = []
+    for ref in out.get("cast_refs", []):
+        if ref.startswith("@"):
+            new_refs.append(_resolve(ref))
+        else:
+            new_refs.append(ref)
+    out["cast_refs"] = new_refs
+
+    # speaker 里的 @slot（如 "@elder_male" / "@mid_female画外"）
+    sp = out.get("speaker", "")
+    for slot in re.findall(r"@[a-z_]+", sp):
+        sp = sp.replace(slot, _resolve(slot))
+    out["speaker"] = sp
+    out["_cast_mapping"] = mapping
+    return out
+
 
 def resolve_refs(cast_refs: list[str]) -> list[Path]:
     """把分镜里的简称列表解析成实际文件路径（保持顺序，人物在前产品在后）

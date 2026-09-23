@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib.cast import CAST, resolve_refs, resolve_voice
+from lib.cast import CAST, cast_shot, resolve_refs, resolve_voice
 from lib.llm import chat_json
 from lib.tools import ffmpeg
 from s4_generate.autodl_client import generate_video, to_data_url
@@ -89,11 +89,16 @@ def build_prompts(storyboard: dict) -> dict[str, str]:
     return prompts
 
 
-def gen_shot(shot: dict, prompt: str, out_dir: Path) -> dict:
+def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
     seq = shot["seq"]
     out_path = out_dir / f"shot_{seq:02d}.mp4"
     if out_path.exists() and out_path.stat().st_size > 100 * 1024:
         return {"seq": seq, "status": "cached", "path": str(out_path)}
+
+    # 选角：@slot → 具体角色（同 job 内同槽位一致，跨 job 轮换）
+    shot = cast_shot(shot, job_uid)
+    if shot.get("_cast_mapping"):
+        print(f"  [镜{seq}] 选角: {shot['_cast_mapping']}", flush=True)
 
     refs = [str(p) for p in resolve_refs(shot["cast_refs"])]
     # 产品参考图（product_ref：字符串或数组）——必须传入，否则 H3 会自由发挥
@@ -162,7 +167,7 @@ def run(storyboard_path: str, skip_prompt_build: bool = False) -> Path:
     print(f"🎬 逐镜生成（{sb.get('template_name', uid)}）...", flush=True)
     results = []
     with ThreadPoolExecutor(max_workers=3) as pool:
-        futures = {pool.submit(gen_shot, s, prompts[str(s["seq"])], out_dir / "shots"): s
+        futures = {pool.submit(gen_shot, s, prompts[str(s["seq"])], out_dir / "shots", uid): s
                    for s in sb["shots"]}
         for f in as_completed(futures):
             s = futures[f]

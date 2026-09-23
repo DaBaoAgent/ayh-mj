@@ -28,3 +28,9 @@ roles:
   - {id: city_boy_10, name: 城市小男孩, age: 10, gender: 男, relation: 孙子, trait: 寸头·红白运动服·活泼}
   - {id: city_girl_8, name: 城市小女孩, age: 8, gender: 女, relation: 孙女, trait: 双马尾·黄卫衣·好奇}
   - {id: city_toddler_girl_5, name: 城市小孙女, age: 5, gender: 女, relation: 孙女, trait: 双小辫·幼儿园园服·萌}
+  # ── 欧美线（5个·说中文的外国人，2026-09-23） ──
+  - {id: western_grandpa_70, name: 外国爷爷, age: 70, gender: 男, relation: 外籍邻居/爷爷, trait: 白发蓝眼·米色开衫眼镜·和善学究·说中文}
+  - {id: western_dad_45, name: 外国爸爸, age: 45, gender: 男, relation: 跨国家庭父亲, trait: 棕发灰鬓·军绿夹克·随和可靠·说中文}
+  - {id: western_mom_40, name: 外国妈妈, age: 40, gender: 女, relation: 跨国家庭母亲, trait: 红棕卷发绿眼·灰高领·温和干练·说中文}
+  - {id: western_young_woman_28, name: 外国姑娘, age: 28, gender: 女, relation: 外籍朋友/路人, trait: 金发马尾·米白毛衣·明亮好奇·说中文}
+  - {id: western_young_man_30, name: 外国小伙, age: 30, gender: 男, relation: 外籍朋友/路人, trait: 沙金短发·深蓝飞行员夹克·松弛友善·说中文}

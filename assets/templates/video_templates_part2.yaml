@@ -24,10 +24,10 @@ templates:
     concept: 快递小哥抱大箱子累喘，看儿子3秒折车进电梯，直接服了
     hot_slot: "快递场景可绑定节日/网购热点"
     shots:
-      - {seq: 1, duration: 3, purpose: "钩子：累喘的快递小哥", shot_size: 中景, camera: "固定，快递员抱箱入画", start_state: "快递员抱着大箱子进单元门", end_state: "喘着气放下箱子", speaker: S3(快递员), narration: "您好，快递。", sound_design: "对白+气喘声", cast_refs: [courier], product_ref: ""}
-      - {seq: 2, duration: 3.5, purpose: "反转：3秒折车看呆", shot_size: 近景, camera: "快递员视线方向拍折叠动作", start_state: "儿子单手把车折上", end_state: "快递员瞪大眼睛", speaker: S3(快递员), narration: "哥，这车还能这么折？", sound_design: "折叠咔哒+快递员惊叹", cast_refs: [son_urgent, courier], product_ref: 折叠}
+      - {seq: 1, duration: 3, purpose: "钩子：累喘的快递小哥", shot_size: 中景, camera: "固定，快递员抱箱入画", start_state: "快递员抱着大箱子进单元门", end_state: "喘着气放下箱子", speaker: "@courier", narration: "您好，快递。", sound_design: "对白+气喘声", cast_refs: ["@courier"], product_ref: ""}
+      - {seq: 2, duration: 3.5, purpose: "反转：3秒折车看呆", shot_size: 近景, camera: "快递员视线方向拍折叠动作", start_state: "儿子单手把车折上", end_state: "快递员瞪大眼睛", speaker: "@courier", narration: "哥，这车还能这么折？", sound_design: "折叠咔哒+快递员惊叹", cast_refs: [son_urgent, "@courier"], product_ref: 折叠}
       - {seq: 3, duration: 3, purpose: "卖点：单手拎进电梯", shot_size: 中景, camera: "跟拍进电梯", start_state: "儿子拎车进电梯", end_state: "在电梯里单手提车按下楼层", speaker: S1, narration: "就十三点八公斤。", sound_design: "对白+电梯提示音", cast_refs: [son_urgent], product_ref: 折叠}
-      - {seq: 4, duration: 2.5, purpose: "收尾梗：同行对比", shot_size: 中景, camera: "电梯门关上前最后一拍", start_state: "快递员看着手里的大箱子", end_state: "摇头佩服，电梯门缓缓关上", speaker: S3(快递员), narration: "服了，我搬箱子都没您快。", sound_design: "对白+电梯门关声", cast_refs: [courier], product_ref: ""}
+      - {seq: 4, duration: 2.5, purpose: "收尾梗：同行对比", shot_size: 中景, camera: "电梯门关上前最后一拍", start_state: "快递员看着手里的大箱子", end_state: "摇头佩服，电梯门缓缓关上", speaker: "@courier", narration: "服了，我搬箱子都没您快。", sound_design: "对白+电梯门关声", cast_refs: ["@courier"], product_ref: ""}
 
   # ============ T09 脑洞・对比实验 ============
   - id: T09

@@ -28,14 +28,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx
 
 ARK_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
-MODEL = "doubao-seedream-5-0-pro-260628"
+MODEL = "doubao-seedream-5-0-lite-260128"  # 新账号开通5.0-lite(pro/4.5/4.0未开通；换账号或开通后调整)
 
 # 尺寸映射（长边 basic 1536 / high 2048 / ultra 2560，面积上限 4.3M px）
 SIZE_MAP = {
-    "9:16": {"basic": "864x1536", "high": "1152x2048", "ultra": "1440x2560"},
-    "3:4": {"basic": "1152x1536", "high": "1536x2048", "ultra": "1776x2368"},
-    "16:9": {"basic": "1536x864", "high": "2048x1152", "ultra": "2560x1440"},
-    "1:1": {"basic": "1536x1536", "high": "2048x2048", "ultra": "2048x2048"},
+    # 5.0 系列要求 ≥368万像素（2026-09-23 适配 doubao-seedream-5-0-lite）
+    "9:16": {"basic": "1440x2560", "high": "1440x2560", "ultra": "1728x3072"},
+    "3:4": {"basic": "1728x2304", "high": "2048x2730", "ultra": "2448x3264"},
+    "16:9": {"basic": "2560x1440", "high": "2730x2048", "ultra": "3264x2448"},
+    "1:1": {"basic": "1920x1920", "high": "2048x2048", "ultra": "2560x2560"},
 }
 
 
