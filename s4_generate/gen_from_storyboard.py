@@ -37,7 +37,7 @@ PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩
 运镜只用大全景内轻缓运动（static / gentle pan / slow subtle push），不写特写/推近类运镜。
 
 【输出格式（每镜一个字符串，严格三段）】
-integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a natural pace: <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
+integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a slightly brisk pace (clear articulation, a bit faster than natural) : <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
 
 overall_soundscape: <具体音效（从 sound_design 扩写），英文>
 
@@ -56,7 +56,12 @@ non_diegetic_music: N/A
    (d) 画面里必须能看到轮椅特征（四个小轮/座椅框/扶手），不能只拍一个光秃秃的车架
    (e) 产品始终在画面内与人物同框（大全景内可见）
 5. 每镜是独立视频（时长给定），动作在时长内完成，不跨镜连续
-6. 数字读法：218→二一八（台词已是中文则原样）
+6. **读音规则（严格遵守）**：
+   - 数字：218 一律写"二幺八"（号码中的"一"读"幺"）；13.8 写"十三点八"；"十"字发音清晰（shí）
+   - 多音字按语义读；如需注音，写在 <d> 标签**外**（H3 只朗读 <d> 内文本，注音不能进 <d>）：
+     重=zhòng（重量义，如"有多沉/多重zhòng"）；行=xíng（行走）行=háng（行业）；还=hái（还是）；长=cháng（长度）；为=wèi（因为）
+   - **品牌收尾**：推荐品牌用"爱优护轻便侠"（品牌名），不报型号数字
+7. 语速 slightly brisk（偏快一点点、咬字清晰，不拖沓）
 
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 

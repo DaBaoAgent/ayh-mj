@@ -126,12 +126,22 @@ def _try_align(segments: list[dict], expected_lines: list[str]):
     return None
 
 
-def _split_natural(text: str, max_chars: int = 10) -> list[str]:
-    """把一个句子拆成 ≤max_chars 的自然句行（优先按标点，其次硬切）
+def _strip_punct(s: str) -> str:
+    """去字幕标点（宝哥规则：字幕里不要标点符号）"""
+    import re
+    return re.sub(r"[，。？！、；：,.?!;:｜|]", "", s).strip()
 
-    规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字（含标点）、尽量自然句。
-    拆行时行首标点清理掉（字幕习惯行末可省标点）。
+
+def _split_natural(text: str, max_chars: int = 10) -> list[str]:
+    """把一个句子拆成 ≤max_chars 的自然句行（去标点输出）
+
+    规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字、尽量自然句、不带标点。
     """
+    return [s for s in (_strip_punct(x) for x in _split_raw(text, max_chars)) if s]
+
+
+def _split_raw(text: str, max_chars: int = 10) -> list[str]:
+    """断句核心（保留标点用于判断，去标点在 _split_natural 统一处理）"""
     import re
     text = text.strip()
     if not text:
@@ -140,13 +150,13 @@ def _split_natural(text: str, max_chars: int = 10) -> list[str]:
     if "｜" in text or "|" in text:
         out: list[str] = []
         for chunk in re.split(r"[｜|]", text):
-            out.extend(_split_natural(chunk, max_chars))
+            out.extend(_split_raw(chunk, max_chars))
         return out
     if len(text) <= max_chars:
         return [text]
     # 按标点切分（标点跟随前片段）
     pieces = re.findall(r"[^，。？！、；：,.?!;:｜|]+[，。？！、；：,.?!;:｜|]*", text) or [text]
-    out: list[str] = []
+    out = []
     cur = ""
     for piece in pieces:
         if len(cur) + len(piece) <= max_chars:
@@ -162,8 +172,7 @@ def _split_natural(text: str, max_chars: int = 10) -> list[str]:
             cur = p
     if cur:
         out.append(cur)
-    # 行首标点清理（"，一只手拎得动。" → "一只手拎得动。"）
-    return [re.sub(r"^[，。？！、；：,.?!;:]+", "", x) for x in out if re.sub(r"^[，。？！、；：,.?!;:]+", "", x)]
+    return out
 
 
 def _explode_rows(segments: list[dict], texts: list[str] | None,
