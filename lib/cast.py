@@ -217,17 +217,61 @@ def resolve_refs(cast_refs: list[str]) -> list[Path]:
                 raise KeyError(f"演员库角色图缺失: {ref} → {p}（先跑 tools/gen_cast_batch.py）")
             people.append(p)
             continue
-        # 核心卡司情绪引用: son_urgent / mother_stubborn / dog (默认 neutral)
+        # 核心卡司情绪引用: son_urgent / mother_quiet / dog (默认 neutral)
         parts = ref.split("_", 1)
         role = parts[0]
         if role not in CAST:
             raise KeyError(f"未知角色引用: {ref}（可用: {list(CAST)} + 演员库 {list(LIBRARY_ROLES)} + {list(PROPS)}）")
         emo = parts[1] if len(parts) > 1 else "neutral"
-        emos = CAST[role]["emotions"]
-        if emo not in emos:
-            raise KeyError(f"角色 {role} 无情绪 '{emo}'（可用: {list(emos)}）")
-        people.append(emos[emo])
+        p = _emo_path(role, emo)
+        if p is None:
+            raise KeyError(f"角色 {role} 无情绪 '{emo}'（可用: {list(CAST[role]['emotions'])} + emotions/ 目录动态变体）")
+        people.append(p)
     return people + props_
+
+
+def _emo_path(role: str, emo: str) -> Path | None:
+    """情绪图路径：先查 CAST 注册表，再查 emotions/ 目录动态变体（如 quiet）"""
+    registered = CAST[role]["emotions"].get(emo)
+    if registered and Path(registered).exists():
+        return Path(registered)
+    dynamic = EMO_DIR / f"{role}_{emo}.png"
+    return dynamic if dynamic.exists() else None
+
+
+# ── 非说话人闭嘴机制（防 A说话B动嘴）───────────────────────
+# H3 会把参考图的表情带到人物脸上：参考图嘴张开 → 非说话人也动嘴。
+# 规则：非说话人的参考图一律换成 quiet（嘴唇完全闭合）版定妆图。
+_SPEAKER_ALIAS = {"S1": "son", "S2": "mother", "S3": "elder"}
+
+
+def _speaks(speaker: str, role: str) -> bool:
+    """speaker 字段是否指向该角色（son / S1 / son画外 / city_grandpa_75）"""
+    sp = speaker or ""
+    if role in sp:
+        return True
+    up = sp.upper()
+    return any(tok in up and r == role for tok, r in _SPEAKER_ALIAS.items())
+
+
+def neutralize_refs_for_silent(cast_refs: list[str], speaker: str) -> list[str]:
+    """非说话人的角色引用 → quiet 闭嘴版（如有）；情绪图无 quiet 版则降级 neutral
+
+    说话人保持原引用（情绪图驱动表演）；产品/演员库引用不动。
+    """
+    out: list[str] = []
+    for ref in cast_refs:
+        base = ref.split("_")[0]
+        if base in CAST and not _speaks(speaker, base):
+            if _emo_path(base, "quiet"):
+                out.append(f"{base}_quiet")
+                continue
+            # 无 quiet 版：情绪图降级为 neutral（避免带情绪嘴型）
+            if ref != base and ref.split("_", 1)[1] not in ("neutral",):
+                out.append(base)
+                continue
+        out.append(ref)
+    return out
 
 
 def cast_menu() -> str:

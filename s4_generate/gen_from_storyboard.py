@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib.cast import cast_shot, resolve_refs, resolve_voice
+from lib.cast import cast_shot, neutralize_refs_for_silent, resolve_refs, resolve_voice
 from lib.llm import chat_json
 from lib.tools import ffmpeg
 from s4_generate.autodl_client import generate_video, generate_video_smart
@@ -104,7 +104,11 @@ def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
     if shot.get("_cast_mapping"):
         print(f"  [镜{seq}] 选角: {shot['_cast_mapping']}", flush=True)
 
-    refs = [str(p) for p in resolve_refs(shot["cast_refs"])]
+    # 非说话人 → quiet 闭嘴版参考图（防 H3 把情绪图的张嘴表情带歪）
+    refs_raw = neutralize_refs_for_silent(shot["cast_refs"], shot["speaker"])
+    if refs_raw != shot["cast_refs"]:
+        print(f"  [镜{seq}] 非说话人闭嘴化: {shot['cast_refs']} → {refs_raw}", flush=True)
+    refs = [str(p) for p in resolve_refs(refs_raw)]
     # 产品参考图（product_ref：字符串或数组）——必须传入，否则 H3 会自由发挥
     product_ref = shot.get("product_ref") or ""
     if product_ref:
