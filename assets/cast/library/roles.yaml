@@ -1,41 +1,30 @@
-# 演员库元数据（24角色）— 供脚本智能选角（年龄/性别/城乡/关系/气质）
-# 引用方式：cast_refs 里直接写 id（如 city_grandpa_75）；图像在 assets/cast/library/<id>.png
+# 演员库元数据（20 城市角色）— 供脚本智能选角（年龄/性别/关系/气质）
+# 2026-09-23 老板指令：舍弃农村角色，城市角色整理为 20 个
+# 引用方式：cast_refs 里直接写 id（如 city_grandma_70）；图像在 assets/cast/library/<id>.png
+# 弃用角色（农村12+双人/运动青年2）移至 _deprecated/ 保底
 
 roles:
-  # ── 城市线 ──
-  - {id: city_grandpa_75, name: 城市爷爷, age: 75, gender: 男, region: 城市, relation: 爷爷, trait: 白发深皱纹·灰毛衣·和善但固执}
-  - {id: city_mom_45, name: 城市妈妈, age: 45, gender: 女, region: 城市, relation: 母亲/阿姨, trait: 米色开衫·温柔疲惫}
-  - {id: city_daughter_35, name: 城市女儿, age: 35, gender: 女, region: 城市, relation: 女儿/儿媳, trait: 通勤装·干练温和}
-  - {id: city_son_teen_16, name: 城市少年, age: 16, gender: 男, region: 城市, relation: 孙子, trait: 校服·书包·腼腆}
-  - {id: city_girl_8, name: 城市小女孩, age: 8, gender: 女, region: 城市, relation: 孙女, trait: 双马尾·黄卫衣·好奇}
-  - {id: city_boy_10, name: 城市小男孩, age: 10, gender: 男, region: 城市, relation: 孙子, trait: 寸头·红白运动服·活泼}
-  - {id: city_nurse_28, name: 社区护士, age: 28, gender: 女, region: 城市, relation: 职业配角, trait: 浅粉制服·温和专业}
-  - {id: city_neighbor_aunt_55, name: 城市阿姨, age: 55, gender: 女, region: 城市, relation: 邻居, trait: 卷发·紫运动服·爱唠嗑}
-  - {id: city_young_man_30, name: 城市青年, age: 30, gender: 男, region: 城市, relation: 路人/儿子, trait: 绿工装·疲惫友善}
-  - {id: city_young_woman_26, name: 城市姑娘, age: 26, gender: 女, region: 城市, relation: 女儿/路人, trait: 长发·风衣·自然俏}
-  - {id: city_couple_70, name: 城市老夫妻, age: 70, gender: 双人, region: 城市, relation: 夫妻, trait: 双人同框·灰夹克+酒红开衫}
-  - {id: city_dad_50, name: 城市爸爸, age: 50, gender: 男, region: 城市, relation: 父亲, trait: 深蓝工装·风霜和善}
-  # ── 城市扩充线（第二组10个：2026-09-23） ──
-  - {id: city_grandma_70, name: 城市奶奶, age: 70, gender: 女, region: 城市, relation: 奶奶, trait: 银白烫卷发·紫开衫珍珠链·慈祥}
-  - {id: city_grandma_maternal_65, name: 城市外婆, age: 65, gender: 女, region: 城市, relation: 外婆, trait: 圆脸发髻·深蓝盘扣·温和}
-  - {id: city_son_in_law_38, name: 城市女婿, age: 38, gender: 男, region: 城市, relation: 女婿, trait: 整洁衬衫·斯文可靠}
-  - {id: city_daughter_in_law_32, name: 城市儿媳, age: 32, gender: 女, region: 城市, relation: 儿媳, trait: 披肩发·米色毛衣围裙·温柔干练}
-  - {id: city_toddler_girl_5, name: 城市小孙女, age: 5, gender: 女, region: 城市, relation: 孙女, trait: 双小辫·幼儿园园服·萌}
-  - {id: city_security_guard_45, name: 社区保安, age: 45, gender: 男, region: 城市, relation: 职业配角, trait: 深蓝制服·憨厚}
-  - {id: city_delivery_rider_28, name: 外卖骑手, age: 28, gender: 男, region: 城市, relation: 职业配角, trait: 黄外套·夹头盔·匆忙友善}
-  - {id: city_teacher_woman_42, name: 城市女教师, age: 42, gender: 女, region: 城市, relation: 职业配角, trait: 细框眼镜·风衣·知性}
-  - {id: city_retired_professor_70, name: 退休教授, age: 70, gender: 男, region: 城市, relation: 父亲/爷爷, trait: 灰白背头·羊毛背心眼镜·学究}
-  - {id: city_athlete_man_25, name: 城市运动青年, age: 25, gender: 男, region: 城市, relation: 儿子/路人, trait: 运动装发带·阳光}
-  # ── 农村线 ──
-  - {id: rural_grandpa_78, name: 农村爷爷, age: 78, gender: 男, region: 农村, relation: 爷爷, trait: 草帽·晒黑深纹·蓝布褂}
-  - {id: rural_grandma_72, name: 农村奶奶, age: 72, gender: 女, region: 农村, relation: 奶奶, trait: 花头巾·深色花布·笑纹深}
-  - {id: rural_dad_48, name: 农村父亲, age: 48, gender: 男, region: 农村, relation: 父亲, trait: 迷彩工装·胶鞋·黝黑}
-  - {id: rural_mom_45, name: 农村母亲, age: 45, gender: 女, region: 农村, relation: 母亲, trait: 碎花布衣·发髻红皮筋}
-  - {id: rural_daughter_30, name: 农村女儿, age: 30, gender: 女, region: 农村, relation: 女儿, trait: 长辫·粉毛衣·打工返乡}
-  - {id: rural_son_33, name: 农村儿子, age: 33, gender: 男, region: 农村, relation: 儿子, trait: 工地装·风尘仆仆·憨厚}
-  - {id: rural_teen_15, name: 农村闺女, age: 15, gender: 女, region: 农村, relation: 孙女, trait: 马尾·校服·文静}
-  - {id: rural_kid_7, name: 农村小孩, age: 7, gender: 男, region: 农村, relation: 孙子, trait: 锅盖头·大棉袄·红脸蛋}
-  - {id: rural_uncle_60, name: 农村大爷, age: 60, gender: 男, region: 农村, relation: 邻居, trait: 皮夹克·布鞋·旱烟袋}
-  - {id: rural_aunt_58, name: 农村大婶, age: 58, gender: 女, region: 农村, relation: 邻居, trait: 绿外套·红包斜挎·爱说}
-  - {id: rural_couple_75, name: 农村老夫妻, age: 75, gender: 双人, region: 农村, relation: 夫妻, trait: 双人同框·灰布褂+黑头巾}
-  - {id: rural_village_doctor_40, name: 村医, age: 40, gender: 男, region: 农村, relation: 职业配角, trait: 眼镜·白大褂·医药箱}
+  # ── 老年组（60-75岁） ──
+  - {id: city_grandpa_75, name: 城市爷爷, age: 75, gender: 男, relation: 爷爷, trait: 白发深皱纹·灰毛衣·和善但固执}
+  - {id: city_grandma_70, name: 城市奶奶, age: 70, gender: 女, relation: 奶奶, trait: 银白烫卷发·紫开衫珍珠链·慈祥}
+  - {id: city_retired_professor_70, name: 退休教授, age: 70, gender: 男, relation: 父亲/爷爷, trait: 灰白背头·羊毛背心眼镜·学究}
+  - {id: city_grandma_maternal_65, name: 城市外婆, age: 65, gender: 女, relation: 外婆, trait: 圆脸发髻·深蓝盘扣·温和}
+  # ── 中老年组（42-55岁） ──
+  - {id: city_neighbor_aunt_55, name: 城市阿姨, age: 55, gender: 女, relation: 邻居, trait: 卷发·紫运动服·爱唠嗑}
+  - {id: city_dad_50, name: 城市爸爸, age: 50, gender: 男, relation: 父亲, trait: 深蓝工装·风霜和善}
+  - {id: city_mom_45, name: 城市妈妈, age: 45, gender: 女, relation: 母亲/阿姨, trait: 米色开衫·温柔疲惫}
+  - {id: city_teacher_woman_42, name: 城市女教师, age: 42, gender: 女, relation: 职业配角, trait: 细框眼镜·风衣·知性}
+  - {id: city_security_guard_45, name: 社区保安, age: 45, gender: 男, relation: 职业配角, trait: 深蓝制服·憨厚}
+  # ── 青中年组（25-38岁） ──
+  - {id: city_son_in_law_38, name: 城市女婿, age: 38, gender: 男, relation: 女婿, trait: 整洁衬衫·斯文可靠}
+  - {id: city_daughter_35, name: 城市女儿, age: 35, gender: 女, relation: 女儿/儿媳, trait: 通勤装·干练温和}
+  - {id: city_daughter_in_law_32, name: 城市儿媳, age: 32, gender: 女, relation: 儿媳, trait: 披肩发·米色毛衣围裙·温柔干练}
+  - {id: city_young_man_30, name: 城市青年, age: 30, gender: 男, relation: 路人/儿子, trait: 绿工装·疲惫友善}
+  - {id: city_delivery_rider_28, name: 外卖骑手, age: 28, gender: 男, relation: 职业配角, trait: 黄外套·夹头盔·匆忙友善}
+  - {id: city_nurse_28, name: 社区护士, age: 28, gender: 女, relation: 职业配角, trait: 浅粉制服·温和专业}
+  - {id: city_young_woman_26, name: 城市姑娘, age: 26, gender: 女, relation: 女儿/路人, trait: 长发·风衣·自然俏}
+  # ── 少年儿童组 ──
+  - {id: city_son_teen_16, name: 城市少年, age: 16, gender: 男, relation: 孙子, trait: 校服·书包·腼腆}
+  - {id: city_boy_10, name: 城市小男孩, age: 10, gender: 男, relation: 孙子, trait: 寸头·红白运动服·活泼}
+  - {id: city_girl_8, name: 城市小女孩, age: 8, gender: 女, relation: 孙女, trait: 双马尾·黄卫衣·好奇}
+  - {id: city_toddler_girl_5, name: 城市小孙女, age: 5, gender: 女, relation: 孙女, trait: 双小辫·幼儿园园服·萌}
