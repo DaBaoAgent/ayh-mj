@@ -1,58 +1,157 @@
-"""DeepSeek API 接口"""
+"""DeepSeek API 接口
+
+模型名（2026-09 实测）：本账号 DeepSeek API 只认 `deepseek-flash` / `deepseek-v4-pro`
+密钥来源优先级：环境变量 → hermes .env 文件
+"""
 import os
 import json
 import httpx
+from pathlib import Path
 from typing import Generator
 
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEFAULT_MODEL = "deepseek-flash"
+
+
+def _load_key() -> str:
+    """加载 API Key：环境变量优先，回退 hermes .env"""
+    key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if key:
+        return key
+
+    env_file = Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / ".env"
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("DEEPSEEK_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
+DEEPSEEK_API_KEY = _load_key()
+
 
 def chat(
     messages: list[dict],
-    model: str = "deepseek-chat",
+    model: str = DEFAULT_MODEL,
     temperature: float = 0.7,
     max_tokens: int = 2000,
     stream: bool = False,
-) -> str | Generator:
+) -> str:
     """调用 DeepSeek Chat API"""
     if not DEEPSEEK_API_KEY:
-        raise ValueError("DEEPSEEK_API_KEY 未设置")
-    
+        raise ValueError("DEEPSEEK_API_KEY 未设置（环境变量或 hermes .env 都没有）")
+
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json",
     }
-    
+
     payload = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "stream": stream,
+        "stream": False,
     }
-    
-    with httpx.Client(timeout=120) as client:
-        if stream:
-            with client.stream("POST", f"{DEEPSEEK_BASE_URL}/chat/completions",
-                               headers=headers, json=payload) as resp:
-                resp.raise_for_status()
-                for line in resp.iter_lines():
-                    if line.startswith("data: "):
-                        data = line[6:]
-                        if data == "[DONE]":
-                            break
-                        chunk = json.loads(data)
-                        delta = chunk["choices"][0].get("delta", {})
-                        if "content" in delta:
-                            yield delta["content"]
-        else:
-            resp = client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
-                               headers=headers, json=payload)
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+
+    # 不走系统代理（api.deepseek.com 在 no_proxy 列表里，显式清空更稳）
+    with httpx.Client(timeout=120, proxy=None) as client:
+        resp = client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
+                           headers=headers, json=payload)
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+def _extract_json(text: str) -> dict:
+    """从模型输出里抠出 JSON（去 markdown 包裹 + 截断修复）"""
+    text = text.strip()
+    # 去 markdown 代码块
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text
+        if "```" in text:
+            text = text.rsplit("```", 1)[0]
+    text = text.strip()
+    # 直解
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # 找最外层 {...}
+    start = text.find("{")
+    end = text.rfind("}")
+    candidate = text[start:end + 1] if (start >= 0 and end > start) else text[start:]
+
+    def _repair(s: str) -> str:
+        """修复常见截断：悬空 key / 未闭合字符串 / 未闭合括号（栈序闭合）"""
+        import re as _re
+        s = s.rstrip()
+        # 悬空 key（`"key":` 结尾）→ 删掉整个 key 段（含前面逗号）
+        s = _re.sub(r',?\s*"[^"]*"\s*:\s*$', '', s)
+        s = s.rstrip()
+        # 扫描字符串状态与括号栈
+        stack: list[str] = []
+        in_str = False
+        escaped = False
+        for ch in s:
+            if in_str:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch in "[{":
+                    stack.append(ch)
+                elif ch in "]}":
+                    if stack:
+                        stack.pop()
+        # 未闭合字符串 → 补引号
+        if in_str:
+            s += '"'
+        # 悬空逗号/冒号 → 去掉
+        s = s.rstrip()
+        while s.endswith(",") or s.endswith(":"):
+            s = s[:-1].rstrip()
+        # 括号栈逆序闭合
+        for op in reversed(stack):
+            s += "]" if op == "[" else "}"
+        return s
+
+    for attempt in (candidate, _repair(candidate)):
+        try:
+            return json.loads(attempt)
+        except json.JSONDecodeError:
+            continue
+    raise ValueError(f"无法解析 JSON（前80字: {text[:80]}）")
+
+
+def chat_json(
+    messages: list[dict],
+    model: str = DEFAULT_MODEL,
+    temperature: float = 0.5,
+    max_tokens: int = 3000,
+    retries: int = 2,
+) -> dict:
+    """调用 API 并要求返回 JSON（截断自动重试 + 容错解析）"""
+    last_err = None
+    for attempt in range(retries + 1):
+        mt = max_tokens * (2 ** attempt)  # 每次翻倍
+        text = chat(messages, model=model, temperature=temperature, max_tokens=mt)
+        try:
+            return _extract_json(text)
+        except ValueError as e:
+            last_err = e
+            if attempt < retries:
+                continue
+    raise ValueError(f"chat_json 失败（{retries + 1} 次尝试）: {last_err}")
+
 
 def generate_script(topic: str, product_info: dict, style: str = "轻快科普风") -> str:
-    """生成软广脚本"""
+    """生成软广脚本（简版，完整版见 s2_copy/gen_script.py）"""
     system_prompt = f"""你是一个抖音爆款文案专家，擅长写电动轮椅软广视频脚本。
 
 产品信息：
@@ -64,46 +163,11 @@ def generate_script(topic: str, product_info: dict, style: str = "轻快科普�
 - 口语化，像朋友聊天
 - 自然植入产品，不硬广
 - 适合10-20秒短视频
-- 字数控制在150-300字
-- 分镜提示用【】标注"""
+- 字数控制在150-300字"""
 
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"请根据这个热点话题写一个软广脚本：\n{topic}"},
     ]
-    
+
     return chat(messages, temperature=0.8)
-
-def analyze_trend(title: str, likes: int, comments: int) -> dict:
-    """分析热点是否适合植入"""
-    messages = [
-        {"role": "system", "content": """你是一个内容策略专家。判断这个热点视频是否适合植入电动轮椅广告。
-
-返回JSON格式：
-{
-  "match": true/false,
-  "score": 0-100,
-  "reason": "原因",
-  "angle": "植入角度建议"
-}
-
-适合植入的场景：
-1. 老年人出行、旅游
-2. 残障人士生活日常
-3. 家庭关爱、送礼场景
-4. 产品测评、开箱
-5. 出行痛点吐槽
-
-不适合植入的场景：
-1. 医疗康复（容易违规）
-2. 残障权益倡导（主体人群不同）
-3. 竞品硬广
-4. 猎奇搞笑（调性不符）"""},
-        {"role": "user", "content": f"标题：{title}\n点赞：{likes}\n评论：{comments}"},
-    ]
-    
-    result = chat(messages, temperature=0.3)
-    try:
-        return json.loads(result)
-    except:
-        return {"match": False, "score": 0, "reason": "解析失败", "angle": ""}
