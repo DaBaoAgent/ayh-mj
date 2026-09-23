@@ -93,7 +93,12 @@ ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜�
   · 前3秒开场有冲突/悬念钩子；单句台词尽量 8-12 字
   · 有质疑→打脸的反转结构；台词大白话零修饰（拒绝解释性长句）
   · 禁止与已用创意清单重复的桥段/梗
+- **最后一镜台词必须包含品牌"爱优护轻便侠"**（CTA 硬要求；若超字数就把该镜拆两段：前半回应+后半品牌）
 - 如果热点完全不适用，原样返回（宁可不动）
+- **场景微调（可选字段）**：若某镜台词涉及的动作无法用现有 scene 表达（例：主打"手机遥控"但场景是"拎车甩开"），
+  可输出 `scene_tweaks` 微调该镜动作细节（例："掏出手机轻按，新车自动滑到脚边"）——
+  只改动作细节（start_state/end_state），**不改人数/机位/景别/情绪基调**；不需要就省略
+- 输出 JSON 可含：`"scene_tweaks": {"2": {"start_state": "…", "end_state": "…"}}`（只列需要改的镜）
 
 返回 JSON：{"lines": {"1": "第1镜台词", "2": "...", ...}, "reason": "改写说明一句话"}"""
 
@@ -168,9 +173,9 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             for s in template["shots"]
         ],
     }
-    # 卖点轮换（宝哥规则：每条视频换一个卖点主打）
+    # 卖点轮换（宝哥规则：每条视频换一个卖点主打；与本模板动作匹配优先）
     from lib.products import next_point, points_block
-    pt = next_point()
+    pt = next_point(template.get("id", ""))
     payload["本期主打卖点（必须围绕它设计核心冲突/台词，不要用已用过的）"] = (
         f"{pt['name']}：{pt['hook']}")
     pb = points_block()
@@ -202,11 +207,17 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
                     ok = False
                     last_err = f"镜{seq}超字数({len(lines[seq])}>{max_chars})"
                     break
+            # 校验：最后一镜必须含品牌 CTA
+            if ok:
+                last_seq = str(template["shots"][-1]["seq"])
+                if "爱优护" not in lines.get(last_seq, ""):
+                    ok = False
+                    last_err = f"镜{last_seq}缺品牌CTA"
             if ok:
                 if attempt > 1:
                     print(f"  ✓ 台词改写第{attempt}次成功", flush=True)
                 return {"lines": lines, "reason": out.get("reason", "热点已融入"),
-                        "sales_point": pt}
+                        "sales_point": pt, "scene_tweaks": out.get("scene_tweaks", {}) or {}}
             print(f"  ⚠ 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
         except Exception as e:
             last_err = str(e)[:80]

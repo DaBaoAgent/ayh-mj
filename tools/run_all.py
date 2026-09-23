@@ -129,6 +129,15 @@ def run_stage_storyboard(dry: bool = False):
             lines_result = adapt_lines(tpl, hot_title)
             sb = to_storyboard(tpl, lines_result["lines"], job_uid=uid)
             sb["hot_title"] = hot_title
+            # 应用场景微调（LLM 让场景服务主打卖点）
+            tw = lines_result.get("scene_tweaks") or {}
+            for shot in sb["shots"]:
+                t = tw.get(str(shot["seq"]))
+                if t:
+                    if t.get("start_state"):
+                        shot["start_state"] = t["start_state"]
+                    if t.get("end_state"):
+                        shot["end_state"] = t["end_state"]
             # 角色组（宝哥规则：每条新视频换一组角色）——storyboard 阶段定组（审核可见，生成时同组）
             from lib.cast import _role_group_for
             rg = _role_group_for(uid)

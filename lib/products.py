@@ -31,11 +31,27 @@ def _used() -> dict:
     return {}
 
 
-def next_point() -> dict:
-    """选本期主打卖点：使用次数最少优先（同次数按池顺序）"""
+# ── 模板-卖点适配（防止"折叠场景讲刹车"这类画面/台词违和——宝哥规则延伸）──
+TEMPLATE_FIT = {
+    "T01": ["auto_stop", "anti_flip", "light_13.8", "range_39"],          # 换车对比（安全/轻/续航）
+    "T02": ["fold_1s", "small_boot", "light_13.8"],                        # 折叠循环+后备箱
+    "T03": ["remote_15m", "recline_145", "light_13.8"],                    # 大爷操控反差（遥控/躺）
+    "T04": ["fold_1s", "small_boot", "remote_15m"],                        # 路人疑惑（折叠/遥控）
+    "T05": ["auto_stop", "brake_light", "anti_flip"],                      # 安全向
+    "T06": ["recline_145", "shock_18", "range_39"],                        # 舒适向
+    "T07": ["remote_15m", "plane_ok", "range_39"],                         # 智能/出行
+    "T08": ["plane_ok", "small_boot", "fold_1s"],                          # 出行场景
+    "T09": ["shock_18", "recline_145", "brake_light"],                     # 舒适细节
+    "T10": ["auto_stop", "anti_flip", "plane_ok"],                         # 安全/认证
+}
+
+
+def next_point(template_id: str = "") -> dict:
+    """选本期主打卖点：优先与模板动作匹配 + 使用次数最少"""
     used = _used()
-    best = min(SALES_POINTS, key=lambda p: len(used.get(p["id"], [])))
-    return best
+    fit = TEMPLATE_FIT.get(template_id)
+    pool = [p for p in SALES_POINTS if (not fit or p["id"] in fit)] or SALES_POINTS
+    return min(pool, key=lambda p: len(used.get(p["id"], [])))
 
 
 def record_point(point_id: str, tag: str) -> None:
