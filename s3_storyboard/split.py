@@ -48,15 +48,15 @@ SYSTEM_PROMPT = """你是短剧分镜导演。把一个软广脚本拆解成 4-6
    钩子类型可选：冲突质问/数字冲击/悬念/反常识/痛点直击/对比反差/路人疑惑
 3. **全程对白**：每一镜都必须有人说话（禁止静音镜头，旁白也算）
 4. **每镜只有一个人说话**（口型最稳）；两人对话时轮流分到不同镜头；画外音可写"画外"
-5. 相邻镜头景别必须不同（极近特写/近景/中景/全景轮换）
-6. 至少 1 镜展示产品动作（折叠/拎起/放后备箱，用低角度仰拍显质感）
+5. **构图铁律**：所有镜头统一大全景（wide/full shot）——人物全身从头到脚完整入画，人物高度约占画面高度的二分之一，上下留环境空间；不截头、不截脚、不切半身
+6. 至少 1 镜展示产品动作（折叠/拎起/放后备箱），产品与人物同框
 
 【每镜必须输出字段】
 - seq: 镜号（从1开始）
 - duration: 时长秒（2.5-4）
 - purpose: 叙事目的（一句话，如"开场冲突钩子：儿子质问"）
-- shot_size: 景别（极近特写/近景/中景/全景）
-- camera: 机位+运镜（如"手持感微晃，手部特写快速上摇到面部" / "固定近景浅景深" / "低角度仰拍轻微推近"）
+- shot_size: 固定 "大全景"（人物全身占画面高度约1/2）
+- camera: 机位+运镜（大全景内的运动，如"轻微跟随平移" / "固定大全景" / "缓慢推近"）
 - start_state: 起点画面
 - end_state: 终点画面
 - speaker: 说话人（S1=儿子/S2=母亲/画外）
@@ -141,10 +141,11 @@ def split_script(script: str, trend_title: str = "") -> dict:
         if narr_len > dur * 4.5 + 1:
             warnings.append(f"镜{shot.get('seq')}: 台词{narr_len}字超{dur}秒容量({dur * 4.5:.0f}字)")
 
-    # 相邻景别检查
-    for i in range(1, len(shots)):
-        if shots[i].get("shot_size") == shots[i - 1].get("shot_size"):
-            warnings.append(f"镜{shots[i].get('seq')}: 与上一镜景别相同({shots[i].get('shot_size')})")
+    # 构图检查：统一大全景（人物全身占画面高度约1/2）
+    for s in shots:
+        ssize = s.get("shot_size", "")
+        if ssize and "大全景" not in ssize:
+            warnings.append(f"镜{s.get('seq')}: 景别非大全景({ssize})—构图铁律要求统一大全景")
 
     # 开场冲突检查
     first_purpose = shots[0].get("purpose", "") if shots else ""

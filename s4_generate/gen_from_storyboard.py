@@ -31,8 +31,13 @@ HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating t
 
 PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩写成 MiniMax H3 三段式提示词。
 
+【构图铁律（2026-09-23 定，所有镜头统一）】
+每镜 integrated_multimodal_description 的镜头语言必须以大全景构图描述开头，固定句式用英文表达：
+"Wide shot (full shot), camera at a medium-far distance: the person's COMPLETE body from head to toe is fully visible in frame and occupies about half (50%) of the frame height, natural environment visible above the head and below the feet (vertical 9:16 framing)."
+然后接该镜的运镜/光线/场景描述。人物永远全身入画（不截头、不截脚），人物高度约占画面1/2，上下各留环境空间。
+
 【输出格式（每镜一个字符串，严格三段）】
-integrated_multimodal_description: [Shot N] Live-action documentary drama, <镜头语言：景别/机位/运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a natural pace: <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
+integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a natural pace: <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
 
 overall_soundscape: <具体音效（从 sound_design 扩写），英文>
 
@@ -49,6 +54,7 @@ non_diegetic_music: N/A
    (b) 折叠/展开动作必须落到具体轮椅特征：展开后 "its four small wheels settle onto the ground, the seat frame locks into place"
    (c) 动作描述只用 "unfolds/folds the electric wheelchair frame"，严禁 bicycle/scooter/bike 等词
    (d) 画面里必须能看到轮椅特征（四个小轮/座椅框/扶手），不能只拍一个光秃秃的车架
+   (e) 产品始终在画面内与人物同框（大全景内可见）
 5. 每镜是独立视频（时长给定），动作在时长内完成，不跨镜连续
 6. 数字读法：218→二一八（台词已是中文则原样）
 
