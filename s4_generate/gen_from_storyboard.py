@@ -66,7 +66,11 @@ non_diegetic_music: N/A
    - 多音字按语义读；如需注音，写在 <d> 标签**外**（H3 只朗读 <d> 内文本，注音不能进 <d>）：
      重=zhòng（重量义，如"有多沉/多重zhòng"）；行=xíng（行走）行=háng（行业）；还=hái（还是）；长=cháng（长度）；为=wèi（因为）
    - **品牌收尾**：推荐品牌用"爱优护轻便侠"（品牌名），不报型号数字
-7. 语速 slightly brisk（偏快一点点、咬字清晰，不拖沓）
+7. 语速与节奏 slightly brisk（偏快一点点、咬字清晰，不拖沓）；**即说即停**（宝哥规则）：
+   - 镜头开头：简短准备动作后立刻开口（开头静默 ≤0.5s）
+   - 台词说完立即收尾/定格（结尾静默 ≤0.5s，不要长时间无声空镜）
+   - 句间停顿短促，不拖长音
+   提示词中写明 "starts speaking almost immediately after a brief action, and finishes the line right before the shot ends; short pauses between phrases, no long silences or trailing quiet"
 8. **禁画面字幕（硬要求）**：H3 常把对白"画"成画面内字幕——每镜 integrated 段必须附上：
    "No on-screen text or subtitles anywhere in frame; the dialogue is audio only, never visualized as text."
    （后期统一烧录字幕，生成画面必须无任何文字）
@@ -167,7 +171,72 @@ def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
     return {"seq": seq, "status": "ok", **result}
 
 
+def _probe_silences(video: Path):
+    """silencedetect 解析 → ([(start,end)...], duration)"""
+    import re
+    r = subprocess.run([ffmpeg(), "-i", str(video), "-af", "silencedetect=n=-35dB:d=0.25",
+                        "-f", "null", "-"],
+                       capture_output=True, text=True, errors="replace")
+    text = r.stderr or ""
+    dur = 0.0
+    m = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", text)
+    if m:
+        dur = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+    out, cur = [], None
+    for ln in text.splitlines():
+        m1 = re.search(r"silence_start:\s*(-?[\d.]+)", ln)
+        if m1:
+            cur = max(0.0, float(m1.group(1)))
+        m2 = re.search(r"silence_end:\s*([\d.]+)", ln)
+        if m2 and cur is not None:
+            out.append((cur, float(m2.group(1))))
+            cur = None
+    return out, dur
+
+
+def trim_shot_edges(video: Path, pad: float = 0.15) -> bool:
+    """裁掉镜头头尾静默（保留 pad 秒缓冲；说话间停顿不动）
+
+    宝哥规则 2026-09-23：开头/分镜间/结尾停顿要短，整体节奏流畅。
+    幂等：处理后写 .trimmed 标记，重复调用跳过。
+    """
+    flag = video.with_suffix(".trimmed")
+    if flag.exists():
+        return False
+    silences, dur = _probe_silences(video)
+    if dur <= 0 or not silences:
+        flag.write_text("no-trim")
+        return False
+    keep_start, keep_end = 0.0, dur
+    if silences[0][0] <= 0.08:  # 贴边头部静默
+        keep_start = max(0.0, silences[0][1] - pad)
+    if silences[-1][1] >= dur - 0.08:  # 贴边尾部静默
+        keep_end = min(dur, silences[-1][0] + pad)
+    if keep_start <= 0.05 and keep_end >= dur - 0.05:
+        flag.write_text("no-trim")
+        return False
+    tmp = video.with_name(video.stem + ".trimtmp.mp4")
+    r = subprocess.run([ffmpeg(), "-y", "-ss", f"{keep_start:.3f}", "-to", f"{keep_end:.3f}",
+                        "-i", str(video), "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
+                        "-c:a", "aac", "-b:a", "128k", str(tmp)],
+                       capture_output=True, text=True, errors="replace")
+    if r.returncode == 0 and tmp.exists() and tmp.stat().st_size > 50 * 1024:
+        tmp.replace(video)
+        flag.write_text(f"trimmed {keep_start:.3f}-{keep_end:.3f}")
+        print(f"  ✂ 静默裁剪 {video.name}: {dur:.2f}s → {keep_end - keep_start:.2f}s", flush=True)
+        return True
+    return False
+
+
 def concat_shots(shots: list[dict], out_dir: Path, final_name: str = "final.mp4") -> Path:
+    # 节奏优化：拼接前裁头尾静默（宝哥规则）
+    for s in shots:
+        p = out_dir / "shots" / f"shot_{s['seq']:02d}.mp4"
+        if p.exists():
+            try:
+                trim_shot_edges(p)
+            except Exception as e:
+                print(f"  ⚠ 镜{s['seq']} 静默裁剪失败（跳过）: {str(e)[:80]}", flush=True)
     concat_list = out_dir / "concat.txt"
     concat_list.write_text(
         "\n".join(f"file 'shots/shot_{s['seq']:02d}.mp4'" for s in shots),
