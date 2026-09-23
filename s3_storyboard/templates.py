@@ -164,33 +164,41 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             for s in template["shots"]
         ],
     }
-    try:
-        from lib.ideas import ideas_block
-        user_msg = "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1)
-        ib = ideas_block()
-        if ib:
-            user_msg += "\n\n" + ib
-        out = chat_json([
-            {"role": "system", "content": ADAPT_SYSTEM},
-            {"role": "user", "content": user_msg},
-        ], temperature=0.5, max_tokens=2000)
-        lines = out.get("lines", {})
-        # 校验：字数上限
-        ok = True
-        for s in template["shots"]:
-            seq = str(s["seq"])
-            if seq not in lines:
-                ok = False
-                break
-            max_chars = int(float(s["duration"]) * 4.5)
-            if len(lines[seq]) > max_chars:
-                ok = False
-                break
-        if ok:
-            return {"lines": lines, "reason": out.get("reason", "热点已融入")}
-    except Exception as e:
-        return {"lines": std, "reason": f"改写失败回退标准版: {str(e)[:80]}"}
-    return {"lines": std, "reason": "校验未过，回退标准版"}
+    last_err = ""
+    for attempt in range(1, 4):
+        try:
+            from lib.ideas import ideas_block
+            user_msg = "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1)
+            ib = ideas_block()
+            if ib:
+                user_msg += "\n\n" + ib
+            out = chat_json([
+                {"role": "system", "content": ADAPT_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ], temperature=0.5, max_tokens=2000)
+            lines = out.get("lines", {})
+            # 校验：字数上限
+            ok = True
+            for s in template["shots"]:
+                seq = str(s["seq"])
+                if seq not in lines:
+                    ok = False
+                    last_err = f"缺镜{seq}"
+                    break
+                max_chars = int(float(s["duration"]) * 4.5)
+                if len(lines[seq]) > max_chars:
+                    ok = False
+                    last_err = f"镜{seq}超字数({len(lines[seq])}>{max_chars})"
+                    break
+            if ok:
+                if attempt > 1:
+                    print(f"  ✓ 台词改写第{attempt}次成功", flush=True)
+                return {"lines": lines, "reason": out.get("reason", "热点已融入")}
+            print(f"  ⚠ 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
+        except Exception as e:
+            last_err = str(e)[:80]
+            print(f"  ⚠ 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
+    return {"lines": std, "reason": f"校验未过回退标准版({last_err})"}
 
 
 def to_storyboard(template: dict, lines: dict | None = None,

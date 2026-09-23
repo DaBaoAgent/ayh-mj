@@ -21,8 +21,13 @@ from lib.llm import chat_json
 from lib.tools import ffmpeg
 from s4_generate.autodl_client import generate_video, generate_video_smart
 
-HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating text, letters, "
-        "numbers, stickers, price tags, platform logos, UI elements or QR codes anywhere in frame; "
+HARD = ("CRITICAL — NO ON-SCREEN TEXT: the video must contain absolutely NO text of any kind "
+        "anywhere in any frame — no subtitles, no captions, no on-screen dialogue text, "
+        "no Chinese characters, no floating text, no lower-third graphics, no burned-in words. "
+        "The spoken dialogue exists ONLY as audio and must NEVER be visualized as subtitles, "
+        "captions, speech bubbles or any on-screen text — even when people are talking, "
+        "keep the frame completely text-free. "
+        "Also: render no watermarks, stickers, price tags, platform logos, UI elements or QR codes; "
         "keep the product's own brand lettering exactly as it appears in the reference image; "
         "the product must always keep its exact electric-wheelchair form from the reference images "
         "— four small wheels, seat frame and armrests visible — and must never turn into a bicycle, "
@@ -62,6 +67,9 @@ non_diegetic_music: N/A
      重=zhòng（重量义，如"有多沉/多重zhòng"）；行=xíng（行走）行=háng（行业）；还=hái（还是）；长=cháng（长度）；为=wèi（因为）
    - **品牌收尾**：推荐品牌用"爱优护轻便侠"（品牌名），不报型号数字
 7. 语速 slightly brisk（偏快一点点、咬字清晰，不拖沓）
+8. **禁画面字幕（硬要求）**：H3 常把对白"画"成画面内字幕——每镜 integrated 段必须附上：
+   "No on-screen text or subtitles anywhere in frame; the dialogue is audio only, never visualized as text."
+   （后期统一烧录字幕，生成画面必须无任何文字）
 
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 
