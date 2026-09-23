@@ -63,8 +63,9 @@ def chat(
         "stream": False,
     }
 
-    # 不走系统代理（api.deepseek.com 在 no_proxy 列表里，显式清空更稳）
-    with httpx.Client(timeout=120, proxy=None) as client:
+    # 直连 api.deepseek.com（trust_env=False 真正禁用环境变量代理——此前 proxy=None
+    # 仍会走 HTTPS_PROXY，代理抖动时返回空响应导致"无法解析 JSON"）
+    with httpx.Client(timeout=120, trust_env=False) as client:
         resp = client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
                            headers=headers, json=payload)
         resp.raise_for_status()
