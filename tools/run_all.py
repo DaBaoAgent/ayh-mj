@@ -129,6 +129,17 @@ def run_stage_storyboard(dry: bool = False):
             lines_result = adapt_lines(tpl, hot_title)
             sb = to_storyboard(tpl, lines_result["lines"], job_uid=uid)
             sb["hot_title"] = hot_title
+            # 角色组（宝哥规则：每条新视频换一组角色）——storyboard 阶段定组（审核可见，生成时同组）
+            from lib.cast import _role_group_for
+            rg = _role_group_for(uid)
+            sb["role_group"] = rg["name"]
+            sb["role_group_cast"] = {k: v for k, v in rg.items() if k != "name" and v}
+            # 卖点轮换记录（宝哥规则：每条视频换一个卖点主打）
+            sp = lines_result.get("sales_point")
+            if sp:
+                from lib.products import record_point
+                record_point(sp["id"], uid)
+                sb["sales_point"] = sp
             sb_path = STATE_DIR / f"storyboard_{uid}.json"
             sb_path.write_text(json.dumps(sb, ensure_ascii=False, indent=1), encoding="utf-8")
             update_job(uid, status="storyboard", storyboard=json.dumps(sb, ensure_ascii=False))

@@ -168,6 +168,14 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             for s in template["shots"]
         ],
     }
+    # 卖点轮换（宝哥规则：每条视频换一个卖点主打）
+    from lib.products import next_point, points_block
+    pt = next_point()
+    payload["本期主打卖点（必须围绕它设计核心冲突/台词，不要用已用过的）"] = (
+        f"{pt['name']}：{pt['hook']}")
+    pb = points_block()
+    if pb:
+        payload["卖点轮换规则"] = f"以下卖点已当过主打——本期不要再用：{pb}"
     last_err = ""
     for attempt in range(1, 4):
         try:
@@ -197,12 +205,13 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             if ok:
                 if attempt > 1:
                     print(f"  ✓ 台词改写第{attempt}次成功", flush=True)
-                return {"lines": lines, "reason": out.get("reason", "热点已融入")}
+                return {"lines": lines, "reason": out.get("reason", "热点已融入"),
+                        "sales_point": pt}
             print(f"  ⚠ 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
         except Exception as e:
             last_err = str(e)[:80]
             print(f"  ⚠ 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
-    return {"lines": std, "reason": f"校验未过回退标准版({last_err})"}
+    return {"lines": std, "reason": f"校验未过回退标准版({last_err})", "sales_point": pt}
 
 
 def to_storyboard(template: dict, lines: dict | None = None,
