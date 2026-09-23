@@ -34,6 +34,7 @@ templates = Jinja2Templates(directory=WEBUI_DIR / "templates")
 RUN_STATUS_FILE = STATE_DIR / "run_status.json"
 RUN_PROGRESS_FILE = STATE_DIR / "run_progress.jsonl"
 CONSOLE_STATE_FILE = STATE_DIR / "console.json"
+ENGINE_PID_FILE = STATE_DIR / "engine.pid"
 
 # 6阶段定义
 STAGES = [
@@ -131,15 +132,17 @@ async def api_start():
 
     # 启动全流程引擎（后台进程）
     engine_script = Path(__file__).parent.parent / "tools" / "run_all.py"
-    subprocess.Popen(
+    proc = subprocess.Popen(
         [sys.executable, str(engine_script)],
         cwd=str(Path(__file__).parent.parent),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
     )
+    # 记录 PID（用于真停止）
+    ENGINE_PID_FILE.write_text(str(proc.pid), encoding="utf-8")
 
-    return {"ok": True, "message": "已启动全流程"}
+    return {"ok": True, "message": "已启动全流程", "pid": proc.pid}
 
 
 # ============ Hermes 对话（接入 hermes 内核） ============
@@ -268,12 +271,31 @@ async def api_chat_history():
 
 @app.post("/api/stop")
 async def api_stop():
-    """停止运行"""
+    """停止运行（真停止：kill 引擎进程树 + 更新状态）"""
+    import subprocess
+
+    killed = False
+    if ENGINE_PID_FILE.exists():
+        try:
+            pid = int(ENGINE_PID_FILE.read_text(encoding="utf-8").strip())
+            if sys.platform == "win32":
+                r = subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                                   capture_output=True, timeout=15)
+                killed = r.returncode == 0
+            else:
+                import os as _os
+                import signal
+                _os.kill(pid, signal.SIGTERM)
+                killed = True
+        except (ValueError, ProcessLookupError, subprocess.TimeoutExpired):
+            pass
+        ENGINE_PID_FILE.unlink(missing_ok=True)
+
     status = load_run_status()
     status["running"] = False
-    status["message"] = "已停止"
+    status["message"] = "已停止" if killed else "已停止（引擎进程未找到或已退出）"
     RUN_STATUS_FILE.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
-    return {"ok": True}
+    return {"ok": True, "killed": killed}
 
 @app.get("/api/logs")
 async def api_logs():
@@ -306,10 +328,10 @@ async def api_logs():
 
 @app.get("/api/outputs")
 async def api_outputs(limit: int = 6):
-    """获取最新产出（含缩略图）"""
+    """获取最新产出（含缩略图；递归扫子目录——模板链路产物在 out/<dir>/final*.mp4）"""
     outputs = []
     if OUT_DIR.exists():
-        files = sorted(OUT_DIR.glob("*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
+        files = sorted(OUT_DIR.glob("**/*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
         for f in files[:limit]:
             thumb = THUMBS_DIR / f"{f.stem}.jpg"
             if not thumb.exists():

@@ -50,6 +50,8 @@ def get_video_duration(video_path: str) -> float:
         video_path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(f"ffprobe 失败: {result.stderr[-200:] if result.stderr else video_path}")
     return float(result.stdout.strip())
 
 def get_video_info(video_path: str) -> dict:
@@ -62,4 +64,6 @@ def get_video_info(video_path: str) -> dict:
         video_path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError(f"ffprobe 失败: {result.stderr[-200:] if result.stderr else video_path}")
     return json.loads(result.stdout)

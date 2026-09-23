@@ -112,6 +112,16 @@ CAST_SLOTS = {
 }
 
 CASTING_STATE = ROOT / "state" / "casting_history.json"
+_CASTING_LOCK = None
+
+
+def _get_casting_lock():
+    """并发锁（ThreadPoolExecutor 多线程同时选角时防竞态）"""
+    global _CASTING_LOCK
+    if _CASTING_LOCK is None:
+        import threading
+        _CASTING_LOCK = threading.Lock()
+    return _CASTING_LOCK
 
 
 def _casting_history() -> dict:
@@ -122,33 +132,40 @@ def _casting_history() -> dict:
 
 
 def _pick_from_slot(slot: str, job_key: str = "") -> str:
-    """从槽位池轮换选角（避开上次用过的；同一 job 内同槽位保持一致）"""
+    """从槽位池轮换选角（避开上次用过的；同一 job 内同槽位保持一致）
+
+    线程安全：多线程并发选角（并发生成时）加锁串行化读写。
+    """
     pool = [r for r in CAST_SLOTS.get(slot, [])]
     if not pool:
         raise KeyError(f"未知选角槽位: {slot}（可用: {list(CAST_SLOTS)}）")
     import json
-    hist = _casting_history()
-    # job 级缓存：同一条视频内同槽位保持同一角色
-    jobs = hist.setdefault("_jobs", {})
-    job_hist = jobs.setdefault(job_key or "_adhoc", {})
-    if slot in job_hist:
-        return job_hist[slot]
-    last = hist.get(slot)
-    # 核心卡司优先保持稳定；库角色轮换
-    if slot in ("@elder_female", "@mid_female", "@mid_male") and last in (None, "son", "mother"):
-        pick = pool[0]
-    else:
-        idx = (pool.index(last) + 1) % len(pool) if last in pool else 0
-        pick = pool[idx]
-    hist[slot] = pick
-    job_hist[slot] = pick
-    # 历史只留最近 20 个 job
-    if len(jobs) > 20:
-        for k in list(jobs)[:-20]:
-            jobs.pop(k, None)
-    CASTING_STATE.parent.mkdir(parents=True, exist_ok=True)
-    CASTING_STATE.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
-    return pick
+    with _get_casting_lock():
+        hist = _casting_history()
+        # job 级缓存：同一条视频内同槽位保持同一角色
+        jobs = hist.setdefault("_jobs", {})
+        job_hist = jobs.setdefault(job_key or "_adhoc", {})
+        if slot in job_hist:
+            return job_hist[slot]
+        last = hist.get(slot)
+        # 核心卡司优先保持稳定；库角色轮换
+        if slot in ("@elder_female", "@mid_female", "@mid_male") and last in (None, "son", "mother"):
+            pick = pool[0]
+        else:
+            idx = (pool.index(last) + 1) % len(pool) if last in pool else 0
+            pick = pool[idx]
+        hist[slot] = pick
+        job_hist[slot] = pick
+        # 历史只留最近 20 个 job
+        if len(jobs) > 20:
+            for k in list(jobs)[:-20]:
+                jobs.pop(k, None)
+        CASTING_STATE.parent.mkdir(parents=True, exist_ok=True)
+        # 原子写：临时文件 + rename（防写一半崩溃损坏）
+        tmp = CASTING_STATE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.replace(CASTING_STATE)
+        return pick
 
 
 def cast_shot(shot: dict, job_key: str = "") -> dict:

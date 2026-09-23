@@ -130,8 +130,8 @@ def init_db():
         conn.commit()
 
 def create_job(trend_id: int = None) -> str:
-    """创建新任务，返回uid"""
-    uid = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{trend_id or 0}"
+    """创建新任务，返回uid（微秒级时间戳防同秒碰撞）"""
+    uid = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{trend_id or 0}"
     with connect() as conn:
         conn.execute(
             "INSERT INTO jobs (uid, trend_id, status) VALUES (?, ?, 'pending')",
@@ -140,8 +140,18 @@ def create_job(trend_id: int = None) -> str:
         conn.commit()
     return uid
 
+
+_FIELD_WHITELIST = {
+    "trend_id", "status", "script", "script_word_count", "storyboard", "shots",
+    "video_path", "duration", "covers", "publish_results", "published_at",
+}
+
+
 def update_job(uid: str, **kwargs):
-    """更新任务"""
+    """更新任务（字段白名单校验，防注入与错字）"""
+    bad = set(kwargs) - _FIELD_WHITELIST
+    if bad:
+        raise ValueError(f"update_job 不允许的字段: {bad}（白名单: {sorted(_FIELD_WHITELIST)}）")
     kwargs["updated_at"] = datetime.now().isoformat()
     sets = ", ".join(f"{k} = ?" for k in kwargs)
     with connect() as conn:

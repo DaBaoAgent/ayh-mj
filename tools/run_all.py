@@ -1,10 +1,14 @@
-"""全流程引擎 — 唯一执行入口
+"""全流程引擎 — 唯一执行入口（双模式）
 
-阶段选择：s1_trend → s2_copy → s3_storyboard → s4_generate → s5_compose → s6_publish
+模式（state/console.json 的 "mode" 字段）：
+  · template（新链路）：热点 → 10套模板+选角+音色克隆出片 → 烧字幕 → 发布
+  · legacy（旧链路）：s2 脚本 → split 分镜 → batch_gen → merge(TTS字幕) → 发布
+
 用法：
     python tools/run_all.py                    # 全流程
     python tools/run_all.py --only trend,copy  # 只跑部分阶段（免费验证用）
     python tools/run_all.py --dry              # 演练（不出片不花钱）
+    python tools/run_all.py --mode template    # 强制模板链路
 """
 import argparse
 import json
@@ -17,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import STATE_DIR
-from lib.state import list_jobs
+from lib.state import create_job, list_jobs, update_job
 
 # 状态文件
 RUN_STATUS_FILE = STATE_DIR / "run_status.json"
@@ -33,7 +37,11 @@ CONSOLE_STATE_FILE = STATE_DIR / "console.json"
 def load_console_state() -> dict:
     if CONSOLE_STATE_FILE.exists():
         return json.loads(CONSOLE_STATE_FILE.read_text(encoding="utf-8"))
-    return {"daily_target": 3, "real_publish": False, "real_engage": False}
+    return {"daily_target": 3, "real_publish": False, "real_engage": False, "mode": "legacy"}
+
+
+def console_mode() -> str:
+    return load_console_state().get("mode", "legacy")
 
 
 def log(message: str, level: str = "info"):
@@ -87,11 +95,47 @@ def run_stage_copy(dry: bool = False):
     return True
 
 
+def _latest_hotspot() -> dict | None:
+    """取匹配分最高的热点（模板链路热点绑定用）"""
+    from lib.state import connect
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM trends WHERE matched = 1 ORDER BY score DESC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def run_stage_storyboard(dry: bool = False):
     """阶段3: 智能分镜"""
-    log("🎬 智能分镜...")
-    from s3_storyboard.split import run as sb_run
     target = load_console_state().get("daily_target", 3)
+
+    if console_mode() == "template":
+        log("🎬 模板分镜（10套模板轮换 + 热点绑定）...")
+        from s3_storyboard.templates import adapt_lines, mark_used, pick_template, to_storyboard
+        hot = _latest_hotspot()
+        hot_title = hot["title"] if hot else ""
+        if hot:
+            log(f"  绑定热点：{hot_title[:40]}")
+
+        done = 0
+        for _ in range(max(1, target)):
+            uid = create_job()
+            tpl = pick_template()
+            lines_result = adapt_lines(tpl, hot_title)
+            sb = to_storyboard(tpl, lines_result["lines"], job_uid=uid)
+            sb["hot_title"] = hot_title
+            sb_path = STATE_DIR / f"storyboard_{uid}.json"
+            sb_path.write_text(json.dumps(sb, ensure_ascii=False, indent=1), encoding="utf-8")
+            update_job(uid, status="storyboard", storyboard=json.dumps(sb, ensure_ascii=False))
+            mark_used(tpl["id"])
+            log(f"  ✓ {uid}: {tpl['id']} {tpl['name']}（{lines_result.get('reason', '')[:30]}）")
+            done += 1
+        log(f"✓ 分镜完成：{done} 个任务", "success")
+        return True
+
+    # legacy：旧分镜器
+    log("🎬 智能分镜（legacy）...")
+    from s3_storyboard.split import run as sb_run
     result = sb_run(top=target)
     log(f"✓ 分镜完成：{result.get('processed', 0)} 个任务", "success")
     return True
@@ -99,9 +143,37 @@ def run_stage_storyboard(dry: bool = False):
 
 def run_stage_generate(dry: bool = False):
     """阶段4: H3视频生成"""
-    log(f"🎥 H3 视频生成{'（演练）' if dry else ''}...")
-    from s4_generate.batch_gen import run as gen_run
     target = load_console_state().get("daily_target", 3)
+
+    if console_mode() == "template":
+        log(f"🎥 模板链路出片（选角+音色克隆）{'（演练）' if dry else ''}...")
+        from s4_generate.gen_from_storyboard import run as gen_run
+        jobs = list_jobs("storyboard", limit=target)
+        if not jobs:
+            log("⚠ 没有待生成任务（status=storyboard）", "warning")
+            return True
+        done = 0
+        for job in jobs:
+            sb_path = STATE_DIR / f"storyboard_{job['uid']}.json"
+            if not sb_path.exists():
+                log(f"  ⚠ {job['uid']}: 缺分镜文件，跳过", "warning")
+                continue
+            if dry:
+                log(f"  (演练) {job['uid']}")
+                continue
+            try:
+                final = gen_run(str(sb_path))
+                update_job(job["uid"], status="generate", video_path=str(final))
+                log(f"  ✓ {job['uid']}: {final.name}", "success")
+                done += 1
+            except Exception as e:
+                log(f"  ✗ {job['uid']}: {str(e)[:100]}", "error")
+        log(f"✓ 生成完成：{done}/{len(jobs)}", "success")
+        return True
+
+    # legacy：batch_gen
+    log(f"🎥 H3 视频生成（legacy）{'（演练）' if dry else ''}...")
+    from s4_generate.batch_gen import run as gen_run
     result = gen_run(top=target, dry=dry)
     log(f"✓ 生成完成：{result.get('processed', 0)} 个任务", "success")
     return True
@@ -109,7 +181,39 @@ def run_stage_generate(dry: bool = False):
 
 def run_stage_compose(dry: bool = False):
     """阶段5: 合成烧字幕"""
-    log("🎞️ 合成装配（TTS + 拼接 + 烧字幕）...")
+    if console_mode() == "template":
+        log("🎞️ 模板链路烧字幕...")
+        from s5_compose.burn_subtitles import burn
+        jobs = list_jobs("generate", limit=10)
+        if not jobs:
+            log("⚠ 没有待装配任务", "warning")
+            return True
+        done = 0
+        for job in jobs:
+            sb_path = STATE_DIR / f"storyboard_{job['uid']}.json"
+            video = job.get("video_path")
+            if not video or not Path(video).exists():
+                log(f"  ⚠ {job['uid']}: 缺视频文件", "warning")
+                continue
+            if dry:
+                log(f"  (演练) {job['uid']}")
+                continue
+            try:
+                lines = None
+                if sb_path.exists():
+                    sb = json.loads(sb_path.read_text(encoding="utf-8"))
+                    lines = [s["narration"] for s in sb["shots"]]
+                sub = burn(video, expected_lines=lines)
+                update_job(job["uid"], status="ready", video_path=str(sub))
+                log(f"  ✓ {job['uid']}: {sub.name}", "success")
+                done += 1
+            except Exception as e:
+                log(f"  ✗ {job['uid']}: {str(e)[:100]}", "error")
+        log(f"✓ 装配完成：{done}/{len(jobs)}", "success")
+        return True
+
+    # legacy：TTS+merge
+    log("🎞️ 合成装配（legacy: TTS + 拼接 + 烧字幕）...")
     from s5_compose.merge import merge_job
 
     jobs = list_jobs("generate", limit=10)
@@ -133,9 +237,38 @@ def run_stage_publish(dry: bool = False):
     """阶段6: 发布互动"""
     console = load_console_state()
     real = console.get("real_publish", False)
-    log(f"📤 发布{'（真发）' if real and not dry else '（演练）'}...")
-    # TODO: 接入 PostFlow + Upload-Post
-    log("⚠ 发布模块开发中（s6_publish 待实现）", "warning")
+    real_engage = console.get("real_engage", False)
+    yes = real and not dry
+    log(f"📤 发布{'（真发）' if yes else '（演练）'}...")
+
+    from lib.state import get_job
+    from s6_publish.publish import publish_job
+
+    jobs = list_jobs("ready", limit=5)
+    if not jobs:
+        log("⚠ 没有待发布任务（status=ready）", "warning")
+        return True
+
+    platforms = console.get("publish_platforms") or ["douyin"]
+    done = 0
+    for job in jobs:
+        try:
+            result = publish_job(job["uid"], platforms=platforms, yes=yes)
+            ok = result.get("results", result)
+            log(f"  {'✓' if yes else '(演练)'} {job['uid']}: {str(ok)[:120]}")
+            done += 1
+        except Exception as e:
+            log(f"  ✗ {job['uid']}: {str(e)[:100]}", "error")
+    log(f"✓ 发布流程完成：{done}/{len(jobs)}", "success")
+
+    if real_engage:
+        log("💬 评论区互动（真回复）...")
+        try:
+            from s6_publish.engage import run as engage_run
+            engage_run(demo=not yes)
+            log("✓ 互动完成", "success")
+        except Exception as e:
+            log(f"✗ 互动异常: {str(e)[:100]}", "error")
     return True
 
 
@@ -157,7 +290,7 @@ def run_all(only: list = None, dry: bool = False):
     # 清空进度文件
     RUN_PROGRESS_FILE.write_text("", encoding="utf-8")
 
-    log(f"🏭 轻便侠·AI视频工厂 启动：{' → '.join(stages_to_run)}")
+    log(f"🏭 轻便侠·AI视频工厂 启动（{console_mode()} 模式）：{' → '.join(stages_to_run)}")
     update_status(running=True, stage=stages_to_run[0], progress=0, message="启动中")
 
     for idx, stage in enumerate(stages_to_run):
@@ -191,7 +324,15 @@ def main():
     parser = argparse.ArgumentParser(description="轻便侠·AI视频工厂 全流程引擎")
     parser.add_argument("--only", type=str, help="只运行指定阶段，逗号分隔")
     parser.add_argument("--dry", action="store_true", help="演练模式（不出片不花钱）")
+    parser.add_argument("--mode", type=str, choices=["template", "legacy"],
+                        help="强制运行模式（默认读 console.json）")
     args = parser.parse_args()
+
+    if args.mode:
+        state = load_console_state()
+        state["mode"] = args.mode
+        CONSOLE_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2),
+                                      encoding="utf-8")
 
     only = args.only.split(",") if args.only else None
 

@@ -68,17 +68,42 @@ def mark_used(template_id: str) -> None:
 
 
 ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜头台词（标准版）和一个热点话题。
-你的任务：在【不改镜头结构、不改单镜字数上限】的前提下，把热点话题自然融入台词（融入开场钩子最优先）。
+你的任务：在【不改镜头结构、不改单镜字数上限、不改角色关系】的前提下，把热点话题自然融入台词（融入开场钩子最优先）。
+
+【角色铁律（违反=失败）】
+1. 每个镜头的 speaker 标注了说话人身份——台词必须符合该身份
+2. 禁止改变称呼与角色关系：儿子叫"妈"就是妈，不能把"妈"改成"爷爷"；坐车人是谁就写谁
+3. 热点元素如果与模板角色冲突（如热点讲"爷爷"但模板角色是"母亲"）：
+   - 优先把热点转译为通用表述（"爷爷十年旧轮椅"→"这车用了十年"/"老一辈的旧车"）
+   - 或只绑定数据/事实（"十年"/"后备箱"），不要硬塞新角色
+4. 人称代词（他/她/它）必须与所指角色一致
+5. 改写后通读检查：每句话"谁对谁说"是否通顺合理
 
 规则：
-1. 每镜台词字数必须 ≤ 该镜时长×4.5（如 3 秒 ≤ 13 字）
-2. 如果热点与产品/家庭场景弱相关，只微调开场钩子句（第 1 镜），其余保持原样
-3. 如果热点完全不适用，原样返回（宁可不动）
-4. 台词保持口语、有对抗张力（如原句有）
-5. 数字仍用中文（218→二一八）
-6. 不改变说话人分配
+- 每镜台词字数必须 ≤ 该镜时长×4.5（如 3 秒 ≤ 13 字）
+- 会话自然口语，保持原有对抗张力/情感
+- 数字用中文（218→二一八）
+- 不改变说话人分配
+- 如果热点完全不适用，原样返回（宁可不动）
 
 返回 JSON：{"lines": {"1": "第1镜台词", "2": "...", ...}, "reason": "改写说明一句话"}"""
+
+# 角色引用 → 可读描述（给 LLM 理解角色关系）
+_CAST_READABLE = {
+    "son": "儿子(45岁男)", "son_urgent": "儿子(45岁男,急切)", "son_proud": "儿子(得意)",
+    "mother": "母亲(68岁女,通常坐车人)", "mother_stubborn": "母亲(68岁女,倔强,通常坐车人)",
+    "mother_softening": "母亲(68岁女,松动)", "elder": "邻居大爷(65岁男)",
+    "courier": "快递员(30岁男)", "dog": "宠物狗",
+    "old_wheelchair": "旧轮椅(道具)", "折叠": "折叠新轮椅(道具)", "正侧": "新轮椅(道具)", "45度": "新轮椅(道具)",
+}
+
+
+def _readable_role(ref: str) -> str:
+    if ref in _CAST_READABLE:
+        return _CAST_READABLE[ref]
+    if ref.startswith("@"):
+        return f"槽位{ref}(轮换演员)"
+    return ref
 
 
 def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> dict:
@@ -95,7 +120,12 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             {"seq": s["seq"], "duration": s["duration"],
              "max_chars": int(int(s["duration"]) * 4.5)
              if isinstance(s["duration"], (int, float)) else int(float(s["duration"]) * 4.5),
-             "speaker": s["speaker"], "line": s["narration"]}
+             "speaker": s["speaker"],
+             "speaker_role": " + ".join(_readable_role(r) for r in s.get("cast_refs", [])
+                                        if not r.startswith("@") and r in _CAST_READABLE)
+             or _readable_role(s["speaker"]),
+             "scene": f"{s.get('start_state', '')} → {s.get('end_state', '')}",
+             "line": s["narration"]}
             for s in template["shots"]
         ],
     }
