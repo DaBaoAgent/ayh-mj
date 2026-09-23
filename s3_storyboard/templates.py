@@ -82,8 +82,13 @@ ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜�
 规则：
 - 每镜台词字数必须 ≤ 该镜时长×4.5（如 3 秒 ≤ 13 字）
 - 会话自然口语，保持原有对抗张力/情感
-- 数字用中文（218→二一八）
+- 数字用中文读音写（218→二幺八，"一"读"幺"；13.8→十三点八）
 - 不改变说话人分配
+- 参考 product_points 把真实卖点自然融入（数字/功能/场景，不硬广）
+- **必须遵循 drama_structure_rules（短剧结构库）创作**：
+  · 前3秒开场有冲突/悬念钩子；单句台词尽量 8-12 字
+  · 有质疑→打脸的反转结构；台词大白话零修饰（拒绝解释性长句）
+  · 禁止与已用创意清单重复的桥段/梗
 - 如果热点完全不适用，原样返回（宁可不动）
 
 返回 JSON：{"lines": {"1": "第1镜台词", "2": "...", ...}, "reason": "改写说明一句话"}"""
@@ -115,6 +120,15 @@ def _product_points() -> str:
         return ""
 
 
+def _drama_rules() -> str:
+    """短剧结构库摘要（爆款结构智能调用：节拍/爽点/台词规则）"""
+    try:
+        from lib.copybook import structure_brief
+        return structure_brief()
+    except Exception:
+        return ""
+
+
 def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> dict:
     """热点融入台词；失败回退标准版"""
     std = {str(s["seq"]): s["narration"] for s in template["shots"]}
@@ -126,6 +140,7 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
         "hot_topic": hotspot_title or hotspot_text[:60],
         "hot_context": hotspot_text[:400],
         "product_points": _product_points(),
+        "drama_structure_rules": _drama_rules(),
         "shots": [
             {"seq": s["seq"], "duration": s["duration"],
              "max_chars": int(int(s["duration"]) * 4.5)
