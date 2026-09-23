@@ -1,6 +1,7 @@
 """轻便侠·AI视频工厂 控制台后端"""
 import asyncio
 import json
+import os
 import sys
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -195,6 +196,12 @@ async def api_chat(request: Request):
     CHAT_LOG_FILE.write_text("", encoding="utf-8")
     _append_chat_history("user", message)
 
+    # 清理 venv 环境变量（hermes 用系统 Python 3.12，继承 venv 的 PYTHONHOME/PYTHONPATH
+    # 会导致 "SRE module mismatch"）
+    env = os.environ.copy()
+    for k in ("PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"):
+        env.pop(k, None)
+
     # 起子进程，输出重定向到文件（不用管道，避免 EPIPE）
     log_fh = open(CHAT_LOG_FILE, "a", encoding="utf-8")
     proc = subprocess.Popen(
@@ -202,6 +209,7 @@ async def api_chat(request: Request):
         cwd=str(Path(__file__).parent.parent),
         stdout=log_fh,
         stderr=subprocess.STDOUT,
+        env=env,
     )
 
     return {"ok": True, "pid": proc.pid, "session_id": sid, "resumed": bool(sid)}
@@ -222,9 +230,10 @@ async def api_chat_stream():
                     pos = f.tell()
                 if new:
                     idle_rounds = 0
-                    # 抓会话 ID（hermes 输出里 "session: <id>" 之类）
+                    # 抓会话 ID（格式：20260923_112925_4ddfd3）
                     import re
-                    m = re.search(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", new)
+                    m = re.search(r"Session:\s+(\S+)", new) or \
+                        re.search(r"--resume\s+(\S+)", new)
                     if m:
                         session = _load_chat_session()
                         if session.get("session_id") != m.group(1):
