@@ -261,6 +261,92 @@ def segments_to_srt(segments: list[dict], srt_path: Path,
     return srt_path
 
 
+def _probe_duration(video: Path) -> float:
+    """ffmpeg 解析时长"""
+    r = subprocess.run([ffmpeg(), "-i", str(video), "-f", "null", "-"],
+                       capture_output=True, text=True, errors="replace")
+    import re
+    m = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", r.stderr or "")
+    if m:
+        return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+    return 0.0
+
+
+def shot_ranges_from_files(shots_dir: Path, n_shots: int) -> list[tuple[float, float]]:
+    """从裁剪后的镜头文件推算拼接时间轴 [(t0, t1), ...]"""
+    t = 0.0
+    ranges = []
+    for i in range(1, n_shots + 1):
+        p = shots_dir / f"shot_{i:02d}.mp4"
+        d = _probe_duration(p) if p.exists() else 0.0
+        ranges.append((t, t + d))
+        t += d
+    return ranges
+
+
+def segments_to_srt_by_shots(segments: list[dict], ranges: list[tuple[float, float]],
+                             expected_lines: list[str], max_chars: int = 10) -> list[tuple[float, float, str]]:
+    """按镜头时间轴精确对齐字幕（比 whisper 话轮分段准）
+
+    - 每镜台词拆行（≤max_chars、去标点、数字化）
+    - 镜内语音窗口：优先用落在该镜范围内的转写段起止；否则用整镜范围
+    - 行时间：在语音窗口内按字数比例分配
+    """
+    rows: list[tuple[float, float, str]] = []
+    for (t0, t1), line in zip(ranges, expected_lines, strict=False):
+        if t1 <= t0:
+            continue
+        parts = _split_natural(line, max_chars)
+        if not parts:
+            continue
+        segs = [s for s in segments if s.get("end", 0) > t0 + 0.05 and s.get("start", 0) < t1 - 0.05]
+        if segs:
+            win_start = max(t0, min(s["start"] for s in segs)) + 0.05
+            win_end = min(t1, max(s["end"] for s in segs))
+        else:
+            win_start, win_end = t0 + 0.1, t1 - 0.1
+        if win_end - win_start < 0.3:
+            win_start, win_end = t0, t1
+        total = sum(len(p) for p in parts)
+        t = win_start
+        for p in parts:
+            dt = (win_end - win_start) * len(p) / total
+            rows.append((t, min(t + dt, win_end), p))
+            t += dt
+    return rows
+
+
+def burn_by_storyboard(video: str, shots_dir: Path, expected_lines: list[str],
+                       suffix: str = "_sub") -> Path:
+    """按镜头时间轴对齐烧字幕（字幕与对白精准匹配——宝哥规则）"""
+    video_p = Path(video).resolve()
+    n = len(expected_lines)
+    ranges = shot_ranges_from_files(Path(shots_dir), n)
+    segments = transcribe_segments(str(video_p))  # 仍转写（提供镜内语音窗口+日志）
+    rows = segments_to_srt_by_shots(segments, ranges, expected_lines)
+    srt_path = video_p.parent / f"{video_p.stem}.srt"
+    lines = []
+    for i, (start, end, text) in enumerate(rows, 1):
+        lines.append(str(i))
+        lines.append(f"{_srt_ts(start)} --> {_srt_ts(end)}")
+        lines.append(text)
+        lines.append("")
+    srt_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"✓ SRT（按镜头对齐）: {srt_path}（{len(rows)} 条 / {n} 镜）", flush=True)
+    out = video_p.with_name(f"{video_p.stem}{suffix}.mp4")
+    srt_arg = str(srt_path).replace("\\", "/").replace(":", "\\:")
+    vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}'"
+    cmd = [ffmpeg(), "-y", "-i", str(video_p), "-vf", vf,
+           "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
+           "-c:a", "copy", str(out)]
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+    if r.returncode != 0:
+        raise RuntimeError(f"烧字幕失败: {r.stderr[-400:]}")
+    print(f"✓ 成片（带字幕）: {out}", flush=True)
+    return out
+
+
 def burn(video: str, srt: str = None, suffix: str = "_sub",
          expected_lines: list[str] = None) -> Path:
     """烧字幕，返回新文件路径

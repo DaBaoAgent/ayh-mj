@@ -212,7 +212,13 @@ def run_stage_compose(dry: bool = False):
                 if sb_path.exists():
                     sb = json.loads(sb_path.read_text(encoding="utf-8"))
                     lines = [s["narration"] for s in sb["shots"]]
-                sub = burn(video, expected_lines=lines)
+                # 优先"按镜头时间轴对齐"烧录（字幕与对白精准匹配——宝哥规则）
+                shots_dir = Path(video).parent / "shots"
+                if lines and shots_dir.exists():
+                    from s5_compose.burn_subtitles import burn_by_storyboard
+                    sub = burn_by_storyboard(video, shots_dir, lines)
+                else:
+                    sub = burn(video, expected_lines=lines)
                 update_job(job["uid"], status="ready", video_path=str(sub))
                 log(f"  ✓ {job['uid']}: {sub.name}", "success")
                 done += 1
