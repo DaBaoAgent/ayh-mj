@@ -121,8 +121,11 @@ def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
                 if "NO ON-SCREEN TEXT" not in p:
                     p = p.rstrip() + "\n\n" + HARD
                 # 族裔兜底：欧美组角色禁止 Chinese 描述（LLM 惯性照抄模板）
+                # 注意：storyboard 的 cast_refs 是原始核心名（组替换发生在 cast_shot），
+                # 所以以 storyboard 的 role_group 字段判断
                 refs_str = " ".join(s.get("cast_refs", []))
-                if "western_" in refs_str:
+                group_name = str(storyboard.get("role_group", ""))
+                if "western_" in refs_str or "欧美" in group_name:
                     p = (p.replace("Chinese man", "Caucasian man")
                           .replace("Chinese woman", "Caucasian woman")
                           .replace("Chinese person", "Caucasian person"))
