@@ -96,13 +96,18 @@ def run_stage_copy(dry: bool = False):
 
 
 def _latest_hotspot() -> dict | None:
-    """取匹配分最高的热点（模板链路热点绑定用）"""
+    """取匹配分最高且**未用过的**热点（全用过则退回最高分）"""
+    from lib.ideas import used_hotspots
     from lib.state import connect
+    used = used_hotspots()
     with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM trends WHERE matched = 1 ORDER BY score DESC LIMIT 1"
-        ).fetchone()
-        return dict(row) if row else None
+        rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM trends WHERE matched = 1 ORDER BY score DESC LIMIT 20"
+        ).fetchall()]
+    for r in rows:
+        if (r.get("title") or "") not in used:
+            return r
+    return rows[0] if rows else None
 
 
 def run_stage_storyboard(dry: bool = False):
@@ -128,6 +133,10 @@ def run_stage_storyboard(dry: bool = False):
             sb_path.write_text(json.dumps(sb, ensure_ascii=False, indent=1), encoding="utf-8")
             update_job(uid, status="storyboard", storyboard=json.dumps(sb, ensure_ascii=False))
             mark_used(tpl["id"])
+            # 记录已用创意（防重复用点）
+            from lib.ideas import record_idea
+            record_idea(tpl["id"], tpl["name"], hot_title,
+                        lines_result["lines"], lines_result.get("reason", ""))
             log(f"  ✓ {uid}: {tpl['id']} {tpl['name']}（{lines_result.get('reason', '')[:30]}）")
             done += 1
         log(f"✓ 分镜完成：{done} 个任务", "success")

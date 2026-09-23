@@ -45,8 +45,9 @@ def main(dry: bool = False) -> None:
             if not dry:
                 shutil.copy2(src, dst)
             print(f"  ✓ 归档: {name} ({src.stat().st_size / 1024 / 1024:.1f}MB)")
-        # 分镜元数据
-        sb_src = STATE / f"storyboard_{job}.json"
+        # 分镜元数据（state 文件名 = storyboard_<uid>.json，uid 无 gen_ 前缀）
+        uid = job.removeprefix("gen_")
+        sb_src = STATE / f"storyboard_{uid}.json"
         if sb_src.exists():
             sb_dst = APPROVED / sb_name
             if not dry:
