@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from s4_generate.autodl_client import to_data_url, create_task, poll_task, download, BASE_URL
+from s4_generate.autodl_client import create_task, download, poll_task, to_data_url
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out" / "voice_test"

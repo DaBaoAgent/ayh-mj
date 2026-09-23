@@ -12,8 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
-from s4_generate.autodl_client import generate_video
 from lib.tools import ffmpeg
+from s4_generate.autodl_client import generate_video
 
 LIB = ROOT / "assets" / "cast" / "library"
 VOICE = ROOT / "assets" / "cast" / "voice"
@@ -75,7 +75,7 @@ def make_voice_sample(cid: str, line: str) -> dict:
     video = TMP / f"{cid}.mp4"
     TMP.mkdir(parents=True, exist_ok=True)
     if not video.exists() or video.stat().st_size < 100 * 1024:
-        result = generate_video(
+        generate_video(
             prompt=voice_prompt(line, VOICE_TYPE.get(cid, "male_adult")),
             ref_images=[str(LIB / f"{cid}.png")],
             duration=5,

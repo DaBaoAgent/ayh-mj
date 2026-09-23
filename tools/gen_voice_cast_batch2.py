@@ -11,9 +11,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
-from s4_generate.autodl_client import generate_video
+from gen_voice_cast import voice_prompt
+
 from lib.tools import ffmpeg
-from gen_voice_cast import VOICE_HINT, voice_prompt
+from s4_generate.autodl_client import generate_video
 
 LIB = ROOT / "assets" / "cast" / "library"
 CAST = ROOT / "assets" / "cast"
