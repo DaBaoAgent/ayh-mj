@@ -42,7 +42,7 @@ PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩
 运镜只用大全景内轻缓运动（static / gentle pan / slow subtle push），不写特写/推近类运镜。
 
 【输出格式（每镜一个字符串，严格三段）】
-integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a slightly brisk pace (clear articulation, a bit faster than natural) : <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
+integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> <族裔 Caucasian/Asian> <性别> (<S1>) (the appearance MUST exactly match the reference image and this character archive: <从 cast 清单取该角色的 trait/外貌描述>) in <服装>，<动作>，and says <语气描述> at a slightly brisk pace (clear articulation, a bit faster than natural) : <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
 
 overall_soundscape: <具体音效（从 sound_design 扩写），英文>
 
@@ -74,6 +74,10 @@ non_diegetic_music: N/A
 8. **禁画面字幕（硬要求）**：H3 常把对白"画"成画面内字幕——每镜 integrated 段必须附上：
    "No on-screen text or subtitles anywhere in frame; the dialogue is audio only, never visualized as text."
    （后期统一烧录字幕，生成画面必须无任何文字）
+9. **人物外貌规则（硬要求）**：每个人物的族裔/年龄/发型/服装必须从 cast 清单中该角色档案取：
+   - 角色 id 以 western_ 开头（或 region=欧美）→ 必须写 **Caucasian/European**（如 "A 45-year-old Caucasian man with brown hair and grey temples"），**严禁写成 Chinese**
+   - 中国角色 → Chinese
+   - 每镜写 "the appearance must exactly match the reference photo"（参考图优先于文字）
 
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 
@@ -116,6 +120,12 @@ def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
                 # 代码层强制附 HARD 段（LLM 经常漏附——硬约束必须进 H3 提示词）
                 if "NO ON-SCREEN TEXT" not in p:
                     p = p.rstrip() + "\n\n" + HARD
+                # 族裔兜底：欧美组角色禁止 Chinese 描述（LLM 惯性照抄模板）
+                refs_str = " ".join(s.get("cast_refs", []))
+                if "western_" in refs_str:
+                    p = (p.replace("Chinese man", "Caucasian man")
+                          .replace("Chinese woman", "Caucasian woman")
+                          .replace("Chinese person", "Caucasian person"))
                 cleaned[seq] = p
         except RuntimeError as e:
             last_err = e

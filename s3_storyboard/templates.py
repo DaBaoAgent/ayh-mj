@@ -95,9 +95,10 @@ ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜�
   · 禁止与已用创意清单重复的桥段/梗
 - **最后一镜台词必须包含品牌"爱优护轻便侠"**（CTA 硬要求；若超字数就把该镜拆两段：前半回应+后半品牌）
 - 如果热点完全不适用，原样返回（宁可不动）
-- **场景微调（可选字段）**：若某镜台词涉及的动作无法用现有 scene 表达（例：主打"手机遥控"但场景是"拎车甩开"），
-  可输出 `scene_tweaks` 微调该镜动作细节（例："掏出手机轻按，新车自动滑到脚边"）——
-  只改动作细节（start_state/end_state），**不改人数/机位/景别/情绪基调**；不需要就省略
+- **场景微调（可选字段）**：若某镜台词涉及的动作/地点无法用现有 scene 表达，可输出 `scene_tweaks` 微调
+  （例：主打"手机遥控"但场景是"拎车甩开"→改成"掏出手机轻按，新车自动滑到脚边"；
+  或按本期思路**更换场景地点/背景**，如"机场候机楼门口/地铁站口/公园"）——
+  只改动作细节与地点背景（start_state/end_state），**不改人数/机位/景别/情绪基调**；不需要就省略
 - 输出 JSON 可含：`"scene_tweaks": {"2": {"start_state": "…", "end_state": "…"}}`（只列需要改的镜）
 
 返回 JSON：{"lines": {"1": "第1镜台词", "2": "...", ...}, "reason": "改写说明一句话"}"""
@@ -181,6 +182,14 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
     pb = points_block()
     if pb:
         payload["卖点轮换规则"] = f"以下卖点已当过主打——本期不要再用：{pb}"
+    # 叙事思路轮换（宝哥规则：每次都要不同的思路——禁止"旧车换新"反复用）
+    from lib.angles import angles_block, next_angle
+    ang = next_angle()
+    payload["本期叙事思路（必须用这个全新框架重写故事，禁止再用'劝换车/旧车新车对比'套路）"] = (
+        f"{ang['name']}：{ang['dir']}")
+    ab = angles_block()
+    if ab:
+        payload["已用思路（禁止再用）"] = ab
     last_err = ""
     for attempt in range(1, 4):
         try:
@@ -217,7 +226,8 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
                 if attempt > 1:
                     print(f"  ✓ 台词改写第{attempt}次成功", flush=True)
                 return {"lines": lines, "reason": out.get("reason", "热点已融入"),
-                        "sales_point": pt, "scene_tweaks": out.get("scene_tweaks", {}) or {}}
+                        "sales_point": pt, "scene_tweaks": out.get("scene_tweaks", {}) or {},
+                        "angle": ang}
             print(f"  ⚠ 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
         except Exception as e:
             last_err = str(e)[:80]

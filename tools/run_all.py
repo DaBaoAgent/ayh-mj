@@ -149,6 +149,12 @@ def run_stage_storyboard(dry: bool = False):
                 from lib.products import record_point
                 record_point(sp["id"], uid)
                 sb["sales_point"] = sp
+            # 叙事思路记录（宝哥规则：每次不同的思路）
+            ang = lines_result.get("angle")
+            if ang:
+                from lib.angles import record_angle
+                record_angle(ang["id"], uid)
+                sb["angle"] = ang
             sb_path = STATE_DIR / f"storyboard_{uid}.json"
             sb_path.write_text(json.dumps(sb, ensure_ascii=False, indent=1), encoding="utf-8")
             update_job(uid, status="storyboard", storyboard=json.dumps(sb, ensure_ascii=False))
