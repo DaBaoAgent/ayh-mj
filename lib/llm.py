@@ -14,7 +14,15 @@ DEFAULT_MODEL = "deepseek-flash"
 
 
 def _load_key() -> str:
-    """加载 API Key：环境变量优先，回退 hermes .env"""
+    """加载 API Key：统一key文件优先 → 环境变量 → hermes .env（2026-09-23 文件为权威源）"""
+    try:
+        from lib.keyfile import load_from_keyfile
+        k = load_from_keyfile("deepseek")
+        if k:
+            return k
+    except Exception:
+        pass
+
     key = os.environ.get("DEEPSEEK_API_KEY", "")
     if key:
         return key

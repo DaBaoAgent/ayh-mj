@@ -25,13 +25,39 @@ from gen_cast_city_ext import CAST_CITY_EXT  # noqa: E402
 # 已有音色复用的核心角色对照（新角色列表见 CAST_CITY_EXT）
 
 
-def voice_prompt(desc_line: str) -> str:
+# 音色描述（H3 按描述分配音色，避免随机分配不符合角色）
+VOICE_HINT = {
+    "male_adult": "in a clear, masculine adult male voice",
+    "male_mature": "in a deep, steady mature male voice",
+    "male_young": "in a bright young adult male voice",
+    "female_elderly": "in a warm, gentle elderly woman's voice",
+    "female_adult": "in a soft, clear adult woman's voice",
+    "child_girl": "in a bright, lively little girl's voice",
+    "child_boy": "in a playful little boy's voice",
+}
+# 角色 → 音色类型
+VOICE_TYPE = {
+    "city_grandma_70": "female_elderly",
+    "city_grandma_maternal_65": "female_elderly",
+    "city_son_in_law_38": "male_adult",
+    "city_daughter_in_law_32": "female_adult",
+    "city_toddler_girl_5": "child_girl",
+    "city_security_guard_45": "male_mature",
+    "city_delivery_rider_28": "male_young",
+    "city_teacher_woman_42": "female_adult",
+    "city_retired_professor_70": "male_mature",
+    "city_athlete_man_25": "male_young",
+}
+
+
+def voice_prompt(desc_line: str, voice_type: str = "male_adult") -> str:
+    hint = VOICE_HINT.get(voice_type, "in a natural voice")
     return (
         "integrated_multimodal_description: [Shot 1] Live-action documentary close-up, static "
         "camera, natural daylight. The person from the reference image, keeping their exact face, "
-        "hairstyle and clothing, looks slightly off-camera and speaks warmly at a natural pace: "
-        "<d>[Chinese] " + desc_line + "</d> Their lips move in sync; mouth and eyes fully "
-        "unobstructed. Only this person is in frame and only they speak.\n\n"
+        "hairstyle and clothing, looks slightly off-camera and speaks " + hint + " at a natural, "
+        "clear pace: <d>[Chinese] " + desc_line + "</d> Their lips move in sync; mouth and eyes "
+        "fully unobstructed. Only this person is in frame and only they speak.\n\n"
         "overall_soundscape: Quiet outdoor community ambience, the voice is clear and close.\n\n"
         "non_diegetic_music: N/A\n\n"
         "Hard constraints: render no watermarks, subtitles, captions, floating text, letters, "
@@ -48,12 +74,12 @@ def make_voice_sample(cid: str, line: str) -> dict:
     TMP.mkdir(parents=True, exist_ok=True)
     if not video.exists() or video.stat().st_size < 100 * 1024:
         result = generate_video(
-            prompt=voice_prompt(line),
+            prompt=voice_prompt(line, VOICE_TYPE.get(cid, "male_adult")),
             ref_images=[str(LIB / f"{cid}.png")],
             duration=5,
             resolution="768p竖",
             out_path=str(video),
-            workflow="voice_clone",  # zm_u08（无 ref_audio，自然分配音色）
+            workflow="voice_clone",  # zm_u08（无 ref_audio，按音色描述分配）
         )
     # 提取音轨（取中段 4.2s 去头尾）
     cmd = [ffmpeg(), "-y", "-ss", "0.5", "-t", "4.2", "-i", str(video),

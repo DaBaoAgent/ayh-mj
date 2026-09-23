@@ -60,7 +60,14 @@ def _parse_key_file(env_file: Path) -> str:
 
 
 def load_key() -> str:
-    """加载 AUTODL_API_KEY：环境变量 → 已知 .env/文本文件（按优先级）"""
+    """加载 AUTODL_API_KEY：统一key文件优先 → 环境变量 → 已知 .env（2026-09-23 文件为权威源）"""
+    try:
+        from lib.keyfile import load_from_keyfile
+        k = load_from_keyfile("autodl")
+        if k:
+            return k
+    except Exception:
+        pass
     key = os.environ.get("AUTODL_API_KEY", "")
     if key:
         return key
