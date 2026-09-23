@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -40,10 +41,14 @@ def transcribe_segments(video: str) -> list[dict]:
     video_p = Path(video).resolve()
     json_path = video_p.parent / "transcripts" / f"{video_p.stem}.json"
     if not json_path.exists():
+        # 关键：清掉 PYTHONHOME/PYTHONPATH —— uv venv 里它们指向 uv 的 3.11，
+        # 会让系统 Python 3.12 加载错版本 stdlib（SRE module mismatch）
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("PYTHONHOME", "PYTHONPATH", "PYTHONSTARTUP")}
         r = subprocess.run([str(SYS_PYTHON), str(ROOT / "tools" / "transcribe_local.py"),
                             str(video_p)],
                            capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=900)
+                           errors="replace", timeout=900, env=env)
         if not json_path.exists():
             raise RuntimeError(f"转写失败: {r.stdout[-300:]} {r.stderr[-300:]}")
     return json.loads(json_path.read_text(encoding="utf-8"))

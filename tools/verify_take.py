@@ -30,13 +30,15 @@ def transcribe(video_path: str) -> str:
     print("🎧 whisperx 转写中（首次可能下载模型）...", flush=True)
     # whisperx 在系统 Python 3.12 的 Scripts 里；国内走 hf-mirror
     whisperx = r"C:\Users\xxx13\AppData\Local\Programs\Python\Python312\Scripts\whisperx.exe"
-    env = {**os.environ,
-           "HF_ENDPOINT": "https://hf-mirror.com",
-           "HF_HUB_DISABLE_XET": "1"}
+    # 清掉 PYTHONHOME/PYTHONPATH：uv venv 里它们指向 uv 的 3.11，会污染系统 Python（SRE mismatch）
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("PYTHONHOME", "PYTHONPATH", "PYTHONSTARTUP")}
+    env["HF_ENDPOINT"] = "https://hf-mirror.com"
+    env["HF_HUB_DISABLE_XET"] = "1"
     cmd = [whisperx, str(video), "--language", "zh", "--model", "small",
            "--output_dir", str(out_dir), "--output_format", "json"]
     result = subprocess.run(cmd, capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=1800)
+                            encoding="utf-8", errors="replace", timeout=1800, env=env)
 
     if not json_path.exists():
         print("✗ 转写失败：", (result.stderr or result.stdout or "")[-800:], flush=True)
@@ -72,10 +74,8 @@ def main() -> int:
 
     # 打印转录文本预览
     data = json.loads(Path(json_path).read_text(encoding="utf-8"))
-    if isinstance(data, list):
-        text = "".join(seg.get("text", "") for seg in data)
-    else:
-        text = data.get("text", "")
+    text = ("".join(seg.get("text", "") for seg in data) if isinstance(data, list)
+            else data.get("text", ""))
     print(f"\n转录文本: {text[:200]}", flush=True)
 
     return check_take(json_path, expected)
