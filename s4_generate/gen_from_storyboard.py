@@ -113,6 +113,9 @@ def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
                 p = prompts.get(seq, "")
                 if not p or "<d>" not in p:
                     raise RuntimeError(f"镜{seq} 不合格（缺 <d> 或为空）")
+                # 代码层强制附 HARD 段（LLM 经常漏附——硬约束必须进 H3 提示词）
+                if "NO ON-SCREEN TEXT" not in p:
+                    p = p.rstrip() + "\n\n" + HARD
                 cleaned[seq] = p
         except RuntimeError as e:
             last_err = e

@@ -214,6 +214,19 @@ def _split_raw(text: str, max_chars: int = 10) -> list[str]:
     return out
 
 
+def _no_overlap(rows: list[tuple[float, float, str]], gap: float = 0.05) -> list[tuple[float, float, str]]:
+    """防字幕重叠/相接（宝哥规则）：保证 start >= 上一条 end + gap"""
+    out: list[tuple[float, float, str]] = []
+    for start, end, text in rows:
+        s, e = start, end
+        if out and s < out[-1][1] + 0.0005:
+            s = out[-1][1] + gap
+        if e <= s:
+            e = s + 0.2
+        out.append((s, e, text))
+    return out
+
+
 def _explode_rows(segments: list[dict], texts: list[str] | None,
                   max_chars: int = 10) -> list[tuple[float, float, str]]:
     """把每条字幕拆成 ≤max_chars 的行，时间按字数比例分配
@@ -250,7 +263,7 @@ def segments_to_srt(segments: list[dict], srt_path: Path,
         aligned = _try_align(segments, expected_lines)
         if aligned:
             segments, texts = aligned
-    rows = _explode_rows(segments, texts, max_chars=max_chars)
+    rows = _no_overlap(_explode_rows(segments, texts, max_chars=max_chars))
     lines = []
     for i, (start, end, text) in enumerate(rows, 1):
         lines.append(str(i))
@@ -313,7 +326,7 @@ def segments_to_srt_by_shots(segments: list[dict], ranges: list[tuple[float, flo
             dt = (win_end - win_start) * len(p) / total
             rows.append((t, min(t + dt, win_end), p))
             t += dt
-    return rows
+    return _no_overlap(rows)
 
 
 def burn_by_storyboard(video: str, shots_dir: Path, expected_lines: list[str],

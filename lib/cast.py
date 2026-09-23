@@ -162,37 +162,89 @@ def _pick_from_slot(slot: str, job_key: str = "") -> str:
         return pick
 
 
+# ── 角色组轮换（宝哥规则 2026-09-23：每条新视频换一组角色）──
+ROLE_GROUPS = [
+    {"name": "核心卡司", "son": None, "mother": None, "elder": None},
+    {"name": "城市家庭组", "son": "city_dad_50", "mother": "city_mom_45", "elder": "city_grandpa_75"},
+    {"name": "城市邻里组", "son": "city_son_in_law_38", "mother": "city_neighbor_aunt_55",
+     "elder": "city_retired_professor_70"},
+    {"name": "欧美组", "son": "western_dad_45", "mother": "western_mom_40",
+     "elder": "western_grandpa_70"},
+]
+
+
+def _role_group_for(job_key: str) -> dict:
+    """本 job 使用的角色组（同 job 一致；跨 job 轮换；None=用核心卡司本人）"""
+    import json
+    with _CASTING_LOCK:
+        hist = _casting_history()
+        gmap = hist.setdefault("_group_of_job", {})
+        if job_key and job_key in gmap:
+            return ROLE_GROUPS[gmap[job_key] % len(ROLE_GROUPS)]
+        idx = (hist.get("_group_idx", -1) + 1) % len(ROLE_GROUPS)
+        hist["_group_idx"] = idx
+        if job_key:
+            gmap[job_key] = idx
+            if len(gmap) > 20:
+                for k in list(gmap)[:-20]:
+                    gmap.pop(k, None)
+        CASTING_STATE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CASTING_STATE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(hist, ensure_ascii=False, indent=1), encoding="utf-8")
+        tmp.replace(CASTING_STATE)
+        return ROLE_GROUPS[idx]
+
+
+def _apply_role_group(ref: str, group: dict) -> str:
+    """核心卡司引用 → 组内替换（son_urgent→city_dad_50 等；非核心引用不动）"""
+    base = ref.split("_", 1)[0]
+    if base in ("son", "mother", "elder"):
+        repl = group.get(base)
+        if repl:
+            return repl
+    return ref
+
+
 def cast_shot(shot: dict, job_key: str = "") -> dict:
     """为单个镜头做选角：@slot → 具体角色（轮换），cast_refs 与 speaker 同步替换
 
     job_key：同一条视频的标识（同 job 内同槽位选同一角色）。
+    + 角色组轮换（每条新视频换一组角色——宝哥规则）。
     返回替换后的新 shot（不修改原对象）。
     """
     import copy
     import re
     out = copy.deepcopy(shot)
     mapping: dict[str, str] = {}
+    group = _role_group_for(job_key)
 
     def _resolve(slot: str) -> str:
         if slot not in mapping:
             mapping[slot] = _pick_from_slot(slot, job_key)
         return mapping[slot]
 
-    # cast_refs 里的 @slot
+    # cast_refs 里的 @slot + 角色组替换
     new_refs = []
     for ref in out.get("cast_refs", []):
         if ref.startswith("@"):
             new_refs.append(_resolve(ref))
         else:
-            new_refs.append(ref)
+            new_refs.append(_apply_role_group(ref, group))
     out["cast_refs"] = new_refs
 
-    # speaker 里的 @slot（如 "@elder_male" / "@mid_female画外"）
+    # speaker 里的 @slot（如 "@elder_male" / "@mid_female画外"）+ 角色组替换
     sp = out.get("speaker", "")
     for slot in re.findall(r"@[a-z_]+", sp):
         sp = sp.replace(slot, _resolve(slot))
+    for base in ("son", "mother", "elder"):
+        repl = group.get(base)
+        if repl:
+            sp = re.sub(rf"(?<![a-z_]){base}(?![a-z_])", repl, sp)
+            # S1/S2/S3 别名
+            sp = sp.replace({"son": "S1", "mother": "S2", "elder": "S3"}[base], repl)
     out["speaker"] = sp
     out["_cast_mapping"] = mapping
+    out["_role_group"] = group["name"]
     return out
 
 
