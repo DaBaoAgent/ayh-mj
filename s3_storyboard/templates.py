@@ -100,8 +100,10 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
         ],
     }
     try:
-        out = chat_json(ADAPT_SYSTEM,
-                        "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1))
+        out = chat_json([
+            {"role": "system", "content": ADAPT_SYSTEM},
+            {"role": "user", "content": "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1)},
+        ], temperature=0.5, max_tokens=2000)
         lines = out.get("lines", {})
         # 校验：字数上限
         ok = True

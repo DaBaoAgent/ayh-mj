@@ -50,7 +50,8 @@ non_diegetic_music: N/A
 
 def build_prompts(storyboard: dict) -> dict[str, str]:
     """LLM 基于分镜字段生成每镜完整 H3 提示词"""
-    cast_ctx = {k: v["desc"] for k, v in CAST.items()}
+    from lib.cast import cast_menu
+    cast_ctx = cast_menu()
     shots_ctx = []
     for s in storyboard["shots"]:
         shots_ctx.append({
@@ -67,8 +68,10 @@ def build_prompts(storyboard: dict) -> dict[str, str]:
         "shots": shots_ctx,
         "HARD_SECTION": HARD,
     }
-    out = chat_json(PROMPT_SYSTEM,
-                    "分镜数据：\n" + json.dumps(payload, ensure_ascii=False, indent=1))
+    out = chat_json([
+        {"role": "system", "content": PROMPT_SYSTEM},
+        {"role": "user", "content": "分镜数据：\n" + json.dumps(payload, ensure_ascii=False, indent=1)},
+    ], temperature=0.4, max_tokens=4000)
     prompts = out.get("prompts", {})
     # 校验：每镜都有 + 含 <d>
     for s in storyboard["shots"]:

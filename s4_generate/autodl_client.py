@@ -210,7 +210,7 @@ def generate_video(
         "duration": duration,
         "resolution": resolution,
     }
-    for i, img in enumerate(ref_images[:3]):  # v5 上限 9 张，但保守 3 张
+    for i, img in enumerate(ref_images[:5]):  # 工作流支持 9 张，保守 5 张
         payload[f"ref_image_{i}"] = to_data_url(img)
     if ref_audio:
         payload["ref_audio_0"] = to_data_url(ref_audio, resize=False)
