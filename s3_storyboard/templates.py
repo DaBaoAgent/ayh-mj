@@ -106,6 +106,15 @@ def _readable_role(ref: str) -> str:
     return ref
 
 
+def _product_points() -> str:
+    """产品卖点摘要（供文案引用真实参数）"""
+    try:
+        from lib.products import sales_points_brief
+        return sales_points_brief()
+    except Exception:
+        return ""
+
+
 def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> dict:
     """热点融入台词；失败回退标准版"""
     std = {str(s["seq"]): s["narration"] for s in template["shots"]}
@@ -116,6 +125,7 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
         "template": template["name"],
         "hot_topic": hotspot_title or hotspot_text[:60],
         "hot_context": hotspot_text[:400],
+        "product_points": _product_points(),
         "shots": [
             {"seq": s["seq"], "duration": s["duration"],
              "max_chars": int(int(s["duration"]) * 4.5)

@@ -126,19 +126,88 @@ def _try_align(segments: list[dict], expected_lines: list[str]):
     return None
 
 
+def _split_natural(text: str, max_chars: int = 10) -> list[str]:
+    """把一个句子拆成 ≤max_chars 的自然句行（优先按标点，其次硬切）
+
+    规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字（含标点）、尽量自然句。
+    拆行时行首标点清理掉（字幕习惯行末可省标点）。
+    """
+    import re
+    text = text.strip()
+    if not text:
+        return []
+    # ｜/| 为双人台词分隔符 → 强制分句，各句独立处理
+    if "｜" in text or "|" in text:
+        out: list[str] = []
+        for chunk in re.split(r"[｜|]", text):
+            out.extend(_split_natural(chunk, max_chars))
+        return out
+    if len(text) <= max_chars:
+        return [text]
+    # 按标点切分（标点跟随前片段）
+    pieces = re.findall(r"[^，。？！、；：,.?!;:｜|]+[，。？！、；：,.?!;:｜|]*", text) or [text]
+    out: list[str] = []
+    cur = ""
+    for piece in pieces:
+        if len(cur) + len(piece) <= max_chars:
+            cur += piece
+        else:
+            if cur:
+                out.append(cur)
+            # 片段自身超长 → 硬切
+            p = piece
+            while len(p) > max_chars:
+                out.append(p[:max_chars])
+                p = p[max_chars:]
+            cur = p
+    if cur:
+        out.append(cur)
+    # 行首标点清理（"，一只手拎得动。" → "一只手拎得动。"）
+    return [re.sub(r"^[，。？！、；：,.?!;:]+", "", x) for x in out if re.sub(r"^[，。？！、；：,.?!;:]+", "", x)]
+
+
+def _explode_rows(segments: list[dict], texts: list[str] | None,
+                  max_chars: int = 10) -> list[tuple[float, float, str]]:
+    """把每条字幕拆成 ≤max_chars 的行，时间按字数比例分配
+
+    返回 [(start, end, text), ...]，直接写 SRT。
+    """
+    rows: list[tuple[float, float, str]] = []
+    for i, seg in enumerate(segments):
+        text = texts[i].strip() if texts else seg["text"].strip()
+        parts = _split_natural(text, max_chars)
+        if not parts:
+            continue
+        if len(parts) == 1:
+            rows.append((seg["start"], seg["end"], parts[0]))
+            continue
+        total = sum(len(p) for p in parts)
+        t = seg["start"]
+        dur = max(seg["end"] - seg["start"], 0.01)
+        for p in parts:
+            dt = dur * len(p) / total
+            rows.append((t, min(t + dt, seg["end"]), p))
+            t += dt
+    return rows
+
+
 def segments_to_srt(segments: list[dict], srt_path: Path,
-                    expected_lines: list[str] = None) -> Path:
-    """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读/分段的合并对齐）"""
-    lines = []
+                    expected_lines: list[str] = None, max_chars: int = 10) -> Path:
+    """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读/分段的合并对齐）
+
+    字幕规则：一行≤max_chars 字、自然句成行、按字数比例分配时间轴。
+    """
     texts = None
     if expected_lines:
         aligned = _try_align(segments, expected_lines)
         if aligned:
             segments, texts = aligned
-    for i, seg in enumerate(segments, 1):
+    rows = _explode_rows(segments, texts, max_chars=max_chars)
+    lines = []
+    for i, (start, end, text) in enumerate(rows, 1):
         lines.append(str(i))
-        lines.append(f"{_srt_ts(seg['start'])} --> {_srt_ts(seg['end'])}")
-        lines.append(texts[i - 1].strip() if texts else seg["text"])
+        lines.append(f"{_srt_ts(start)} --> {_srt_ts(end)}")
+        lines.append(text)
         lines.append("")
     srt_path.write_text("\n".join(lines), encoding="utf-8")
     return srt_path
