@@ -25,10 +25,10 @@ templates:
     concept: 同一折叠动作魔性重复三次，咔哒节奏，越叠越顺
     hot_slot: "循环次数/节奏卡点可配合热点BGM或梗"
     shots:
-      - {seq: 1, duration: 3, purpose: "钩子：第一折就抓住（节奏感）", shot_size: 近景, camera: "固定机位怼动作，咔哒声同步", start_state: "儿子单手甩开折叠新车", end_state: "车架咔一下立住", speaker: S1画外, narration: "一键折叠。", sound_design: "折叠咔哒声+轻鼓点", cast_refs: [son_urgent], product_ref: 折叠}
-      - {seq: 2, duration: 3, purpose: "魔性重复①（节奏升级）", shot_size: 近景, camera: "同机位同动作，剪辑点卡在咔哒声上", start_state: "车架重新展开", end_state: "再次折上", speaker: S1画外, narration: "再试一次。", sound_design: "折叠咔哒声+鼓点加重", cast_refs: [son_urgent], product_ref: 折叠}
-      - {seq: 3, duration: 3, purpose: "魔性重复②（推近加压）", shot_size: 近景, camera: "轻微推近", start_state: "第三次甩开", end_state: "折上，儿子挑眉看镜头", speaker: S1画外, narration: "还是这么顺。", sound_design: "折叠咔哒声+鼓点收束", cast_refs: [son_urgent], product_ref: 折叠}
-      - {seq: 4, duration: 3, purpose: "收尾卖点+行动引导", shot_size: 中景, camera: "低角度，车滑进后备箱", start_state: "拎起车架", end_state: "滑进后备箱关上", speaker: S1, narration: "二一八，就这么简单。", sound_design: "滑入声+后备箱关合声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 1, duration: 3, purpose: "钩子：第一折就抓住（节奏感）", shot_size: 近景, camera: "固定机位怼动作，咔哒声同步", start_state: "儿子单手甩开折叠新车", end_state: "车架咔一下立住四轮落地", speaker: S1画外, narration: "一键折叠。", sound_design: "折叠咔哒声+轻鼓点", cast_refs: [son_urgent], product_ref: [折叠, 正侧]}
+      - {seq: 2, duration: 3, purpose: "魔性重复①（节奏升级）", shot_size: 近景, camera: "同机位同动作，剪辑点卡在咔哒声上", start_state: "车架重新折叠", end_state: "再次展开四轮落地", speaker: S1画外, narration: "再试一次。", sound_design: "折叠咔哒声+鼓点加重", cast_refs: [son_urgent], product_ref: [折叠, 正侧]}
+      - {seq: 3, duration: 3, purpose: "魔性重复②（推近加压）", shot_size: 近景, camera: "轻微推近", start_state: "第三次操作折叠/展开", end_state: "四轮稳稳落地，儿子挑眉看镜头", speaker: S1画外, narration: "还是这么顺。", sound_design: "折叠咔哒声+鼓点收束", cast_refs: [son_urgent], product_ref: [折叠, 正侧]}
+      - {seq: 4, duration: 3, purpose: "收尾卖点+行动引导", shot_size: 中景, camera: "低角度，车滑进后备箱", start_state: "拎起折叠好的车架", end_state: "滑进后备箱关上", speaker: S1, narration: "二一八，就这么简单。", sound_design: "滑入声+后备箱关合声", cast_refs: [son_urgent], product_ref: [折叠, 正侧]}
 
   # ============ T03 脑洞・反差王者（参照版本D2） ============
   - id: T03

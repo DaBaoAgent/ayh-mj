@@ -24,6 +24,9 @@ from s4_generate.autodl_client import generate_video, to_data_url
 HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating text, letters, "
         "numbers, stickers, price tags, platform logos, UI elements or QR codes anywhere in frame; "
         "keep the product's own brand lettering exactly as it appears in the reference image; "
+        "the product must always keep its exact electric-wheelchair form from the reference images "
+        "— four small wheels, seat frame and armrests visible — and must never turn into a bicycle, "
+        "scooter, motorcycle or any other vehicle; "
         "no background music; everyone keeps complete visual consistency with the reference images.")
 
 PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩写成 MiniMax H3 三段式提示词。
@@ -41,7 +44,11 @@ non_diegetic_music: N/A
 1. 台词逐字放入 <d>[Chinese] ...</d>，<d> 外只写动作/语气，禁止重复台词文字
 2. 单人说话：场景里其他人必须写 "silent, mouth closed" 或 "keeps lips closed"
 3. 说话人+语气：从 narration 的语气和 speaker 推断（如质问→shouts urgently）
-4. 产品出现时写 "keeps its exact shape, color and brand lettering from the reference images"
+4. **产品镜头强制规则**（违反=失败）：
+   (a) 产品外观声明必须写 "keeps its exact electric-wheelchair form from the reference images"
+   (b) 折叠/展开动作必须落到具体轮椅特征：展开后 "its four small wheels settle onto the ground, the seat frame locks into place"
+   (c) 动作描述只用 "unfolds/folds the electric wheelchair frame"，严禁 bicycle/scooter/bike 等词
+   (d) 画面里必须能看到轮椅特征（四个小轮/座椅框/扶手），不能只拍一个光秃秃的车架
 5. 每镜是独立视频（时长给定），动作在时长内完成，不跨镜连续
 6. 数字读法：218→二一八（台词已是中文则原样）
 
@@ -89,6 +96,11 @@ def gen_shot(shot: dict, prompt: str, out_dir: Path) -> dict:
         return {"seq": seq, "status": "cached", "path": str(out_path)}
 
     refs = [str(p) for p in resolve_refs(shot["cast_refs"])]
+    # 产品参考图（product_ref：字符串或数组）——必须传入，否则 H3 会自由发挥
+    product_ref = shot.get("product_ref") or ""
+    if product_ref:
+        pref_list = product_ref if isinstance(product_ref, list) else [product_ref]
+        refs += [str(p) for p in resolve_refs(pref_list)]
     voice = resolve_voice(shot["speaker"])
 
     kwargs = dict(
