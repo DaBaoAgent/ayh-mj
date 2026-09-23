@@ -187,6 +187,7 @@ def run_stage_generate(dry: bool = False):
         if not jobs:
             log("⚠ 没有待生成任务（status=storyboard）", "warning")
             return True
+        concurrency = int(load_console_state().get("gen_concurrency", 6))
         done = 0
         for job in jobs:
             sb_path = STATE_DIR / f"storyboard_{job['uid']}.json"
@@ -197,7 +198,7 @@ def run_stage_generate(dry: bool = False):
                 log(f"  (演练) {job['uid']}")
                 continue
             try:
-                final = gen_run(str(sb_path))
+                final = gen_run(str(sb_path), concurrency=concurrency)
                 update_job(job["uid"], status="generate", video_path=str(final))
                 log(f"  ✓ {job['uid']}: {final.name}", "success")
                 done += 1
@@ -376,8 +377,11 @@ def main():
 
     only = args.only.split(",") if args.only else None
 
+    # 演练模式：CLI --dry 或控制台设置 dry_mode
+    dry = args.dry or bool(load_console_state().get("dry_mode"))
+
     try:
-        success = run_all(only=only, dry=args.dry)
+        success = run_all(only=only, dry=dry)
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         log("⚠ 用户中断", "warning")
