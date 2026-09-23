@@ -31,6 +31,7 @@ APPROVE_LIST = [
     ("gen_job_20260923_224619_868328_0", "T04c_秋分静养_20260923.mp4", "storyboard_T04c.json"),
     ("gen_job_20260923_230005_851075_0", "T01b_旧物安全感_20260923.mp4", "storyboard_T01b.json"),
     ("gen_job_20260923_231804_807115_0", "B1_机场托运_欧美版_20260923.mp4", "storyboard_B1.json"),
+    ("gen_job_20260923_234330_459411_0", "B2_地铁通勤_20260923.mp4", "storyboard_B2.json"),
 ]
 
 

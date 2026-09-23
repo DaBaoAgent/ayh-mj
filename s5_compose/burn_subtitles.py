@@ -161,7 +161,18 @@ def _cn_to_arabic(text: str) -> str:
         return int_part + "." + "".join(d.get(c, c) for c in m.group(2))
     text = re.sub(r"([一二三四五六七八九]?十[一二三四五六七八九]?|[一二三四五六七八九零])点([零一二三四五六七八九]+)",
                   _dec, text)
-    # 2) 含"十"的整数（十年→10年、二十→20、十三→13）
+    # 2a) 百位组合（一百四十五→145、一百→100、两百→200）——必须先于十位处理
+    def _hundred(m):
+        h = d.get(m.group(1), "1") if m.group(1) else "1"
+        rest = m.group(2) or ""
+        tail = _int_cn(rest) if rest else "0"
+        try:
+            return str(int(h) * 100 + int(tail))
+        except ValueError:
+            return m.group(0)
+    text = re.sub(r"([一二三四五六七八九两])?百([一二三四五六七八九]?十[一二三四五六七八九]?)?",
+                  _hundred, text)
+    # 2b) 含"十"的整数（十年→10年、二十→20、十三→13）
     text = re.sub(r"[一二三四五六七八九]?十[一二三四五六七八九]?", lambda m: _int_cn(m.group(0)), text)
     # 3) 含"幺"的号码串（二幺八 → 218）
     text = re.sub(r"[零一二三四五六七八九幺]*幺[零一二三四五六七八九幺]*",
