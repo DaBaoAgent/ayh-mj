@@ -241,7 +241,6 @@ def run_stage_publish(dry: bool = False):
     yes = real and not dry
     log(f"📤 发布{'（真发）' if yes else '（演练）'}...")
 
-    from lib.state import get_job
     from s6_publish.publish import publish_job
 
     jobs = list_jobs("ready", limit=5)

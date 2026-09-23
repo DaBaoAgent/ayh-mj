@@ -12,11 +12,11 @@
   · 每镜仍单人说话（画外音合并写 "S2+S1画外" 保持原样）
 """
 import json
-import re
 from pathlib import Path
 
 sys_path = Path(__file__).resolve().parent.parent
 import sys
+
 sys.path.insert(0, str(sys_path))
 import yaml
 

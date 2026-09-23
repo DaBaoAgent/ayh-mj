@@ -112,16 +112,10 @@ CAST_SLOTS = {
 }
 
 CASTING_STATE = ROOT / "state" / "casting_history.json"
-_CASTING_LOCK = None
 
+import threading as _threading
 
-def _get_casting_lock():
-    """并发锁（ThreadPoolExecutor 多线程同时选角时防竞态）"""
-    global _CASTING_LOCK
-    if _CASTING_LOCK is None:
-        import threading
-        _CASTING_LOCK = threading.Lock()
-    return _CASTING_LOCK
+_CASTING_LOCK = _threading.Lock()
 
 
 def _casting_history() -> dict:
@@ -136,11 +130,11 @@ def _pick_from_slot(slot: str, job_key: str = "") -> str:
 
     线程安全：多线程并发选角（并发生成时）加锁串行化读写。
     """
-    pool = [r for r in CAST_SLOTS.get(slot, [])]
+    pool = list(CAST_SLOTS.get(slot, []))
     if not pool:
         raise KeyError(f"未知选角槽位: {slot}（可用: {list(CAST_SLOTS)}）")
     import json
-    with _get_casting_lock():
+    with _CASTING_LOCK:
         hist = _casting_history()
         # job 级缓存：同一条视频内同槽位保持同一角色
         jobs = hist.setdefault("_jobs", {})
@@ -211,8 +205,8 @@ def resolve_refs(cast_refs: list[str]) -> list[Path]:
       · 产品道具：折叠 / 正侧 / 45度 / old_wheelchair（PROPS）
     """
     people, props_ = [], []
-    for ref in cast_refs:
-        ref = ref.strip()
+    for raw_ref in cast_refs:
+        ref = raw_ref.strip()
         if ref in PROPS:
             props_.append(PROPS[ref])
             continue

@@ -207,7 +207,7 @@ async def api_chat(request: Request):
         env.pop(k, None)
 
     # 起子进程，输出重定向到文件（不用管道，避免 EPIPE）
-    log_fh = open(CHAT_LOG_FILE, "a", encoding="utf-8")
+    log_fh = open(CHAT_LOG_FILE, "a", encoding="utf-8")  # noqa: SIM115  # 文件句柄交给子进程持有
     proc = subprocess.Popen(
         cmd,
         cwd=str(Path(__file__).parent.parent),
@@ -228,7 +228,7 @@ async def api_chat_stream():
         while idle_rounds < 600:  # 最长 10 分钟无输出自动断
             await asyncio.sleep(0.8)
             if CHAT_LOG_FILE.exists():
-                with open(CHAT_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                with open(CHAT_LOG_FILE, encoding="utf-8", errors="replace") as f:
                     f.seek(pos)
                     new = f.read()
                     pos = f.tell()

@@ -28,6 +28,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# 测试/演示脚本允许 print
-"tools/*.py" = ["T201"]
+# 测试/演示脚本允许 print；sys.path.insert(ROOT) 后再 import 是本仓库启动模式
+"tools/*.py" = ["T201", "E402"]
 "s*/run.py" = ["T201"]
+"lib/*.py" = ["E402"]
+"s1_trend/*.py" = ["E402"]
+"s2_copy/*.py" = ["E402"]
+"s3_storyboard/*.py" = ["E402"]
+"s4_generate/*.py" = ["E402"]
+"s5_compose/*.py" = ["E402"]
+"s6_publish/*.py" = ["E402"]
+"webui/*.py" = ["E402"]
+"tests/*.py" = ["E402"]

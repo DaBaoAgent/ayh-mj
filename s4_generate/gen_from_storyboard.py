@@ -16,10 +16,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib.cast import CAST, cast_shot, resolve_refs, resolve_voice
+from lib.cast import cast_shot, resolve_refs, resolve_voice
 from lib.llm import chat_json
 from lib.tools import ffmpeg
-from s4_generate.autodl_client import generate_video, to_data_url
+from s4_generate.autodl_client import generate_video
 
 HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating text, letters, "
         "numbers, stickers, price tags, platform logos, UI elements or QR codes anywhere in frame; "

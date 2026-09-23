@@ -23,9 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib import STATE_DIR
 from lib.llm import chat_json
-from lib.state import connect, update_job, list_jobs
+from lib.state import connect, list_jobs, update_job
 
 # 产品白底图库（用于 H3 参考图）
 PRODUCT_REFS = {
@@ -131,7 +130,7 @@ def split_script(script: str, trend_title: str = "") -> dict:
     # 校验与修复
     shots = data.get("shots", [])
     warnings = []
-    for i, shot in enumerate(shots):
+    for shot in shots:
         # product_ref 合法性
         if shot.get("product_ref") and shot["product_ref"] not in PRODUCT_REFS:
             warnings.append(f"镜{shot.get('seq')}: product_ref 非法已置空")
