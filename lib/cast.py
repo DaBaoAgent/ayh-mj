@@ -317,6 +317,9 @@ def resolve_voice(speaker: str) -> Path | None:
 def _voice_of(token: str) -> Path | None:
     # 核心卡司 S1/S2/S3
     role = {"S1": "son", "S2": "mother", "S3": "elder"}.get(token.upper())
+    # 直接角色名（elder/courier/son/mother/dog）
+    if not role and token.lower() in CAST:
+        role = token.lower()
     if role and role in CAST:
         v = CAST[role].get("voice")
         if v and Path(v).exists():
