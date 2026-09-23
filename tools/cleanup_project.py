@@ -24,6 +24,7 @@ TOOLS = ROOT / "tools"
 APPROVE_LIST = [
     ("gen_job_20260923_203050_696002_0", "T04_路人疑惑三连_20260923.mp4", "storyboard_T04.json"),
     ("gen_job_20260923_211932_580932_0", "T01_母子换车_20260923.mp4", "storyboard_T01.json"),
+    ("gen_job_20260923_214420_385094_0", "T02_魔性循环_20260923.mp4", "storyboard_T02.json"),
 ]
 
 
