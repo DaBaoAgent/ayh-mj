@@ -49,21 +49,51 @@ def transcribe_segments(video: str) -> list[dict]:
     return json.loads(json_path.read_text(encoding="utf-8"))
 
 
+def _clean_for_match(s: str) -> str:
+    """匹配用：去标点/空格/语气词"""
+    import re as _re
+    return _re.sub(r"[，。？！、\s,.?!]", "", s)
+
+
+def _try_align(segments: list[dict], expected_lines: list[str]) -> list[str] | None:
+    """把已知台词对齐到转写段（修同音字）
+
+    1) 条数相同 → 直接换
+    2) 台词多于转写段（H3 常连读短句）→ 相邻合并后相似度校验
+    3) 台词少于转写段 → 放弃（用转写文本）
+    """
+    from difflib import SequenceMatcher
+    n_seg, n_exp = len(segments), len(expected_lines)
+    if n_exp == n_seg:
+        return [line.strip() for line in expected_lines]
+    if n_exp > n_seg and n_seg > 0:
+        # 均匀分组合并（n_exp 句台词 → n_seg 段）
+        groups: list[list[str]] = [[] for _ in range(n_seg)]
+        for i, line in enumerate(expected_lines):
+            groups[min(i * n_seg // n_exp, n_seg - 1)].append(line)
+        merged = ["".join(g) for g in groups]
+        sims = [SequenceMatcher(None, _clean_for_match(seg["text"]),
+                                _clean_for_match(mg)).ratio()
+                for seg, mg in zip(segments, merged, strict=False)]
+        if sum(sims) / n_seg >= 0.35:
+            print(f"✓ 台词合并校正（{n_exp}句→{n_seg}段，相似度{sum(sims)/n_seg:.2f}）", flush=True)
+            return merged
+        print(f"⚠ 合并校正相似度过低（{sum(sims)/n_seg:.2f}），保留转写文本", flush=True)
+    return None
+
+
 def segments_to_srt(segments: list[dict], srt_path: Path,
                     expected_lines: list[str] = None) -> Path:
-    """转写段落 → SRT；expected_lines 提供时用已知台词替换文本（修同音字），时间轴不变"""
+    """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读合并）"""
     lines = []
-    use_expected = bool(expected_lines) and len(expected_lines) == len(segments)
+    texts = None
+    if expected_lines:
+        texts = _try_align(segments, expected_lines)
     for i, seg in enumerate(segments, 1):
         lines.append(str(i))
         lines.append(f"{_srt_ts(seg['start'])} --> {_srt_ts(seg['end'])}")
-        text = expected_lines[i - 1].strip() if use_expected else seg["text"]
-        lines.append(text)
+        lines.append(texts[i - 1].strip() if texts else seg["text"])
         lines.append("")
-    if expected_lines and not use_expected:
-        print(f"⚠ 台词条数({len(expected_lines)})≠转写条数({len(segments)})，用转写文本", flush=True)
-    elif use_expected:
-        print("✓ 已用已知台词校正字幕文本（修同音字）", flush=True)
     srt_path.write_text("\n".join(lines), encoding="utf-8")
     return srt_path
 

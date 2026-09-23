@@ -80,13 +80,17 @@ def build_prompts(storyboard: dict) -> dict[str, str]:
         {"role": "user", "content": "分镜数据：\n" + json.dumps(payload, ensure_ascii=False, indent=1)},
     ], temperature=0.4, max_tokens=4000)
     prompts = out.get("prompts", {})
-    # 校验：每镜都有 + 含 <d>
+    # 校验：每镜都有 + 含 <d>；并清理多余输出（只保留分镜里实际存在的 seq）
+    cleaned = {}
     for s in storyboard["shots"]:
         seq = str(s["seq"])
         p = prompts.get(seq, "")
         if not p or "<d>" not in p:
             raise RuntimeError(f"镜{seq} 提示词生成不合格（缺 <d> 或为空）")
-    return prompts
+        cleaned[seq] = p
+    if len(prompts) > len(cleaned):
+        print(f"  （LLM 多输出 {len(prompts) - len(cleaned)} 条已过滤）", flush=True)
+    return cleaned
 
 
 def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
