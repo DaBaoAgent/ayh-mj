@@ -18,18 +18,18 @@ def find_executable(name: str, known_paths: list[Path] = None) -> str:
     env_path = os.environ.get(f"{name.upper()}_PATH")
     if env_path and Path(env_path).exists():
         return env_path
-    
+
     # 2. PATH
     found = shutil.which(name)
     if found:
         return found
-    
+
     # 3. 已知位置
     for p in (known_paths or []):
         exe = p / f"{name}.exe" if os.name == "nt" else p / name
         if exe.exists():
             return str(exe)
-    
+
     raise FileNotFoundError(f"找不到 {name}，请设置 {name.upper()}_PATH 环境变量或加入 PATH")
 
 def ffmpeg() -> str:

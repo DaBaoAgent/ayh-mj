@@ -23,8 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-from lib import STATE_DIR, CONFIG_DIR
+from lib import STATE_DIR
 from lib.llm import chat_json
 from lib.state import connect, create_job, update_job
 
@@ -60,16 +59,10 @@ def gen_script_for_trend(trend: dict) -> dict:
 
 请写一个电动轮椅软广脚本。"""
 
-    result = chat([
+    data = chat_json([
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_msg},
     ], temperature=0.8, max_tokens=2500)
-
-    text = result.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text
-        text = text.rsplit("```", 1)[0]
-    data = json.loads(text)
 
     # 校验字数
     full_text = data.get("full_text", "")

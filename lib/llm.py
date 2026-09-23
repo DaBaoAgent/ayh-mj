@@ -3,11 +3,11 @@
 模型名（2026-09 实测）：本账号 DeepSeek API 只认 `deepseek-flash` / `deepseek-v4-pro`
 密钥来源优先级：环境变量 → hermes .env 文件
 """
-import os
 import json
-import httpx
+import os
 from pathlib import Path
-from typing import Generator
+
+import httpx
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-flash"
@@ -21,8 +21,8 @@ def _load_key() -> str:
 
     env_file = Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / ".env"
     if env_file.exists():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
+        for raw in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
             if line.startswith("DEEPSEEK_API_KEY="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return ""
@@ -106,15 +106,14 @@ def _extract_json(text: str) -> dict:
                     in_str = True
                 elif ch in "[{":
                     stack.append(ch)
-                elif ch in "]}":
-                    if stack:
-                        stack.pop()
+                elif ch in "]}" and stack:
+                    stack.pop()
         # 未闭合字符串 → 补引号
         if in_str:
             s += '"'
         # 悬空逗号/冒号 → 去掉
         s = s.rstrip()
-        while s.endswith(",") or s.endswith(":"):
+        while s.endswith((",", ":")):
             s = s[:-1].rstrip()
         # 括号栈逆序闭合
         for op in reversed(stack):

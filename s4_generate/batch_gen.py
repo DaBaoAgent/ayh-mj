@@ -16,14 +16,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib import OUT_DIR, ASSETS_DIR
-from lib.state import get_job, update_job, list_jobs, connect
+from lib import ASSETS_DIR, OUT_DIR
+from lib.state import get_job, list_jobs, update_job
 from s3_storyboard.split import PRODUCT_REFS
 from s4_generate.autodl_client import generate_video
 
@@ -156,7 +155,7 @@ def main() -> int:
     parser.add_argument("--concurrency", type=int, default=3, help="并发数")
     args = parser.parse_args()
 
-    result = run(top=args.top, uid=args.uid, dry=args.dry, concurrency=args.concurrency)
+    run(top=args.top, uid=args.uid, dry=args.dry, concurrency=args.concurrency)
     return 0
 
 

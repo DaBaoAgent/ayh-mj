@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
+
 from lib import CONFIG_DIR
 from lib.state import connect
 

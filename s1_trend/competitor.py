@@ -7,13 +7,12 @@
 from __future__ import annotations
 
 import argparse
-import json
-import yaml
-from pathlib import Path
 from typing import Any
 
-from s1_trend.browser import ctx
+import yaml
+
 from lib import CONFIG_DIR
+from s1_trend.browser import ctx
 
 POSTS_JS = """
 async (secUid) => {

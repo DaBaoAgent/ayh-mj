@@ -1,9 +1,7 @@
 """SQLite 状态管理"""
 import sqlite3
-import json
-from pathlib import Path
-from datetime import datetime
 from contextlib import contextmanager
+from datetime import datetime
 
 from . import STATE_DIR
 
@@ -63,40 +61,40 @@ def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
-            
+
             -- 生产任务
             CREATE TABLE IF NOT EXISTS jobs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 uid TEXT NOT NULL UNIQUE,  -- 任务唯一ID
                 trend_id INTEGER REFERENCES trends(id),
                 status TEXT DEFAULT 'pending',
-                
+
                 -- 文案
                 script TEXT,
                 script_word_count INTEGER,
-                
+
                 -- 分镜
                 storyboard TEXT,  -- JSON array
-                
+
                 -- 视频
                 shots TEXT,  -- JSON array, 每个镜头的视频路径
-                
+
                 -- 合成
                 video_path TEXT,
                 duration REAL,
-                
+
                 -- 封面
                 covers TEXT,  -- JSON object {3:4, 4:3, 16:9}
-                
+
                 -- 发布
                 publish_results TEXT,  -- JSON object
-                
+
                 -- 时间
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 published_at TEXT
             );
-            
+
             -- 发布记录
             CREATE TABLE IF NOT EXISTS publishes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,7 +106,7 @@ def init_db():
                 error TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
-            
+
             -- 互动记录
             CREATE TABLE IF NOT EXISTS interactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,7 +120,7 @@ def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 replied_at TEXT
             );
-            
+
             -- 索引
             CREATE INDEX IF NOT EXISTS idx_trends_platform ON trends(platform);
             CREATE INDEX IF NOT EXISTS idx_trends_score ON trends(score DESC);
@@ -145,7 +143,7 @@ def create_job(trend_id: int = None) -> str:
 def update_job(uid: str, **kwargs):
     """更新任务"""
     kwargs["updated_at"] = datetime.now().isoformat()
-    sets = ", ".join(f"{k} = ?" for k in kwargs.keys())
+    sets = ", ".join(f"{k} = ?" for k in kwargs)
     with connect() as conn:
         conn.execute(f"UPDATE jobs SET {sets} WHERE uid = ?", [*kwargs.values(), uid])
         conn.commit()

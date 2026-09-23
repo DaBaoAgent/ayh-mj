@@ -10,14 +10,14 @@ import argparse
 import json
 import sys
 import traceback
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # 添加项目根目录
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from lib import STATE_DIR
-from lib.state import list_jobs, get_stats
+from lib.state import list_jobs
 
 # 状态文件
 RUN_STATUS_FILE = STATE_DIR / "run_status.json"

@@ -13,11 +13,10 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from s1_trend.browser import ctx
 from lib import STATE_DIR
+from s1_trend.browser import ctx
 
 RELEVANCE_KEYS = ["老", "养老", "轮椅", "适老", "父亲", "母亲", "爸妈",
                   "奶奶", "爷爷", "出行", "健康", "医院", "家", "带娃", "孝"]

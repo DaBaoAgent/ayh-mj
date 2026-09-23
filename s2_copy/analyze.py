@@ -47,17 +47,10 @@ def analyze_trend(trend: dict) -> dict:
 点赞：{trend.get('likes', 0)}  评论：{trend.get('comments', 0)}  时长：{trend.get('duration', 0)}秒"""
 
     try:
-        result = chat([
+        data = chat_json([
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_msg},
         ], temperature=0.3, max_tokens=2000)
-
-        # 清理 markdown 代码块包裹
-        text = result.strip()
-        if text.startswith("```"):
-            text = text.split("\n", 1)[1] if "\n" in text else text
-            text = text.rsplit("```", 1)[0]
-        data = json.loads(text)
         return {
             "score": float(data.get("score", 0)),
             "match": bool(data.get("match", False)),
@@ -130,7 +123,7 @@ def main() -> int:
     parser.add_argument("--min-likes", type=int, default=0, help="最低点赞数过滤")
     args = parser.parse_args()
 
-    result = run_analysis(limit=args.limit, min_likes=args.min_likes)
+    run_analysis(limit=args.limit, min_likes=args.min_likes)
     return 0
 
 

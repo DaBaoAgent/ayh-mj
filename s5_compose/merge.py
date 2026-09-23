@@ -20,9 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import OUT_DIR
 from lib.state import get_job, update_job
-from lib.tools import ffmpeg, ffprobe, get_video_duration
-from s5_compose.tts import gen_tts_for_shots, get_audio_duration
-from s5_compose.subtitle import make_srt, cues_from_tts
+from lib.tools import ffmpeg, get_video_duration
+from s5_compose.subtitle import cues_from_tts, make_srt
+from s5_compose.tts import gen_tts_for_shots
 
 TARGET_W, TARGET_H = 1080, 1920
 SUBTITLE_STYLE = (
@@ -149,7 +149,7 @@ def merge_job(uid: str) -> dict:
     concat_list.write_text(
         "\n".join(f"file '{Path(f['path']).name}'" for f in seg_files),
         encoding="utf-8")
-    raw_path = str(workdir / "merged_raw.mp4")
+    str(workdir / "merged_raw.mp4")
     _run([ffmpeg(), "-y", "-f", "concat", "-safe", "0",
           "-i", concat_list.name, "-c", "copy", "merged_raw.mp4"], cwd=str(workdir))
 

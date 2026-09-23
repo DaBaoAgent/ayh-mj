@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import base64
-import json
 import mimetypes
 import os
 import sys
@@ -49,8 +48,8 @@ def load_key() -> str:
         return key
     for env_file in KNOWN_ENV_FILES:
         if env_file.exists():
-            for line in env_file.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
+            for raw in env_file.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
                 if line.startswith("AUTODL_API_KEY="):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
     return ""
@@ -75,8 +74,9 @@ def to_data_url(path_or_url: str, resize: bool = True) -> str:
 
     if resize:
         try:
-            from PIL import Image
             import io
+
+            from PIL import Image
             img = Image.open(p)
             # 透明转白底
             if img.mode in ("RGBA", "LA", "P"):
@@ -172,8 +172,7 @@ def download(url: str, out_path: str, retries: int = 4) -> str:
             with httpx.stream("GET", url, timeout=300, follow_redirects=True) as resp:
                 resp.raise_for_status()
                 with open(tmp, "wb") as f:
-                    for chunk in resp.iter_bytes(chunk_size=1 << 16):
-                        f.write(chunk)
+                    f.writelines(resp.iter_bytes(chunk_size=1 << 16))
             tmp.replace(out)
             return str(out)
         except (httpx.SSLError, httpx.ConnectError, httpx.TimeoutException,

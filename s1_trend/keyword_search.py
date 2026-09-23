@@ -11,15 +11,15 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
-from s1_trend.browser import ctx
 from lib import STATE_DIR
 from lib.state import connect
+from s1_trend.browser import ctx
 
 SORT_MAP = {"general": 0, "new": 1, "likes": 2, "点赞": 2, "综合": 0, "最新": 1}
 SEARCH_URL = "https://www.douyin.com/search/{kw}?type=video&sort_type={st}"
@@ -120,16 +120,12 @@ def search(keyword: str, pages: int = 2, sort: str = "likes",
                 if stagnant >= 3:
                     notes.append("连续 3 轮无新增（可能已到底或被风控）")
                     break
-                try:
+                with contextlib.suppress(Exception):
                     page.mouse.wheel(0, 1800)
-                except Exception:
-                    pass
                 page.wait_for_timeout(delay_ms)
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 c.close()
-            except Exception:
-                pass
 
     # 转换为 trends 格式并入库
     items: list[dict] = []

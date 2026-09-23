@@ -1,0 +1,33 @@
+[project]
+name = "ayh-mj"
+version = "0.1.0"
+description = "轻便侠·AI视频工厂 — 电动轮椅软广视频全自动生产流水线"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = [".venv", "state", "out", "logs", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "PLW", "PIE", "C4"]
+
+ignore = [
+    # 容错设计：流水线单点异常要降级继续，不能全挂（逐处已评估）
+    "BLE001",
+    # try-except-pass 是有意的容错（清理/兜底路径）
+    "S110",
+    # subprocess 手动检查 returncode（业务需要读 stderr 内容，不用 check=True）
+    "PLW1510",
+    # dict()/list() 调用形式是风格偏好
+    "C408",
+    # 老式 Optional[X] 写法全仓一致，不混用 X | None
+    "RUF013",
+    # 长度由 line-length 控制；中文全角标点误报一并忽略
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试/演示脚本允许 print
+"tools/*.py" = ["T201"]
+"s*/run.py" = ["T201"]

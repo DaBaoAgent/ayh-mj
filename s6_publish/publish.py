@@ -22,8 +22,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yaml
+
 from lib import CONFIG_DIR, STATE_DIR
-from lib.state import connect, get_job, update_job, list_jobs
+from lib.state import connect, get_job, list_jobs, update_job
 
 # PostFlow CLI（AutoAYH vendor）
 POSTFLOW_DIR = Path("D:/@kaifa/AutoAYH/pipeline/vendor/postflow")

@@ -21,8 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import STATE_DIR
-from lib.llm import chat, chat_json
-from lib.state import connect, update_job, list_jobs
+from lib.llm import chat
+from lib.state import connect, list_jobs, update_job
 
 # 产品白底图库（用于 H3 参考图，免生图直接可用）
 PRODUCT_REFS = {

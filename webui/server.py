@@ -2,21 +2,21 @@
 import asyncio
 import json
 import sys
-from pathlib import Path
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import AsyncGenerator
+from pathlib import Path
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import uvicorn
 
-from lib import STATE_DIR, OUT_DIR
-from lib.state import get_stats, list_jobs, get_job
+from lib import OUT_DIR, STATE_DIR
+from lib.state import get_job, get_stats, list_jobs
 
 app = FastAPI(title="轻便侠·AI视频工厂")
 
@@ -121,12 +121,12 @@ async def api_settings(request: Request):
 async def api_start():
     """启动全流程"""
     import subprocess
-    
+
     # 检查是否已在运行
     status = load_run_status()
     if status.get("running"):
         return JSONResponse({"error": "已有任务在运行"}, status_code=400)
-    
+
     # 启动全流程引擎（后台进程）
     engine_script = Path(__file__).parent.parent / "tools" / "run_all.py"
     subprocess.Popen(
@@ -136,7 +136,7 @@ async def api_start():
         stderr=subprocess.DEVNULL,
         creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
     )
-    
+
     return {"ok": True, "message": "已启动全流程"}
 
 @app.post("/api/stop")
@@ -156,21 +156,21 @@ async def api_logs():
         while True:
             # 读取进度文件
             if RUN_PROGRESS_FILE.exists():
-                with open(RUN_PROGRESS_FILE, "r", encoding="utf-8") as f:
+                with open(RUN_PROGRESS_FILE, encoding="utf-8") as f:
                     f.seek(last_pos)
                     new_lines = f.readlines()
                     last_pos = f.tell()
-                    
+
                     for line in new_lines:
                         if line.strip():
                             yield f"data: {line.strip()}\n\n"
-            
+
             # 读取运行状态
             status = load_run_status()
             yield f"data: {json.dumps({'type': 'status', 'data': status}, ensure_ascii=False)}\n\n"
-            
+
             await asyncio.sleep(1)
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
@@ -188,6 +188,7 @@ async def api_outputs(limit: int = 6):
             if not thumb.exists():
                 try:
                     import subprocess
+
                     from lib.tools import ffmpeg
                     subprocess.run(
                         [ffmpeg(), "-y", "-ss", "1", "-i", str(f), "-frames:v", "1",

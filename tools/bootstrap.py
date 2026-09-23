@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -117,7 +116,6 @@ def main() -> int:
 
     ok_count = 0
     todo_count = 0
-    fail_count = 0
     for name, fn in checks:
         try:
             ok, msg = fn()

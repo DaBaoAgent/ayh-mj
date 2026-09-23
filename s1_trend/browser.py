@@ -12,6 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import contextlib
+
 from lib import STATE_DIR
 
 PROFILE_DIR = STATE_DIR / "browser-profile"
@@ -115,6 +117,7 @@ def ensure_login() -> bool:
 def qr_login(minutes: int = 10):
     """二维码扫码登录（每 25 秒自动刷新）——窗口可见，供用户扫码"""
     import time
+
     from playwright.sync_api import sync_playwright
 
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
@@ -140,10 +143,8 @@ def qr_login(minutes: int = 10):
             page.wait_for_timeout(3000)
 
             # 点登录按钮
-            try:
+            with contextlib.suppress(Exception):
                 page.click("text=登录", timeout=5000)
-            except Exception:
-                pass
 
             last_refresh = time.time()
             while time.time() < deadline:
