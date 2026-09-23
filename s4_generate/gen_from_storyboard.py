@@ -31,10 +31,10 @@ HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating t
 
 PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩写成 MiniMax H3 三段式提示词。
 
-【构图铁律（2026-09-23 定，所有镜头统一）】
-每镜 integrated_multimodal_description 的镜头语言必须以大全景构图描述开头，固定句式用英文表达：
-"Wide shot (full shot), camera at a medium-far distance: the person's COMPLETE body from head to toe is fully visible in frame and occupies about half (50%) of the frame height, natural environment visible above the head and below the feet (vertical 9:16 framing)."
-然后接该镜的运镜/光线/场景描述。人物永远全身入画（不截头、不截脚），人物高度约占画面1/2，上下各留环境空间。
+【构图（宽严标准：人物全身占画面高度约1/2，允许±30%偏差；重点是叙事与对白，不为构图反复重跑）】
+每镜 integrated_multimodal_description 的镜头语言以大全景描述开头（英文）：
+"Wide shot: camera at a far distance, every person's full body from head to toe fully visible with environment around; each figure occupies roughly half of the frame height."
+运镜只用大全景内轻缓运动（static / gentle pan / slow subtle push），不写特写/推近类运镜。
 
 【输出格式（每镜一个字符串，严格三段）】
 integrated_multimodal_description: [Shot N] Live-action documentary drama, <上述大全景构图描述 + 该镜运镜/光线/场景，英文>。A <年龄> Chinese <性别> (<S1>) in <服装>，<动作>，and says <语气描述> at a natural pace: <d>[Chinese] 台词</d> <说话后的收尾动作+嘴唇闭合声明>。<其他人物：保持安静、嘴唇闭合>。Everyone keeps their exact faces, hairstyles and clothing from the reference images; <产品外观声明>。Only <说话人> speaks; nobody else moves their mouth.
@@ -61,8 +61,8 @@ non_diegetic_music: N/A
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 
 
-def build_prompts(storyboard: dict) -> dict[str, str]:
-    """LLM 基于分镜字段生成每镜完整 H3 提示词"""
+def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
+    """LLM 基于分镜字段生成每镜完整 H3 提示词（不合格自动重试）"""
     from lib.cast import cast_menu
     cast_ctx = cast_menu()
     shots_ctx = []
@@ -81,22 +81,32 @@ def build_prompts(storyboard: dict) -> dict[str, str]:
         "shots": shots_ctx,
         "HARD_SECTION": HARD,
     }
-    out = chat_json([
-        {"role": "system", "content": PROMPT_SYSTEM},
-        {"role": "user", "content": "分镜数据：\n" + json.dumps(payload, ensure_ascii=False, indent=1)},
-    ], temperature=0.4, max_tokens=4000)
-    prompts = out.get("prompts", {})
-    # 校验：每镜都有 + 含 <d>；并清理多余输出（只保留分镜里实际存在的 seq）
-    cleaned = {}
-    for s in storyboard["shots"]:
-        seq = str(s["seq"])
-        p = prompts.get(seq, "")
-        if not p or "<d>" not in p:
-            raise RuntimeError(f"镜{seq} 提示词生成不合格（缺 <d> 或为空）")
-        cleaned[seq] = p
-    if len(prompts) > len(cleaned):
-        print(f"  （LLM 多输出 {len(prompts) - len(cleaned)} 条已过滤）", flush=True)
-    return cleaned
+    last_err = None
+    for attempt in range(1, retries + 1):
+        out = chat_json([
+            {"role": "system", "content": PROMPT_SYSTEM},
+            {"role": "user", "content": "分镜数据：\n" + json.dumps(payload, ensure_ascii=False, indent=1)},
+        ], temperature=0.35, max_tokens=8000)
+        prompts = out.get("prompts", {})
+        # 校验：每镜都有 + 含 <d>；并清理多余输出（只保留分镜里实际存在的 seq）
+        try:
+            cleaned = {}
+            for s in storyboard["shots"]:
+                seq = str(s["seq"])
+                p = prompts.get(seq, "")
+                if not p or "<d>" not in p:
+                    raise RuntimeError(f"镜{seq} 不合格（缺 <d> 或为空）")
+                cleaned[seq] = p
+        except RuntimeError as e:
+            last_err = e
+            print(f"  ⚠ 提示词第{attempt}次不合格（{e}），重试...", flush=True)
+            continue
+        if len(prompts) > len(cleaned):
+            print(f"  （LLM 多输出 {len(prompts) - len(cleaned)} 条已过滤）", flush=True)
+        if attempt > 1:
+            print(f"  ✓ 第{attempt}次重试成功", flush=True)
+        return cleaned
+    raise RuntimeError(f"提示词生成失败（重试{retries}次仍不合格）: {last_err}")
 
 
 def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:

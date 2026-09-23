@@ -17,6 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+import functools
+
 from lib.tools import ffmpeg
 
 # 转写用系统 Python（.venv 无 faster-whisper）
@@ -60,17 +62,19 @@ def _clean_for_match(s: str) -> str:
     return _re.sub(r"[，。？！、\s,.?!]", "", s)
 
 
-def _try_align(segments: list[dict], expected_lines: list[str]) -> list[str] | None:
+def _try_align(segments: list[dict], expected_lines: list[str]):
     """把已知台词对齐到转写段（修同音字）
 
-    1) 条数相同 → 直接换
-    2) 台词多于转写段（H3 常连读短句）→ 相邻合并后相似度校验
-    3) 台词少于转写段 → 放弃（用转写文本）
+    返回 (segments', texts') 或 None；segments' 可能与输入不同（时间轴合并后）。
+
+    1) 条数相同 → 直接换文本
+    2) 台词多于转写段（H3 连读短句）→ 合并台词到 n_seg 段
+    3) 转写多于台词（H3 停顿切分）→ 合并转写段到 n_exp 段（时间轴重排）
     """
     from difflib import SequenceMatcher
     n_seg, n_exp = len(segments), len(expected_lines)
     if n_exp == n_seg:
-        return [line.strip() for line in expected_lines]
+        return segments, [line.strip() for line in expected_lines]
     if n_exp > n_seg and n_seg > 0:
         # 均匀分组合并（n_exp 句台词 → n_seg 段）
         groups: list[list[str]] = [[] for _ in range(n_seg)]
@@ -82,18 +86,55 @@ def _try_align(segments: list[dict], expected_lines: list[str]) -> list[str] | N
                 for seg, mg in zip(segments, merged, strict=False)]
         if sum(sims) / n_seg >= 0.35:
             print(f"✓ 台词合并校正（{n_exp}句→{n_seg}段，相似度{sum(sims)/n_seg:.2f}）", flush=True)
-            return merged
+            return segments, merged
         print(f"⚠ 合并校正相似度过低（{sum(sims)/n_seg:.2f}），保留转写文本", flush=True)
+    if n_seg > n_exp and n_exp > 0:
+        # 转写段多于台词：DP 选最优"保序分组"（哪几段相邻合并），文本用台词
+        clean_segs = [_clean_for_match(s["text"]) for s in segments]
+        clean_exp = [_clean_for_match(line) for line in expected_lines]
+
+        @functools.cache
+        def _dp(i: int, j: int):
+            """segs[i:] → 分成 exp[j:] 组的最小代价（代价 = Σ(1-相似度)）"""
+            if j == n_exp:
+                return (0.0, ()) if i == n_seg else (float("inf"), ())
+            if (n_seg - i) < (n_exp - j):
+                return (float("inf"), ())
+            best = (float("inf"), ())
+            max_k = n_seg - i - (n_exp - j - 1)
+            for k in range(1, max_k + 1):
+                text = "".join(clean_segs[i:i + k])
+                sim = SequenceMatcher(None, text, clean_exp[j]).ratio()
+                cost, rest = _dp(i + k, j + 1)
+                total = (1 - sim) + cost
+                if total < best[0]:
+                    best = (total, ((i, i + k),) + rest)
+            return best
+
+        total_cost, bounds = _dp(0, 0)
+        if bounds and total_cost != float("inf"):
+            avg_sim = 1 - total_cost / n_exp
+            if avg_sim >= 0.35:
+                new_segs = [{
+                    "start": segments[a]["start"],
+                    "end": segments[b - 1]["end"],
+                    "text": "".join(segments[x]["text"] for x in range(a, b)),
+                } for a, b in bounds]
+                print(f"✓ 转写合并校正（{n_seg}段→{n_exp}句，相似度{avg_sim:.2f}）", flush=True)
+                return new_segs, [line.strip() for line in expected_lines]
+            print(f"⚠ 转写合并校正相似度过低（{avg_sim:.2f}），保留转写文本", flush=True)
     return None
 
 
 def segments_to_srt(segments: list[dict], srt_path: Path,
                     expected_lines: list[str] = None) -> Path:
-    """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读合并）"""
+    """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读/分段的合并对齐）"""
     lines = []
     texts = None
     if expected_lines:
-        texts = _try_align(segments, expected_lines)
+        aligned = _try_align(segments, expected_lines)
+        if aligned:
+            segments, texts = aligned
     for i, seg in enumerate(segments, 1):
         lines.append(str(i))
         lines.append(f"{_srt_ts(seg['start'])} --> {_srt_ts(seg['end'])}")

@@ -255,21 +255,31 @@ def _speaks(speaker: str, role: str) -> bool:
 
 
 def neutralize_refs_for_silent(cast_refs: list[str], speaker: str) -> list[str]:
-    """非说话人的角色引用 → quiet 闭嘴版（如有）；情绪图无 quiet 版则降级 neutral
+    """镜头参考图统一处理：构图（full 全身版）+ 口型（非说话人 quiet）
 
-    说话人保持原引用（情绪图驱动表演）；产品/演员库引用不动。
+    优先级：
+      1. {角色}_full.png（如有）——全身构图+闭嘴双满足，说话人与非说话人统一使用
+      2. 非说话人：{角色}_quiet.png（如有）——闭嘴
+      3. 非说话人情绪图 → 降级 neutral（避免带情绪嘴型）
+      4. 其余（说话人情绪图 / 库角色 / 产品）原样保留
     """
     out: list[str] = []
     for ref in cast_refs:
         base = ref.split("_")[0]
-        if base in CAST and not _speaks(speaker, base):
-            if _emo_path(base, "quiet"):
-                out.append(f"{base}_quiet")
+        if base in CAST:
+            # 1) full 全身版优先（构图铁律）
+            if _emo_path(base, "full"):
+                out.append(f"{base}_full")
                 continue
-            # 无 quiet 版：情绪图降级为 neutral（避免带情绪嘴型）
-            if ref != base and ref.split("_", 1)[1] not in ("neutral",):
-                out.append(base)
-                continue
+            if not _speaks(speaker, base):
+                # 2) 非说话人 quiet 闭嘴版
+                if _emo_path(base, "quiet"):
+                    out.append(f"{base}_quiet")
+                    continue
+                # 3) 情绪图降级 neutral
+                if ref != base and ref.split("_", 1)[1] not in ("neutral",):
+                    out.append(base)
+                    continue
         out.append(ref)
     return out
 
