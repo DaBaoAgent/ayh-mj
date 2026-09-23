@@ -607,4 +607,14 @@ async def api_chat_history():
 if __name__ == "__main__":
     print("🏭 轻便侠·AI视频工厂 控制台 v2")
     print("→ http://127.0.0.1:8899")
-    uvicorn.run(app, host="127.0.0.1", port=8899, log_level="info")
+    # reload 模式（默认）：webui/ 下 Python 代码保存后自动重载 ——
+    # 面板里的 Hermes 改完 server.py / hermes_bridge.py 无需重启即可生效，
+    # 且 worker 意外退出时由 reloader 主进程自动复活。
+    # 设 AYH_NO_RELOAD=1 可关闭（调试 reload 本身时用）。
+    if os.environ.get("AYH_NO_RELOAD") == "1":
+        uvicorn.run(app, host="127.0.0.1", port=8899, log_level="info")
+    else:
+        uvicorn.run(
+            "webui.server:app", host="127.0.0.1", port=8899, log_level="info",
+            reload=True, reload_dirs=[str(WEBUI_DIR)],
+        )
