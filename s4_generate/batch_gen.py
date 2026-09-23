@@ -63,13 +63,16 @@ def gen_shot(uid: str, shot: dict, dry: bool = False) -> dict:
         return {"seq": seq, "status": "dry", "prompt": prompt,
                 "ref": shot.get("product_ref"), "duration": duration}
 
+    # 无参考图 → 走文生视频工作流（multi_image 的 ref_image_0 是必填，缺了报"缺少必填参数"）
+    workflow = "multi_image" if ref_images else "text2video"
+
     result = generate_video(
         prompt=prompt,
         ref_images=ref_images,
         duration=duration,
         resolution="768p竖",
         out_path=str(out_path),
-        workflow="multi_image",
+        workflow=workflow,
     )
     return {"seq": seq, "status": "ok", **result}
 
