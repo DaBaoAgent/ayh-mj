@@ -27,6 +27,7 @@ APPROVE_LIST = [
     ("gen_job_20260923_214420_385094_0", "T02_魔性循环_20260923.mp4", "storyboard_T02.json"),
     ("gen_job_20260923_220754_942374_0", "T03_反差王者_20260923.mp4", "storyboard_T03.json"),
     ("gen_job_20260923_221422_559217_0", "T04b_拆车误会_20260923.mp4", "storyboard_T04b.json"),
+    ("gen_job_20260923_223542_194042_0", "T03b_中秋赶集_20260923.mp4", "storyboard_T03b.json"),
 ]
 
 
