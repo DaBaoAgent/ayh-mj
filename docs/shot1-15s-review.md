@@ -1,6 +1,6 @@
 # 15秒对白镜头 — 审核单（第1镜）
 
-> 状态：待老板审核 → 审核通过后出片
+> 状态：✅ 老板已确认（2026-09-23）→ 出片中（工作流 minimax_h3_lightx2v_v5_15s）
 > 生成通道：AutoDL `minimax_h3_lightx2v_v5_15s`（15秒多图工作流，实测可跑通）
 > 音频方案：H3 原生生成对白+口型+现场音效（不做后期配音，无背景音乐）
 
@@ -16,16 +16,16 @@
 | 2 | (S2) 母亲 | 我用十年了，说扔就扔？ | 11 |
 | 3 | (S1) 儿子 | 这个才十三点八公斤，一只手拎得动。 | 17 |
 | 4 | (S2) 母亲 | 花那冤枉钱干嘛。 | 8 |
-| 5 | (S1) 儿子 | 二一八能一键折叠，你先试试。 | 13 |
+| 5 | (S1) 儿子 | 你先试试，一键折叠，塞后备箱就走。 | 15 |
 
-- 总字数 62 / 15秒容量 64.5（4.5字/秒×15−0.6秒余量）= **96% 铺满** ✓
+- 总字数 64 / 15秒容量 64.5（4.5字/秒×15−0.6秒余量）= **99% 铺满** ✓
 - 无阿拉伯数字、无英文夹带；“十三点八”“二一八”均为中文读法 ✓
 - 时轴无重叠：S1→S2→S1→S2→S1 依次交替
 
 ## 二、H3 提示词（官方三段式）
 
 ```
-integrated_multimodal_description: [Shot 1] Live-action documentary style, one continuous steady shot. Autumn afternoon in a Chinese residential community, grey paving tiles, blurred green trees, soft dappled sunlight. A 45-year-old Chinese man (S1) in a black jacket and blue jeans kneels beside a silver-grey lightweight electric wheelchair with red front springs; a 68-year-old Chinese woman (S2) in a plum-red fleece jacket sits in the wheelchair. Both faces stay unobstructed in a medium two-shot and keep their exact faces, hairstyles and clothing from the reference images. The man (S1) says with concern: <d>[Chinese] 妈，这车刹不住了，不能再骑。</d> The woman (S2) replies stubbornly: <d>[Chinese] 我用十年了，说扔就扔？</d> The man (S1) pats the folded frame: <d>[Chinese] 这个才十三点八公斤，一只手拎得动。</d> The woman (S2) mutters: <d>[Chinese] 花那冤枉钱干嘛。</d> The man (S1) unfolds it one-handed: <d>[Chinese] 二一八能一键折叠，你先试试。</d> Speak at a natural, brisk conversational pace with no long pauses. Only one person speaks at a time in this exact order, verbatim: no overlap, no extra words, no omissions, no repetition, no interruption, no invented lines. The wheelchair keeps its exact frame shape, color and brand lettering from the reference image. Camera holds steady, no cuts.
+integrated_multimodal_description: [Shot 1] Live-action documentary style, one continuous steady shot. Autumn afternoon in a Chinese residential community, grey paving tiles, blurred green trees, soft dappled sunlight. A 45-year-old Chinese man (S1) in a black jacket and blue jeans kneels beside a silver-grey lightweight electric wheelchair with red front springs; a 68-year-old Chinese woman (S2) in a plum-red fleece jacket sits in the wheelchair. Both faces stay unobstructed in a medium two-shot and keep their exact faces, hairstyles and clothing from the reference images. The man (S1) says with concern: <d>[Chinese] 妈，这车刹不住了，不能再骑。</d> The woman (S2) replies stubbornly: <d>[Chinese] 我用十年了，说扔就扔？</d> The man (S1) pats the folded frame: <d>[Chinese] 这个才十三点八公斤，一只手拎得动。</d> The woman (S2) mutters: <d>[Chinese] 花那冤枉钱干嘛。</d> The man (S1) unfolds it one-handed: <d>[Chinese] 你先试试，一键折叠，塞后备箱就走。</d> Speak at a natural, brisk conversational pace with no long pauses. Only one person speaks at a time in this exact order, verbatim: no overlap, no extra words, no omissions, no repetition, no interruption, no invented lines. The wheelchair keeps its exact frame shape, color and brand lettering from the reference image. Camera holds steady, no cuts.
 
 overall_soundscape: Quiet residential community ambience: a light breeze through trees, distant birds, faint footsteps on paving tiles, and a soft mechanical click when the wheelchair frame folds. Voices clear and natural outdoors.
 
