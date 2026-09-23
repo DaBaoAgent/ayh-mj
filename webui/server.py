@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -230,17 +231,20 @@ async def api_chat_stream():
                     pos = f.tell()
                 if new:
                     idle_rounds = 0
+                    # 清除 ANSI 转义序列（终端颜色码会让前端显示乱码）
+                    clean = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", new)
+                    clean = clean.replace("\x1b", "")
                     # 抓会话 ID（格式：20260923_112925_4ddfd3）
-                    import re
-                    m = re.search(r"Session:\s+(\S+)", new) or \
-                        re.search(r"--resume\s+(\S+)", new)
+                    m = re.search(r"Session:\s+(\S+)", clean) or \
+                        re.search(r"--resume\s+(\S+)", clean)
                     if m:
                         session = _load_chat_session()
                         if session.get("session_id") != m.group(1):
                             session["session_id"] = m.group(1)
                             _save_chat_session(session)
-                    payload = json.dumps({"type": "chat", "text": new}, ensure_ascii=False)
-                    yield f"data: {payload}\n\n"
+                    if clean:
+                        payload = json.dumps({"type": "chat", "text": clean}, ensure_ascii=False)
+                        yield f"data: {payload}\n\n"
                 else:
                     idle_rounds += 1
         yield f"data: {json.dumps({'type': 'chat_end'})}\n\n"
