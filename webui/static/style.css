@@ -481,6 +481,20 @@ body {
     object-fit: cover;
 }
 
+.output-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 6px;
+    font-size: 10px;
+    color: var(--text-primary);
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
 .output-placeholder {
     grid-column: span 2;
     padding: 40px;

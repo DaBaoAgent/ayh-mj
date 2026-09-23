@@ -44,7 +44,16 @@ def _run(cmd: list[str], cwd: str = None) -> subprocess.CompletedProcess:
 
 def fit_shot(shot_path: str, audio_path: str | None, audio_dur: float,
              out_path: str, workdir: str) -> str:
-    """单镜头：视频对齐音频时长 + 统一规格（1080x1920 30fps）"""
+    """单镜头：视频对齐音频时长 + 统一规格（1080x1920 30fps）
+
+    注意：ffmpeg 以 workdir 为 cwd 运行（避免 Windows 路径转义问题），
+    所以所有输入输出路径先转绝对路径。
+    """
+    shot_path = str(Path(shot_path).resolve())
+    out_path = str(Path(out_path).resolve())
+    if audio_path:
+        audio_path = str(Path(audio_path).resolve())
+
     video_dur = get_video_duration(shot_path)
 
     # 视频对齐到音频时长

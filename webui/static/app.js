@@ -22,9 +22,11 @@ const $$ = (sel) => document.querySelectorAll(sel);
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadState();
+    loadOutputs();
     setupEventListeners();
     startSSE();
     setInterval(loadState, 5000);
+    setInterval(loadOutputs, 30000);
 });
 
 // 加载状态
@@ -271,8 +273,9 @@ async function loadOutputs() {
         }
         
         grid.innerHTML = outputs.map(o => `
-            <div class="output-item" title="${o.name}">
-                <div class="output-name">${o.name}</div>
+            <div class="output-item" title="${escapeHtml(o.name)}">
+                ${o.thumb ? `<img src="${o.thumb}?t=${Date.now()}" alt="${escapeHtml(o.name)}" loading="lazy">` : ''}
+                <div class="output-name">${escapeHtml(o.name)}</div>
             </div>
         `).join('');
     } catch (e) {

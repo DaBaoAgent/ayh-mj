@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib.tools import ffprobe
 
 DEFAULT_VOICE = "zh-CN-YunxiNeural"  # 云希（活力男声，适合软广）
-DEFAULT_RATE = "+8%"
+DEFAULT_RATE = "+35%"                # 抖音快节奏语速（默认语速约4.1字/秒，+35% 后约5.5字/秒）
 
 
 def gen_tts(text: str, out_path: str, voice: str = DEFAULT_VOICE,

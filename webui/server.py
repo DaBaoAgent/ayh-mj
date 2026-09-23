@@ -22,7 +22,10 @@ app = FastAPI(title="轻便侠·AI视频工厂")
 
 # 静态文件和模板
 WEBUI_DIR = Path(__file__).parent
+THUMBS_DIR = STATE_DIR / "thumbs"
+THUMBS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=WEBUI_DIR / "static"), name="static")
+app.mount("/thumbs", StaticFiles(directory=THUMBS_DIR), name="thumbs")
 templates = Jinja2Templates(directory=WEBUI_DIR / "templates")
 
 # 运行状态文件
@@ -176,16 +179,28 @@ async def api_logs():
 
 @app.get("/api/outputs")
 async def api_outputs(limit: int = 6):
-    """获取最新产出"""
+    """获取最新产出（含缩略图）"""
     outputs = []
     if OUT_DIR.exists():
         files = sorted(OUT_DIR.glob("*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
         for f in files[:limit]:
+            thumb = THUMBS_DIR / f"{f.stem}.jpg"
+            if not thumb.exists():
+                try:
+                    import subprocess
+                    from lib.tools import ffmpeg
+                    subprocess.run(
+                        [ffmpeg(), "-y", "-ss", "1", "-i", str(f), "-frames:v", "1",
+                         "-vf", "scale=270:480", str(thumb)],
+                        capture_output=True, timeout=30)
+                except Exception:
+                    pass
             outputs.append({
                 "name": f.stem,
                 "path": str(f),
                 "size": f.stat().st_size,
                 "mtime": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                "thumb": f"/thumbs/{f.stem}.jpg" if thumb.exists() else None,
             })
     return outputs
 
