@@ -39,22 +39,36 @@ RESIZE_MAX_BYTES = 1.5 * 1024 * 1024
 
 # 已知 token 位置
 KNOWN_ENV_FILES = [
+    Path("D:/BaiduSyncdisk/2 @AI编程/Api Key/爱优护api.txt"),  # 最新（2026-09-23 老板更新）
     Path("D:/自动剪辑/AutoDL/scripts/.env"),
     Path("D:/自动剪辑/AutoDL/佳康顺/.env"),
 ]
 
 
+def _parse_key_file(env_file: Path) -> str:
+    """解析两类格式：AUTODL_API_KEY=xxx / 中文标签行+裸key"""
+    import re
+    lines = [ln.strip() for ln in env_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    for line in lines:
+        if line.startswith("AUTODL_API_KEY="):
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    for line in lines:
+        m = re.search(r"([A-Za-z0-9+/=]{30,})", line)
+        if m:
+            return m.group(1).strip("=")
+    return ""
+
+
 def load_key() -> str:
-    """加载 AUTODL_API_KEY：环境变量 → 已知 .env 文件"""
+    """加载 AUTODL_API_KEY：环境变量 → 已知 .env/文本文件（按优先级）"""
     key = os.environ.get("AUTODL_API_KEY", "")
     if key:
         return key
     for env_file in KNOWN_ENV_FILES:
         if env_file.exists():
-            for raw in env_file.read_text(encoding="utf-8").splitlines():
-                line = raw.strip()
-                if line.startswith("AUTODL_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+            k = _parse_key_file(env_file)
+            if k:
+                return k
     return ""
 
 
