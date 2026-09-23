@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 运行状态（不进git）
+state/
+out/
+logs/
+*.log
+
+# 凭据
+.env
+*.key
+secrets/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+_staging_tmp/
+*.tmp
+*.bak

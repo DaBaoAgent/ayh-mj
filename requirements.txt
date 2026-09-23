@@ -1,0 +1,24 @@
+# ayh-mj 依赖
+
+# Web 框架
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+jinja2>=3.1.0
+
+# HTTP 客户端
+httpx[socks]>=0.25.0
+requests>=2.31.0
+
+# 数据处理
+pyyaml>=6.0
+python-multipart>=0.0.6
+
+# TTS
+edge-tts>=6.1.0
+
+# 工具
+keyring>=24.0.0
+python-dotenv>=1.0.0
+
+# 开发
+ruff>=0.1.0

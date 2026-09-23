@@ -1,0 +1,122 @@
+# ayh-mj 流水线配置
+
+# 产品信息
+product:
+  name: "轻便侠218电动轮椅"
+  brand: "爱优护"
+  slogan: "轻便出行，自由生活"
+  keywords:
+    - 电动轮椅
+    - 轻便折叠
+    - 老年代步
+    - 出行辅具
+  assets_dir: "assets/products"
+
+# 热点抓取 (s1)
+trend:
+  platforms:
+    - douyin
+  keywords:
+    - 电动轮椅
+    - 轮椅生活
+    - 适老化
+    - 老年出行
+  competitor_accounts: []  # 同行对标账号 sec_uid
+  pages_per_keyword: 3
+  min_likes: 1000
+
+# 文案生成 (s2)
+copy:
+  model: "deepseek-chat"
+  temperature: 0.7
+  max_tokens: 2000
+  style: "轻快科普风"
+  word_count:
+    min: 150
+    max: 300  # 10-20秒视频对应字数
+
+# 分镜 (s3)
+storyboard:
+  shots_count:
+    min: 4
+    max: 6
+  shot_duration:
+    min: 2
+    max: 5
+  product_shots: 2  # 至少包含产品镜头数
+
+# 视频生成 (s4)
+generate:
+  provider: "autodl"
+  workflow_id: "minimax_h3_lightx2v_v5"
+  resolution: "768p竖"
+  duration: 5  # 每个镜头秒数
+  max_references: 3
+  concurrency: 3
+
+# 合成 (s5)
+compose:
+  tts:
+    provider: "edge-tts"
+    voice: "zh-CN-YunxiNeural"
+    rate: "+10%"
+  subtitle:
+    font: "Microsoft YaHei"
+    font_size: 48
+    color: "white"
+    outline_color: "black"
+    outline_width: 2
+    position: "bottom"
+  output:
+    resolution: "1080x1920"
+    fps: 30
+    codec: "libx264"
+    preset: "veryfast"
+    crf: 23
+
+# 发布 (s6)
+publish:
+  domestic:
+    enabled: true
+    platforms:
+      - douyin
+      - xiaohongshu
+      - shipinhao
+  overseas:
+    enabled: true
+    profile: "xiangge"
+    platforms:
+      - tiktok
+      - youtube
+      - instagram
+      - facebook
+      - telegram
+      - x
+  # 风控
+  daily_limit: 6  # 每平台每日上限
+  min_interval_minutes: 30
+  publish_windows:
+    - start: "07:00"
+      end: "09:00"
+    - start: "12:00"
+      end: "14:00"
+    - start: "18:00"
+      end: "22:00"
+
+# 互动 (s6)
+engage:
+  auto_reply: true
+  max_replies_per_hour: 20
+  reply_cooldown_seconds: 60
+  escalate_keywords:
+    - 价格
+    - 多少钱
+    - 优惠
+    - 投诉
+    - 退款
+
+# 控制台
+webui:
+  host: "127.0.0.1"
+  port: 8899
+  debug: false

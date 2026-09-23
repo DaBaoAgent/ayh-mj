@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轻便侠·AI视频工厂</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- 顶栏 -->
+    <header class="header">
+        <div class="header-left">
+            <span class="logo">🏭</span>
+            <h1>轻便侠·AI视频工厂</h1>
+            <span class="badge">v1.0</span>
+        </div>
+        <div class="header-center">
+            <div class="status-pill" id="statusPill">
+                <span class="status-dot"></span>
+                <span class="status-text">就绪</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-primary" id="btnStart">
+                <span class="btn-icon">⚡</span> 一键启动
+            </button>
+            <button class="btn btn-secondary" id="btnSettings">
+                <span class="btn-icon">⚙</span> 设置
+            </button>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main">
+        <!-- 左侧：流水线 + 产量看板 -->
+        <div class="col-left">
+            <!-- 能量流水线 -->
+            <section class="card pipeline-card">
+                <div class="card-header">
+                    <h2>📊 能量流水线</h2>
+                    <div class="progress-ring" id="progressRing">
+                        <svg viewBox="0 0 100 100">
+                            <circle class="ring-bg" cx="50" cy="50" r="45"/>
+                            <circle class="ring-progress" cx="50" cy="50" r="45" id="ringProgress"/>
+                        </svg>
+                        <div class="ring-text">
+                            <span class="ring-percent" id="ringPercent">0%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="pipeline">
+                    {% for stage in stages %}
+                    <div class="stage" data-stage="{{ stage.id }}">
+                        <div class="stage-node">
+                            <span class="stage-icon">{{ stage.icon }}</span>
+                        </div>
+                        <div class="stage-label">{{ stage.name }}</div>
+                        {% if not loop.last %}
+                        <div class="stage-connector">
+                            <div class="connector-line"></div>
+                            <div class="connector-flow"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="pipeline-info">
+                    <div class="info-item">
+                        <span class="info-label">当前阶段</span>
+                        <span class="info-value" id="currentStage">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">预计剩余</span>
+                        <span class="info-value" id="timeRemaining">-</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 产量看板 -->
+            <section class="card stats-card">
+                <h2>📈 产量看板</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="statTrends">0</div>
+                        <div class="stat-label">热点素材</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statPending">0</div>
+                        <div class="stat-label">待处理</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statReady">0</div>
+                        <div class="stat-label">待发布</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="statPublished">0</div>
+                        <div class="stat-label">已发布</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 中间：Hermes控制台 -->
+        <div class="col-center">
+            <section class="card console-card">
+                <div class="card-header">
+                    <h2>💬 Hermes 控制台</h2>
+                    <button class="btn btn-sm" id="btnClearChat" title="清空对话">🗑️</button>
+                </div>
+                <div class="console-messages" id="consoleMessages">
+                    <div class="message system">
+                        <div class="message-content">
+                            欢迎使用轻便侠·AI视频工厂！点击「一键启动」开始全自动生产。
+                        </div>
+                    </div>
+                </div>
+                <div class="console-input">
+                    <input type="text" id="chatInput" placeholder="输入指令或问题..." />
+                    <button class="btn btn-primary" id="btnSend">发送</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- 右侧：H3引擎状态 -->
+        <div class="col-right">
+            <section class="card engine-card">
+                <h2>🎥 H3引擎状态</h2>
+                <div class="engine-status">
+                    <div class="engine-item">
+                        <span class="engine-label">队列任务</span>
+                        <span class="engine-value" id="engineQueue">0</span>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-label">渲染中</span>
+                        <span class="engine-value" id="engineRendering">0</span>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-label">今日成片</span>
+                        <span class="engine-value" id="engineToday">0</span>
+                    </div>
+                    <div class="engine-item">
+                        <span class="engine-label">预估成本</span>
+                        <span class="engine-value" id="engineCost">¥0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 最新产出 -->
+            <section class="card outputs-card">
+                <h2>🎬 最新产出</h2>
+                <div class="outputs-grid" id="outputsGrid">
+                    <div class="output-placeholder">暂无成片</div>
+                </div>
+            </section>
+
+            <!-- 实时日志 -->
+            <section class="card logs-card">
+                <h2>📋 实时日志</h2>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-item info">系统就绪</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 底栏 -->
+    <footer class="footer">
+        <div class="footer-left">
+            <span>📁 待发队列: <strong id="footerQueue">0</strong> 条</span>
+        </div>
+        <div class="footer-center">
+            <span>🕐 定时任务: <span id="footerCron">未启用</span></span>
+        </div>
+        <div class="footer-right">
+            <span>💰 本月花费: <strong id="footerCost">¥0</strong></span>
+        </div>
+    </footer>
+
+    <!-- 设置弹窗 -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>⚙ 系统设置</h3>
+                <button class="modal-close" id="btnCloseSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <input type="checkbox" id="settingRealPublish" />
+                        <span>真发到平台</span>
+                    </label>
+                    <p class="setting-hint">关闭时只演练不真发</p>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <input type="checkbox" id="settingRealEngage" />
+                        <span>评论/私信维护</span>
+                    </label>
+                    <p class="setting-hint">关闭时只判定不回复</p>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">每日目标</label>
+                    <input type="number" id="settingDailyTarget" min="1" max="20" value="3" />
+                    <p class="setting-hint">每天生产几条成片</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnCancelSettings">取消</button>
+                <button class="btn btn-primary" id="btnSaveSettings">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
