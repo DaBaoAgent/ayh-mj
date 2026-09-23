@@ -84,15 +84,33 @@ non_diegetic_music: N/A
 
 def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
     """LLM 基于分镜字段生成每镜完整 H3 提示词（不合格自动重试）"""
-    from lib.cast import cast_menu
+    import re as _re
+
+    from lib.cast import _apply_role_group, _role_group_for, cast_menu
     cast_ctx = cast_menu()
+    # 角色组替换：给 LLM 看替换后的角色（欧美组→western_* 档案，避免写"中国男性"矛盾）
+    _group = _role_group_for(storyboard.get("job_uid", ""))
+    _core = ("son", "mother", "elder")
+
+    def _grp_text(t: str) -> str:
+        if not _group:
+            return t
+        for b in _core:
+            repl = _group.get(b)
+            if repl:
+                t = _re.sub(rf"(?<![a-z_]){b}(?![a-z_])", repl, t)
+                t = t.replace({"son": "S1", "mother": "S2", "elder": "S3"}[b], repl)
+        return t
+
     shots_ctx = []
     for s in storyboard["shots"]:
         shots_ctx.append({
             "seq": s["seq"], "duration": s["duration"],
             "purpose": s["purpose"], "shot_size": s["shot_size"], "camera": s["camera"],
             "start_state": s["start_state"], "end_state": s["end_state"],
-            "speaker": s["speaker"], "narration": s["narration"],
+            "speaker": _grp_text(s["speaker"]), "narration": s["narration"],
+            "cast_refs": [_apply_role_group(r, _group) if not r.startswith("@") else r
+                          for r in s.get("cast_refs", [])],
             "sound_design": s["sound_design"],
             "has_product": bool(s.get("product_ref")),
         })
