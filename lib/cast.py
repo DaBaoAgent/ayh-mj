@@ -135,23 +135,34 @@ def cast_menu() -> str:
 
 
 def resolve_voice(speaker: str) -> Path | None:
-    """说话人 → 音色样本路径（S1→son, S2→mother, S3→elder…）；找不到返回 None"""
-    if not speaker or "画外" in speaker:
-        # "S2+S1画外" 这类混合取第一个有音色的
-        for token in ("S1", "S2", "S3"):
-            if token in speaker:
-                return _voice_of(token)
+    """说话人 → 音色样本路径
+
+    支持：S1/S2/S3（核心卡司）| library 角色 id（如 city_grandma_70）| 混合取第一个
+    """
+    if not speaker:
         return None
-    return _voice_of(speaker.strip())
+    # 拆出候选 token（"S2+S1画外" / "city_grandma_70" / "S1"）
+    tokens = [t.strip() for t in speaker.replace("画外", "").replace("＋", "+").split("+") if t.strip()]
+    for token in tokens:
+        v = _voice_of(token)
+        if v:
+            return v
+    return None
 
 
 def _voice_of(token: str) -> Path | None:
-    token = token.upper()
-    role = {"S1": "son", "S2": "mother", "S3": "elder"}.get(token)
-    if not role or role not in CAST:
-        return None
-    v = CAST[role].get("voice")
-    return v if v and Path(v).exists() else None
+    # 核心卡司 S1/S2/S3
+    role = {"S1": "son", "S2": "mother", "S3": "elder"}.get(token.upper())
+    if role and role in CAST:
+        v = CAST[role].get("voice")
+        if v and Path(v).exists():
+            return v
+    # 演员库角色 id → voice/<id>.mp3
+    if token in LIBRARY_ROLES:
+        v = VOICE_DIR / f"{token}.mp3"
+        if v.exists():
+            return v
+    return None
 
 
 def missing_assets() -> list[str]:
