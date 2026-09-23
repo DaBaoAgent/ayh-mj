@@ -129,6 +129,15 @@ def _drama_rules() -> str:
         return ""
 
 
+def _bridges() -> str:
+    """桥段库摘要（每日2点cron刷新：短剧桥段/同行爆款/跨赛道爆款）"""
+    try:
+        from lib.copybook import bridges_brief
+        return bridges_brief()
+    except Exception:
+        return ""
+
+
 def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> dict:
     """热点融入台词；失败回退标准版"""
     std = {str(s["seq"]): s["narration"] for s in template["shots"]}
@@ -141,6 +150,7 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
         "hot_context": hotspot_text[:400],
         "product_points": _product_points(),
         "drama_structure_rules": _drama_rules(),
+        "trend_bridges": _bridges(),
         "shots": [
             {"seq": s["seq"], "duration": s["duration"],
              "max_chars": int(int(s["duration"]) * 4.5)
