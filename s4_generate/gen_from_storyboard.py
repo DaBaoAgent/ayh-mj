@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 from lib.cast import cast_shot, resolve_refs, resolve_voice
 from lib.llm import chat_json
 from lib.tools import ffmpeg
-from s4_generate.autodl_client import generate_video
+from s4_generate.autodl_client import generate_video, generate_video_smart
 
 HARD = ("Hard constraints: render no watermarks, subtitles, captions, floating text, letters, "
         "numbers, stickers, price tags, platform logos, UI elements or QR codes anywhere in frame; "
@@ -108,21 +108,25 @@ def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
         refs += [str(p) for p in resolve_refs(pref_list)]
     voice = resolve_voice(shot["speaker"])
 
-    kwargs = dict(
-        prompt=prompt,
-        ref_images=refs,
-        duration=int(float(shot["duration"])),
-        resolution="768p竖",
-        out_path=str(out_path),
-    )
-    if voice:
-        kwargs["ref_audio"] = str(voice)
-        kwargs["workflow"] = "minimax_h3_zm_u08"  # 带音色克隆的工作流
-        print(f"  [镜{seq}] 音色克隆: {voice.name}", flush=True)
+    # 显式指定 workflow 时直连；否则走智能路由（自动选流+失败切换）
+    explicit_wf = shot.get("workflow")
+    if explicit_wf:
+        result = generate_video(
+            prompt=prompt, ref_images=refs,
+            ref_audio=str(voice) if voice else None,
+            duration=int(float(shot["duration"])),
+            resolution="768p竖", out_path=str(out_path), workflow=explicit_wf)
+        result["used_workflow"] = explicit_wf
     else:
-        kwargs["workflow"] = "minimax_h3_lightx2v_v5"
-
-    result = generate_video(**kwargs)
+        if voice:
+            print(f"  [镜{seq}] 音色克隆: {voice.name}", flush=True)
+        result = generate_video_smart(
+            prompt=prompt, ref_images=refs,
+            ref_audio=str(voice) if voice else None,
+            duration=int(float(shot["duration"])),
+            quality=shot.get("quality", "standard"),
+            out_path=str(out_path))
+        print(f"  [镜{seq}] 路由: {result.get('used_workflow')}", flush=True)
     return {"seq": seq, "status": "ok", **result}
 
 
@@ -148,7 +152,8 @@ def concat_shots(shots: list[dict], out_dir: Path, final_name: str = "final.mp4"
     return final
 
 
-def run(storyboard_path: str, skip_prompt_build: bool = False) -> Path:
+def run(storyboard_path: str, skip_prompt_build: bool = False,
+        concurrency: int = 6) -> Path:
     sb = json.loads(Path(storyboard_path).read_text(encoding="utf-8"))
     uid = sb.get("job_uid") or Path(storyboard_path).stem
     out_dir = ROOT / "out" / f"gen_{uid}"
@@ -164,9 +169,9 @@ def run(storyboard_path: str, skip_prompt_build: bool = False) -> Path:
                                 encoding="utf-8")
         print(f"  ✓ {len(prompts)} 镜提示词就绪", flush=True)
 
-    print(f"🎬 逐镜生成（{sb.get('template_name', uid)}）...", flush=True)
+    print(f"🎬 逐镜生成（{sb.get('template_name', uid)}，并发 {concurrency}）...", flush=True)
     results = []
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
         futures = {pool.submit(gen_shot, s, prompts[str(s["seq"])], out_dir / "shots", uid): s
                    for s in sb["shots"]}
         for f in as_completed(futures):

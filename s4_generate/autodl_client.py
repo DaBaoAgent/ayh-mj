@@ -259,6 +259,47 @@ def generate_video(
     }
 
 
+def generate_video_smart(
+    prompt: str,
+    ref_images: list[str] = None,
+    ref_audio: str = None,
+    duration: int = 5,
+    quality: str = "standard",
+    first_last: bool = False,
+    out_path: str = None,
+    on_status=None,
+) -> dict:
+    """智能路由版：自动选最优工作流 + 失败自动切换
+
+    quality: draft(480p) / standard(768p) / premium(1080p)
+    返回与 generate_video 一致（含 used_workflow 字段）
+    """
+    from s4_generate.workflow_router import resolution_for, route, validate_chain
+
+    chain = route(n_images=len(ref_images or []), has_audio=bool(ref_audio),
+                  duration=duration, first_last=first_last)
+    chain = validate_chain(chain, duration, bool(ref_audio))
+    resolution = resolution_for(quality)
+
+    last_err = None
+    for idx, wf in enumerate(chain):
+        try:
+            if on_status:
+                on_status(f"TRY:{wf}" if idx == 0 else f"FALLBACK:{wf}", {})
+            result = generate_video(
+                prompt=prompt, ref_images=ref_images, ref_audio=ref_audio,
+                duration=duration, resolution=resolution, out_path=out_path,
+                workflow=wf, on_status=on_status)
+            result["used_workflow"] = wf
+            return result
+        except Exception as e:
+            last_err = e
+            if on_status:
+                on_status(f"FAILED:{wf}:{str(e)[:80]}", {})
+
+    raise RuntimeError(f"全部 {len(chain)} 个工作流失败，最后错误: {str(last_err)[:200]}")
+
+
 if __name__ == "__main__":
     # 自检：查询 key 是否可用（不发任务不花钱）
     print("AUTODL_API_KEY:", "已加载" if API_KEY else "未找到", f"({len(API_KEY)} chars)" if API_KEY else "")
