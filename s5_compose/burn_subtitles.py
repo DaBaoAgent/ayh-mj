@@ -132,12 +132,51 @@ def _strip_punct(s: str) -> str:
     return re.sub(r"[，。？！、；：,.?!;:｜|]", "", s).strip()
 
 
-def _split_natural(text: str, max_chars: int = 10) -> list[str]:
-    """把一个句子拆成 ≤max_chars 的自然句行（去标点输出）
+def _cn_to_arabic(text: str) -> str:
+    """字幕显示层：中文数字参数 → 阿拉伯数字（宝哥规则）
 
-    规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字、尽量自然句、不带标点。
+    只转数值参数（十三点八→13.8、十年→10年、二幺八→218），
+    不影响 H3 生视频提示词（台词文本照旧——避免读错）。
+    保护量词搭配：一键/一只手/一个人 等单字"一"不转。
     """
-    return [s for s in (_strip_punct(x) for x in _split_raw(text, max_chars)) if s]
+    import re
+    d = {"零": "0", "一": "1", "二": "2", "两": "2", "三": "3", "四": "4",
+         "五": "5", "六": "6", "七": "7", "八": "8", "九": "9", "幺": "1"}
+
+    def _int_cn(s: str) -> str:
+        """中文整数 → 阿拉伯（十=10、十三=13、二十=20、二十五=25、两百=200 简化）"""
+        if s == "十":
+            return "10"
+        m = re.fullmatch(r"([一二三四五六七八九])?十([一二三四五六七八九])?", s)
+        if m:
+            tens = d.get(m.group(1), "1") if m.group(1) else "1"
+            ones = d.get(m.group(2), "") if m.group(2) else ""
+            return str(int(tens) * 10 + int(ones or 0))
+        return s
+
+    # 1) X点Y 小数（十三点八 → 13.8；整数部分支持含"十"组合）
+    def _dec(m):
+        head = m.group(1)
+        int_part = _int_cn(head) if "十" in head else d.get(head, head)
+        return int_part + "." + "".join(d.get(c, c) for c in m.group(2))
+    text = re.sub(r"([一二三四五六七八九]?十[一二三四五六七八九]?|[一二三四五六七八九零])点([零一二三四五六七八九]+)",
+                  _dec, text)
+    # 2) 含"十"的整数（十年→10年、二十→20、十三→13）
+    text = re.sub(r"[一二三四五六七八九]?十[一二三四五六七八九]?", lambda m: _int_cn(m.group(0)), text)
+    # 3) 含"幺"的号码串（二幺八 → 218）
+    text = re.sub(r"[零一二三四五六七八九幺]*幺[零一二三四五六七八九幺]*",
+                  lambda m: "".join(d.get(c, c) for c in m.group(0)), text)
+    return text
+
+
+def _split_natural(text: str, max_chars: int = 10) -> list[str]:
+    """把一个句子拆成 ≤max_chars 的自然句行（去标点输出 + 参数数字化）
+
+    规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字、尽量自然句、
+    不带标点、参数用阿拉伯数字（十三点八→13.8）。
+    """
+    out = [s for s in (_strip_punct(x) for x in _split_raw(text, max_chars)) if s]
+    return [_cn_to_arabic(s) for s in out]
 
 
 def _split_raw(text: str, max_chars: int = 10) -> list[str]:

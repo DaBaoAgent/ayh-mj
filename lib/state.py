@@ -30,10 +30,14 @@ def get_connection() -> sqlite3.Connection:
 
 @contextmanager
 def connect():
-    """上下文管理器"""
+    """上下文管理器（退出时自动提交；异常回滚）"""
     conn = get_connection()
     try:
         yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
