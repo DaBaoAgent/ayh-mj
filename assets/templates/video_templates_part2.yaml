@@ -1,0 +1,57 @@
+# ayh-mj 视频模板体系 v1 part2（T07-T10）
+# 角色卡司：S1=儿子(45岁) S2=母亲(68岁) S3=邻居大爷/路人(65岁配角)
+# 特别角色：T07 需生成"狗"参考图；T10 夜景需灯光适配
+
+templates:
+  # ============ T07 脑洞・宠物视角 ============
+  - id: T07
+    name: 宠物视角
+    type: 脑洞
+    duration: 12
+    concept: 低机位"狗视角"看新车进家门：好奇→试座→被奶奶抱下来
+    hot_slot: "狗狗反应可绑定热点萌宠梗"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：狗视角出现新车", shot_size: 低机位全景, camera: "贴地狗头视角，广角", start_state: "门口出现搬来的折叠车（狗视角仰望）", end_state: "狗鼻子凑近镜头方向", speaker: S1画外, narration: "旺财好像发现了什么。", sound_design: "狗爪子走路声+轻快底噪", cast_refs: [dog], product_ref: 折叠}
+      - {seq: 2, duration: 3, purpose: "萌点：狗检查新车", shot_size: 低机位近景, camera: "低机位拍车折叠瞬间，狗伸头闻", start_state: "儿子把车展开", end_state: "狗凑近闻车架", speaker: S1画外, narration: "这是给奶奶的新座驾。", sound_design: "折叠声+狗鼻息声", cast_refs: [dog, son_urgent], product_ref: 折叠}
+      - {seq: 3, duration: 3, purpose: "笑点：狗抢先试坐", shot_size: 中景, camera: "固定，狗跳上车座", start_state: "狗跳上座椅坐下", end_state: "狗得意地看向镜头", speaker: S1画外, narration: "它先试了试。", sound_design: "狗爪子蹦跳声+轻笑", cast_refs: [dog], product_ref: 正侧}
+      - {seq: 4, duration: 3, purpose: "收尾：奶奶抱狗+产品归属", shot_size: 中景, camera: "母亲入画抱狗", start_state: "母亲走过来", end_state: "把狗抱怀里笑着", speaker: S2, narration: "下来，这是奶奶的。", sound_design: "对白+狗哼唧声+温暖收尾", cast_refs: [mother_softening, dog], product_ref: 正侧}
+
+  # ============ T08 脑洞・快递小哥惊了 ============
+  - id: T08
+    name: 快递小哥惊了
+    type: 脑洞
+    duration: 12
+    concept: 快递小哥抱大箱子累喘，看儿子3秒折车进电梯，直接服了
+    hot_slot: "快递场景可绑定节日/网购热点"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：累喘的快递小哥", shot_size: 中景, camera: "固定，快递员抱箱入画", start_state: "快递员抱着大箱子进单元门", end_state: "喘着气放下箱子", speaker: S3(快递员), narration: "您好，快递。", sound_design: "对白+气喘声", cast_refs: [courier], product_ref: ""}
+      - {seq: 2, duration: 3.5, purpose: "反转：3秒折车看呆", shot_size: 近景, camera: "快递员视线方向拍折叠动作", start_state: "儿子单手把车折上", end_state: "快递员瞪大眼睛", speaker: S3(快递员), narration: "哥，这车还能这么折？", sound_design: "折叠咔哒+快递员惊叹", cast_refs: [son_urgent, courier], product_ref: 折叠}
+      - {seq: 3, duration: 3, purpose: "卖点：单手拎进电梯", shot_size: 中景, camera: "跟拍进电梯", start_state: "儿子拎车进电梯", end_state: "在电梯里单手提车按下楼层", speaker: S1, narration: "就十三点八公斤。", sound_design: "对白+电梯提示音", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 2.5, purpose: "收尾梗：同行对比", shot_size: 中景, camera: "电梯门关上前最后一拍", start_state: "快递员看着手里的大箱子", end_state: "摇头佩服，电梯门缓缓关上", speaker: S3(快递员), narration: "服了，我搬箱子都没您快。", sound_design: "对白+电梯门关声", cast_refs: [courier], product_ref: ""}
+
+  # ============ T09 脑洞・对比实验 ============
+  - id: T09
+    name: 对比实验
+    type: 脑洞
+    duration: 14
+    concept: 旧车28公斤 vs 新车13.8公斤，数据式对比冲击
+    hot_slot: "数字对比可更新为最新参数口径"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：旧车挂秤", shot_size: 近景, camera: "怼秤特写，数字清晰", start_state: "旧车被吊秤，秤显示二十八公斤", end_state: "秤微微晃动", speaker: S1, narration: "旧的，二十八公斤。", sound_design: "对白+秤钩吱呀声", cast_refs: [old_wheelchair], product_ref: ""}
+      - {seq: 2, duration: 3.5, purpose: "痛点可视化：搬旧车吃力", shot_size: 中景, camera: "手持轻晃，拍真实吃力感", start_state: "儿子和母亲俩人抬旧车", end_state: "两人放下车喘气", speaker: S1, narration: "俩人抬都费劲。", sound_design: "对白+吃力喘息+金属磕碰", cast_refs: [son_urgent, mother_stubborn, old_wheelchair], product_ref: ""}
+      - {seq: 3, duration: 3.5, purpose: "反转：新车单手拎", shot_size: 中近景, camera: "低角度仰拍", start_state: "新车挂秤显示十三点八", end_state: "儿子单手把车拎起", speaker: S1, narration: "新的，十三点八。一只手。", sound_design: "对白+轻快拎起声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 4, purpose: "收尾：一句话总结", shot_size: 中景, camera: "固定，车滑进后备箱", start_state: "车滑进后备箱", end_state: "关上后备箱拍一拍", speaker: S1, narration: "一半的重量，翻倍的省心。", sound_design: "滑入+关合声", cast_refs: [son_urgent], product_ref: 折叠}
+
+  # ============ T10 场景・雨夜接妈 ============
+  - id: T10
+    name: 雨夜接妈
+    type: 情感场景
+    duration: 15
+    concept: 雨夜母亲在公交站避雨，儿子赶到从后备箱取出新轮椅接妈，稳定卖点
+    hot_slot: "天气场景可跟随时令/天气热点"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：雨夜无助感", shot_size: 中景, camera: "雨夜，低照度，冷色调", start_state: "母亲在公交站棚下避雨，打湿了半边肩膀", end_state: "掏出手机打电话", speaker: S2, narration: "雨太大了……", sound_design: "对白+雨声+电话拨号音", cast_refs: [mother_softening], product_ref: ""}
+      - {seq: 2, duration: 3, purpose: "回应：儿子赶到", shot_size: 中景, camera: "车灯切开雨幕，手持跟拍儿子撑伞跑来", start_state: "车灯照亮站台", end_state: "儿子撑伞跑到母亲面前", speaker: S1, narration: "妈，上车。", sound_design: "对白+雨声+快步踩水声", cast_refs: [son_urgent], product_ref: ""}
+      - {seq: 3, duration: 3.5, purpose: "产品镜头：雨中展开、稳", shot_size: 中近景, camera: "低角度，后备箱尾灯照亮轮椅", start_state: "从后备箱取出折叠车甩开", end_state: "雨滴落在车架上（特写）稳稳立住", speaker: S1, narration: "路滑，坐这个。", sound_design: "对白+甩开咔哒+雨滴声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 3, purpose: "情感：稳的感觉", shot_size: 中景, camera: "跟拍雨中推行（背影）", start_state: "儿子推着母亲走在雨中", end_state: "母亲手扶稳扶手", speaker: S2, narration: "你这车，稳。", sound_design: "对白+雨声渐小", cast_refs: [mother_softening], product_ref: 正侧}
+      - {seq: 5, duration: 2.5, purpose: "收尾：一句情感总结", shot_size: 全景, camera: "远景背影，尾灯红点渐远", start_state: "两人背影在雨中远去", end_state: "画面淡出留白", speaker: S1画外, narration: "能装，能拎，更能陪。", sound_design: "雨声+温暖收尾音", cast_refs: [son_urgent], product_ref: ""}

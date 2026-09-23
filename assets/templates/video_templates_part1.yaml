@@ -1,0 +1,83 @@
+# ayh-mj 视频模板体系 v1（10 套循环）
+# 用法：s2_copy 热点分析 → 选定模板 → 热点填入 hot_slot → s3_storyboard 出分镜 → s4 逐镜生成
+# 角色卡司：S1=儿子(45岁) S2=母亲(68岁) S3=邻居大爷(65岁·配角) 音色库 assets/cast/voice/
+# 情绪图库：assets/cast/emotions/ 旧车=old_wheelchair.png 新车=折叠-无阴影.png/正侧-3-无阴影.png
+
+templates:
+  # ============ T01 对白剧・已有跑通 ============
+  - id: T01
+    name: 母子换车
+    type: dialogue_drama
+    duration: 15
+    concept: 儿子发现旧车刹车松了要换，母亲倔强抗拒，产品实力说服，情感落点
+    hot_slot: "母亲抗拒的理由台词可绑定热点话题（如'这钱留着给孙子'等）"
+    shots:
+      - {seq: 1, duration: 3, purpose: "开场冲突钩子：儿子质问", shot_size: 近景, camera: "手持感微晃，手抓扶手特写快速上摇到儿子面部", start_state: "儿子的手猛地抓住旧轮椅扶手", end_state: "儿子俯身质问，母亲瞪眼回看", speaker: S1, narration: "妈！刹车都松了，你还敢骑？", sound_design: "对白+刹车金属松垮声", cast_refs: [son_urgent, mother_stubborn, old_wheelchair], product_ref: ""}
+      - {seq: 2, duration: 4, purpose: "母亲倔强立住（情感对立）", shot_size: 近景, camera: "固定机位，浅景深", start_state: "母亲皱眉瞪眼下巴微抬", end_state: "母亲别过头去", speaker: S2, narration: "我骑十年了，轮不到你说扔就扔。", sound_design: "对白+小区鸟鸣底噪", cast_refs: [mother_stubborn, old_wheelchair], product_ref: ""}
+      - {seq: 3, duration: 4, purpose: "转折：产品实力可视化", shot_size: 中近景, camera: "低角度仰拍，轻微推近", start_state: "儿子单手抓起折叠新车", end_state: "车架滑进后备箱", speaker: S1, narration: "这个才十三点八公斤，一只手拎得动。", sound_design: "对白+折叠咔哒声+滑入声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 4, purpose: "情感落点：抗拒→松动", shot_size: 近景, camera: "固定，浅景深", start_state: "母亲看着后备箱方向皱眉", end_state: "眉头松开微微点头", speaker: "S2+S1画外", narration: "真的假的？｜你试试，折叠，塞后备箱。", sound_design: "对白+微风（画外音时母亲嘴唇闭合）", cast_refs: [mother_softening, old_wheelchair], product_ref: ""}
+
+  # ============ T02 脑洞・魔性循环（参照版本D1） ============
+  - id: T02
+    name: 魔性循环
+    type: 脑洞
+    duration: 12
+    concept: 同一折叠动作魔性重复三次，咔哒节奏，越叠越顺
+    hot_slot: "循环次数/节奏卡点可配合热点BGM或梗"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：第一折就抓住（节奏感）", shot_size: 近景, camera: "固定机位怼动作，咔哒声同步", start_state: "儿子单手甩开折叠新车", end_state: "车架咔一下立住", speaker: S1画外, narration: "一键折叠。", sound_design: "折叠咔哒声+轻鼓点", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 2, duration: 3, purpose: "魔性重复①（节奏升级）", shot_size: 近景, camera: "同机位同动作，剪辑点卡在咔哒声上", start_state: "车架重新展开", end_state: "再次折上", speaker: S1画外, narration: "再试一次。", sound_design: "折叠咔哒声+鼓点加重", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 3, duration: 3, purpose: "魔性重复②（推近加压）", shot_size: 近景, camera: "轻微推近", start_state: "第三次甩开", end_state: "折上，儿子挑眉看镜头", speaker: S1画外, narration: "还是这么顺。", sound_design: "折叠咔哒声+鼓点收束", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 3, purpose: "收尾卖点+行动引导", shot_size: 中景, camera: "低角度，车滑进后备箱", start_state: "拎起车架", end_state: "滑进后备箱关上", speaker: S1, narration: "二一八，就这么简单。", sound_design: "滑入声+后备箱关合声", cast_refs: [son_urgent], product_ref: 折叠}
+
+  # ============ T03 脑洞・反差王者（参照版本D2） ============
+  - id: T03
+    name: 反差王者
+    type: 脑洞
+    duration: 14
+    concept: 旧车画画风 vs 新轮椅"潇洒老头"反差，墨镜老爷子出镜
+    hot_slot: "反差反差梗可绑定热点（如热门BGM/流行梗）"
+    shots:
+      - {seq: 1, duration: 3, purpose: "铺垫：旧车时代的沉闷画风", shot_size: 中景, camera: "慢摇，刻意灰暗调", start_state: "大爷戴墨镜坐旧车上慢慢挪", end_state: "车一顿一顿地走", speaker: S1画外, narration: "以前我爸出门，是这个画风。", sound_design: "咯吱咯吱的旧车声+慢节奏", cast_refs: [mother_stubborn, old_wheelchair], product_ref: ""}
+      - {seq: 2, duration: 4, purpose: "反转登场（音乐/画面风格切换）", shot_size: 中近景, camera: "低角度仰拍，节奏加快", start_state: "大爷单手拎着折叠新车走来", end_state: "甩开车架落地", speaker: S1画外, narration: "换上这个——", sound_design: "咔嚓甩开声+节奏切快", cast_refs: [mother_softening], product_ref: 折叠}
+      - {seq: 3, duration: 4, purpose: "潇洒操作（稳定卖点）", shot_size: 中景, camera: "跟拍侧移", start_state: "大爷开着新车灵活转弯", end_state: "稳稳停住", speaker: S2, narration: "稳当得很。", sound_design: "对白+轮胎过地砖声", cast_refs: [mother_softening], product_ref: 正侧}
+      - {seq: 4, duration: 3, purpose: "收尾梗+卖点", shot_size: 近景, camera: "固定，大爷摘墨镜看镜头", start_state: "大爷抬手摘墨镜", end_state: "冲镜头挑眉", speaker: S1画外, narration: "十三点八公斤，谁都能玩明白。", sound_design: "收尾鼓点", cast_refs: [mother_softening], product_ref: ""}
+
+  # ============ T04 脑洞・路人疑惑三连（参照版本D3） ============
+  - id: T04
+    name: 路人疑惑三连
+    type: 脑洞
+    duration: 13
+    concept: 同一个好奇路人三连问（折上了？多重？放得下吗？），儿子一句收尾
+    hot_slot: "三连问的问题可换成热点相关疑问"
+    shots:
+      - {seq: 1, duration: 3.5, purpose: "疑惑①：折叠速度惊人", shot_size: 中景, camera: "固定，路人大爷踱步入画", start_state: "儿子正折车，大爷驻足看", end_state: "大爷瞪大眼睛", speaker: S3, narration: "哎，这就折上了？", sound_design: "对白+折叠咔哒声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 2, duration: 3.5, purpose: "疑惑②：重量疑问", shot_size: 近景, camera: "大爷探头入画", start_state: "大爷弯腰打量车", end_state: "大爷抬头看儿子", speaker: S3, narration: "这多重啊？", sound_design: "对白+小区底噪", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 3, duration: 3, purpose: "疑惑③：装车疑问", shot_size: 中景, camera: "摇向汽车后备箱", start_state: "大爷看后备箱（半信半疑）", end_state: "盯着后备箱", speaker: S3, narration: "这么点地方，放得下吗？", sound_design: "对白+后备箱打开声", cast_refs: [son_urgent], product_ref: 正侧}
+      - {seq: 4, duration: 3, purpose: "收尾：一句话打脸式回应", shot_size: 中景, camera: "固定，车滑进后备箱", start_state: "儿子拎起车单手示范", end_state: "车滑进后备箱关合，大爷竖拇指", speaker: S1, narration: "十三点八公斤，你说呢？", sound_design: "滑入声+后备箱关合+轻笑", cast_refs: [son_urgent], product_ref: 折叠}
+
+  # ============ T05 脑洞・单手挑战 ============
+  - id: T05
+    name: 单手挑战
+    type: 脑洞
+    duration: 14
+    concept: 邻居大爷不信"单手能拎"，亲自试拎被惊到
+    hot_slot: "挑战赛形式可绑定热点话题（如'不信来试'体）"
+    shots:
+      - {seq: 1, duration: 3, purpose: "钩子：挑战发起", shot_size: 中景, camera: "双人中景，大爷叉腰", start_state: "大爷围着车打转打量", end_state: "大爷摆手不信", speaker: S3, narration: "小伙子，这车得两个人抬吧？", sound_design: "对白+鸟鸣", cast_refs: [son_urgent], product_ref: 正侧}
+      - {seq: 2, duration: 3.5, purpose: "应战：单手拎起", shot_size: 中近景, camera: "低角度，轻微推近", start_state: "儿子蹲下握车架", end_state: "单手把折叠车拎到胸口", speaker: S1, narration: "您看。", sound_design: "对白+拎起衣料声", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 3, duration: 3.5, purpose: "挑战者亲自试（惊喜）", shot_size: 中景, camera: "固定，大爷接手拎", start_state: "大爷半信半疑接过", end_state: "大爷拎起来晃了晃", speaker: S3, narration: "嚯！还真轻。", sound_design: "对白+折叠件轻响", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 4, duration: 4, purpose: "收尾：大爷坐上体验", shot_size: 中景, camera: "慢摇跟拍", start_state: "大爷坐上去按动操控杆", end_state: "车平稳起步", speaker: S1, narration: "稳的，您随便开。", sound_design: "对白+电机轻鸣", cast_refs: [son_urgent], product_ref: 正侧}
+
+  # ============ T06 脑洞・后备箱魔术 ============
+  - id: T06
+    name: 后备箱魔术
+    type: 脑洞
+    duration: 13
+    concept: 后备箱已塞满（行李/菜/杂物），母亲摇头，儿子折车滑入还有空
+    hot_slot: "箱内物品可换成时令/节日热点（如年货/露营装备）"
+    shots:
+      - {seq: 1, duration: 3.5, purpose: "钩子：塞满的后备箱", shot_size: 中景, camera: "俯拍后备箱（视觉冲击）", start_state: "后备箱塞满行李和菜", end_state: "母亲摇头", speaker: S2, narration: "这么多东西，放不下吧？", sound_design: "对白+后备箱盖板声", cast_refs: [mother_stubborn], product_ref: ""}
+      - {seq: 2, duration: 3, purpose: "悬念：儿子神秘一笑", shot_size: 近景, camera: "固定，儿子回头一笑", start_state: "儿子看向后备箱", end_state: "单手把车折上", speaker: S1, narration: "看着。", sound_design: "对白+折叠咔哒", cast_refs: [son_urgent], product_ref: 折叠}
+      - {seq: 3, duration: 3.5, purpose: "魔术时刻：滑入还有空", shot_size: 中景, camera: "跟车滑入，最后一格空间特写", start_state: "车被举起对准缝隙", end_state: "稳稳滑入，旁边还有一个行李箱空间", speaker: S2画外, narration: "还有地方？", sound_design: "滑入声+母亲惊讶语气", cast_refs: [mother_softening], product_ref: 折叠}
+      - {seq: 4, duration: 3, purpose: "收尾卖点", shot_size: 中景, camera: "后备箱关合", start_state: "关后备箱", end_state: "两口子相视一笑", speaker: S1, narration: "它占的，比一个行李箱还小。", sound_design: "关合声+轻快收尾", cast_refs: [son_urgent], product_ref: ""}

@@ -26,6 +26,9 @@ WORKFLOWS = {
     "text2video": "minimax_h3_lightx2v_no_pic",     # 文生视频 1-10s
     "first_last": "minimax_h3_lightx2v",            # 首尾帧 1-10s
     "image_audio": "minimax_h3_image_audio_to_video",  # 对口型 1-15s
+    "multi_image_15s": "minimax_h3_lightx2v_v5_15s",   # 多图参考 15s
+    "voice_clone": "minimax_h3_zm_u08",             # 多图+音色克隆（ref_audio_0）1-15s
+    "voice_clone_hq": "minimax_h3_zm_u24",          # 音色克隆升级画质
 }
 RESOLUTIONS = ["480p竖", "768p竖", "1080p竖", "480p横", "768p横", "1080p横"]
 PRICE_PER_SEC = {"480p": 0.04, "768p": 0.06, "1080p": 0.10}
@@ -72,7 +75,7 @@ def to_data_url(path_or_url: str, resize: bool = True) -> str:
     if not p.exists():
         raise FileNotFoundError(f"文件不存在: {path_or_url}")
 
-    if resize:
+    if resize and p.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp", ".bmp"):
         try:
             import io
 
@@ -186,6 +189,7 @@ def download(url: str, out_path: str, retries: int = 4) -> str:
 def generate_video(
     prompt: str,
     ref_images: list[str] = None,
+    ref_audio: str = None,
     duration: int = 5,
     resolution: str = "768p竖",
     out_path: str = None,
@@ -194,6 +198,7 @@ def generate_video(
 ) -> dict:
     """一站式：提交 → 轮询 → 下载
 
+    ref_audio: 音色样本路径（zm_u08 等支持 ref_audio_0 的工作流传入，H3 克隆音色）
     Returns: {task_id, video_path, duration, resolution, cost}
     """
     ref_images = ref_images or []
@@ -207,6 +212,8 @@ def generate_video(
     }
     for i, img in enumerate(ref_images[:3]):  # v5 上限 9 张，但保守 3 张
         payload[f"ref_image_{i}"] = to_data_url(img)
+    if ref_audio:
+        payload["ref_audio_0"] = to_data_url(ref_audio, resize=False)
 
     if on_status:
         on_status("SUBMITTING", {})
