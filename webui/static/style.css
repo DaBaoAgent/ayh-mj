@@ -103,7 +103,7 @@ body {
 }
 @keyframes badgePulse { 0%,100% { box-shadow: var(--glow-cyan), inset 0 0 18px rgba(0,240,255,.12);} 50% { box-shadow: var(--glow-pink), inset 0 0 18px rgba(255,45,149,.14);} }
 
-.brand-text h1 { font-size: 19px; letter-spacing: 2px; font-weight: 700; white-space: nowrap; }
+.brand-text h1 { font-family: 'MaShanZheng','华文行楷','STXingkai','方正舒体','FZShuTi','KaiTi','楷体',cursive; font-size: 19px; letter-spacing: 2px; font-weight: 400; white-space: nowrap; }
 .brand-sub { font-size: 10px; letter-spacing: 3px; color: var(--text-faint); font-family: var(--mono); }
 .brand-sub em { color: var(--pink); font-style: normal; }
 
@@ -741,7 +741,7 @@ body {
 .topbar::after { background: linear-gradient(90deg, transparent 4%, #21d4f1 23%, #8678ff 54%, #35f2a2 79%, transparent 96%); }
 .brand-badge { width: 43px; height: 43px; border-radius: 5px; transform: skewY(-7deg); }
 .brand-badge span { width: 18px; height: 18px; display: block; transform: rotate(45deg); border: 2px solid var(--cyan); border-left-color: transparent; border-bottom-color: var(--purple); box-shadow: 0 0 13px var(--cyan); }
-.brand-text h1 { font-size: 23px; letter-spacing: 3px; }.brand-sub { color: #72a1bd; letter-spacing: 2px; }
+.brand-text h1 { font-family: 'MaShanZheng','华文行楷','STXingkai','方正舒体','FZShuTi','KaiTi','楷体',cursive; font-size: 23px; letter-spacing: 3px; }.brand-sub { color: #72a1bd; letter-spacing: 2px; }
 .topbar-center { gap: 26px; }.top-metrics { gap: 0; border-left: 1px solid var(--line); }.top-metric { min-width: 75px; border-right: 1px solid var(--line); }
 .top-metric b { color: #d5f8ff; font-size: 17px; }.top-metric label { margin-bottom: 2px; }
 .status-pill { background: rgba(38, 219, 255, .06); border-radius: 4px; padding: 8px 12px; }
