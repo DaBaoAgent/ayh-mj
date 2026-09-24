@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from hermes_bridge import blog, get_bridge
@@ -112,7 +112,7 @@ def resource_stats() -> dict:
 # 6阶段定义
 STAGES = [
     {"id": "trend", "name": "热点雷达", "icon": "◉", "desc": "捕捉全网热点信号"},
-    {"id": "copy", "name": "创意脚本", "icon": "▤", "desc": "策略匹配 + 脚本生成"},
+    {"id": "copy", "name": "创意策划", "icon": "▤", "desc": "热点/爆款/短剧/对标知识库预检"},
     {"id": "storyboard", "name": "智能分镜", "icon": "◇", "desc": "镜头编排 + 角色选择"},
     {"id": "generate", "name": "视频生成", "icon": "▷", "desc": "多模型并发渲染"},
     {"id": "compose", "name": "合成发布", "icon": "↗", "desc": "装配字幕 + 质量检查"},
@@ -139,12 +139,6 @@ SETTINGS_SCHEMA = {
         {
             "id": "pipeline", "name": "生产流水线", "icon": "factory",
             "fields": [
-                {"key": "mode", "label": "生产链路", "type": "select",
-                 "desc": "模板链路 = 10套爆款模板 + 选角 + 音色克隆（推荐）；旧链路 = 自由脚本分镜",
-                 "options": [
-                     {"value": "template", "label": "模板链路（推荐）"},
-                     {"value": "legacy", "label": "旧链路"},
-                 ], "default": "template"},
                 {"key": "daily_target", "label": "每日目标产量", "type": "number",
                  "desc": "每次启动全流程生产几条成片", "min": 1, "max": 20, "default": 1},
                 {"key": "gen_concurrency", "label": "出片并发数", "type": "number",
@@ -200,7 +194,6 @@ def _validate_setting(key: str, value):
 
 def default_console_state() -> dict:
     return {
-        "mode": "template",
         "daily_target": 1,
         "gen_concurrency": 6,
         "dry_mode": False,
@@ -216,6 +209,7 @@ def load_console_state() -> dict:
     if CONSOLE_STATE_FILE.exists():
         with suppress(Exception):
             state.update(json.loads(CONSOLE_STATE_FILE.read_text(encoding="utf-8")))
+    state.pop("mode", None)  # 兼容旧设置文件，但执行器已只支持模板链路。
     return state
 
 
@@ -269,7 +263,7 @@ async def lifespan(app: FastAPI):
     task.cancel()
 
 
-app = FastAPI(title="轻便侠·AI视频工厂", lifespan=lifespan)
+app = FastAPI(title="爱优护AI视频工厂", lifespan=lifespan)
 ENGINE_START_LOCK = asyncio.Lock()
 
 THUMBS_DIR = STATE_DIR / "thumbs"
@@ -288,6 +282,11 @@ async def index(request: Request):
     return templates.TemplateResponse(
         request=request, name="index.html",
         context={"stages": STAGES})
+
+
+@app.get("/brand-logo.png", include_in_schema=False)
+async def brand_logo():
+    return FileResponse(WEBUI_DIR.parent / "logo.png", media_type="image/png")
 
 
 # ============ 流水线 API ============
@@ -637,6 +636,31 @@ async def api_douyin_login():
     return {"ok": True, "message": "扫码窗口即将弹出，请在窗口中完成扫码"}
 
 
+@app.post("/api/action/{platform}_login")
+async def api_domestic_login(platform: str):
+    """通过项目现有 PostFlow 发布通道打开可见的扫码登录浏览器。"""
+    platform_map = {"xiaohongshu": ("xiaohongshu", "小红书"),
+                    "shipinhao": ("tencent", "视频号")}
+    if platform not in platform_map:
+        raise HTTPException(status_code=404, detail="不支持的平台")
+    from s6_publish.publish import POSTFLOW_DIR, POSTFLOW_EXE, load_config
+    if not POSTFLOW_EXE.is_file():
+        raise HTTPException(status_code=503, detail="PostFlow 未安装，无法打开扫码登录窗口")
+    account = (load_config().get("publish", {}).get("domestic", {})
+               .get("account_name") or "ayh-main")
+    subcommand, label = platform_map[platform]
+    try:
+        proc = subprocess.Popen(
+            [str(POSTFLOW_EXE), subcommand, "login", "--account", account, "--headed"],
+            cwd=str(POSTFLOW_DIR),
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail=f"启动{label}登录失败：{exc}") from exc
+    return {"ok": True, "message": f"{label}扫码窗口已启动，请在弹出的浏览器中扫码；登录态将由 PostFlow 保存。",
+            "pid": proc.pid}
+
+
 @app.post("/api/action/cleanup")
 async def api_cleanup(request: Request):
     """清理项目（默认 dry-run 预览；body {confirm: true} 才真删）"""
@@ -699,7 +723,7 @@ async def api_chat_history():
 
 
 if __name__ == "__main__":
-    print("🏭 轻便侠·AI视频工厂 控制台 v2")
+    print("🏭 爱优护AI视频工厂 控制台 v2")
     print("→ http://127.0.0.1:8899")
     # reload 模式（默认）：webui/ 下 Python 代码保存后自动重载 ——
     # 面板里的 Hermes 改完 server.py / hermes_bridge.py 无需重启即可生效，

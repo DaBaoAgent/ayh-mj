@@ -849,7 +849,7 @@ const Pipeline = {
     },
 
     stageName(id) {
-        const map = { trend: '热点雷达', copy: '创意脚本', storyboard: '智能分镜',
+        const map = { trend: '热点雷达', copy: '创意策划', storyboard: '智能分镜',
                       generate: '视频生成', compose: '合成发布', publish: '效果追踪' };
         return map[id] || '';
     },
@@ -966,6 +966,9 @@ const Settings = {
         for (const group of (this.schema && this.schema.groups) || []) {
             const g = el('div', 'setting-group');
             g.innerHTML = `<h3>◆ ${esc(group.name)}</h3>`;
+            if (group.id === 'pipeline') {
+                g.appendChild(el('div', 'pipeline-only-note', '当前唯一链路：热点研究 → 创意策划 → 模板分镜 → 视频生成 → 合成发布'));
+            }
             for (const f of group.fields) {
                 g.appendChild(this.renderField(f));
             }
@@ -1037,6 +1040,8 @@ const Settings = {
 
         row.appendChild(mk('🔐 检测抖音登录', () => this.actionDouyinCheck()));
         row.appendChild(mk('📱 扫码登录抖音', () => this.actionPost('/api/action/douyin_login', {}, '扫码窗口即将弹出')));
+        row.appendChild(mk('📱 扫码登录小红书', () => this.actionPost('/api/action/xiaohongshu_login', {}, '小红书扫码窗口即将弹出')));
+        row.appendChild(mk('📱 扫码登录视频号', () => this.actionPost('/api/action/shipinhao_login', {}, '视频号扫码窗口即将弹出')));
         row.appendChild(mk('🧹 清理项目（预览）', () => this.actionCleanup(false)));
         row.appendChild(mk('📂 打开输出目录', () => this.actionPost('/api/action/open_output', {}, '已打开目录')));
         row.appendChild(mk('♻ 重启 Hermes 内核', () => this.actionRestartKernel()));
@@ -1054,11 +1059,13 @@ const Settings = {
         res.className = 'action-result show';
         res.textContent = '执行中…';
         try {
-            const r = await fetch(url, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
-            }).then((x) => x.json());
+            });
+            const r = await response.json();
+            if (!response.ok || r.ok === false) throw new Error(r.detail || r.message || `HTTP ${response.status}`);
             res.textContent = r.message || r.detail || okMsg || JSON.stringify(r);
             res.className = 'action-result show ok';
         } catch (e) {
