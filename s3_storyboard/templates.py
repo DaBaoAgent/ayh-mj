@@ -47,12 +47,20 @@ def _save_history(h: dict) -> None:
 
 
 def pick_template(exclude_recent: int = 3) -> dict:
-    """轮换：优先避开最近用过的 N 套"""
+    """轮换（宝哥规则 2026-09-24：每条视频都要有新意，不能重复用过的套路）
+
+    1) 从未用过的模板优先——只要还有没用过的模板，就不复用旧的
+    2) 全套都用过 → 才退回"避开最近 N 套"
+    """
     templates = load_templates()
     if not templates:
         raise RuntimeError("没有可用模板")
     hist = _history()
+    used_ids = set(hist.get("used") or hist.get("recent", []))
     recent = set(hist.get("recent", [])[-exclude_recent:])
+    fresh = [t for t in templates if t["id"] not in used_ids]
+    if fresh:
+        return fresh[0]
     for t in templates:
         if t["id"] not in recent:
             return t
@@ -64,6 +72,10 @@ def mark_used(template_id: str) -> None:
     recent = hist.get("recent", [])
     recent.append(template_id)
     hist["recent"] = recent[-30:]
+    # 全历史使用集（保新意判定的依据；首次运行时从 recent 回填 T01-T04）
+    used = hist.setdefault("used", sorted(set(hist["recent"])))
+    if template_id not in used:
+        used.append(template_id)
     _save_history(hist)
 
 
@@ -232,7 +244,9 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
         except Exception as e:
             last_err = str(e)[:80]
             print(f"  ⚠ 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
-    return {"lines": std, "reason": f"校验未过回退标准版({last_err})", "sales_point": pt}
+    # 回退也要带上思路/场景微调，否则思路轮换会丢（2026-09-24 修：曾导致"换车"套路反复重现）
+    return {"lines": std, "reason": f"校验未过回退标准版({last_err})",
+            "sales_point": pt, "scene_tweaks": {}, "angle": ang}
 
 
 def to_storyboard(template: dict, lines: dict | None = None,

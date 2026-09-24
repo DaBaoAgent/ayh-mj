@@ -82,6 +82,29 @@ non_diegetic_music: N/A
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 
 
+# ── 宝哥规则（2026-09-24）：有新旧车对比时，新车必须用爱优护轻便侠参考图去生 ──
+# 缺参考图 H3 会把折叠车自由发挥成自行车/踏板车（历史事故 → 8c）；这里做代码级兜底，
+# 只在"视觉字段"命中新车动作时补图（台词提到但画面没车反应的镜头不补，避免多图干扰）。
+NEW_CAR_KEYWORDS = (
+    "折叠", "展开", "车架", "新车", "轻便侠", "一键", "单手", "拎", "甩开", "抬起", "滑进后备箱",
+)
+NEW_CAR_DEFAULT_REFS = ["折叠", "正侧"]  # 折叠态 + 展开态双图，锚定同一台车
+
+
+def ensure_new_car_ref(shot: dict) -> dict:
+    """新车出镜镜头若无 product_ref，自动补爱优护轻便侠参考图（宝哥规则 2026-09-24）"""
+    if shot.get("product_ref"):
+        return shot
+    blob = " ".join(str(shot.get(k) or "") for k in
+                    ("purpose", "camera", "start_state", "end_state"))
+    if not any(k in blob for k in NEW_CAR_KEYWORDS):
+        return shot
+    patched = dict(shot)
+    patched["product_ref"] = list(NEW_CAR_DEFAULT_REFS)
+    print(f"  [镜{shot.get('seq')}] 新车镜头自动补产品参考图: {NEW_CAR_DEFAULT_REFS}", flush=True)
+    return patched
+
+
 def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
     """LLM 基于分镜字段生成每镜完整 H3 提示词（不合格自动重试）"""
     import re as _re
@@ -104,6 +127,7 @@ def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
 
     shots_ctx = []
     for s in storyboard["shots"]:
+        s = ensure_new_car_ref(s)
         shots_ctx.append({
             "seq": s["seq"], "duration": s["duration"],
             "purpose": s["purpose"], "shot_size": s["shot_size"], "camera": s["camera"],
@@ -170,6 +194,9 @@ def gen_shot(shot: dict, prompt: str, out_dir: Path, job_uid: str = "") -> dict:
     shot = cast_shot(shot, job_uid)
     if shot.get("_cast_mapping"):
         print(f"  [镜{seq}] 选角: {shot['_cast_mapping']}", flush=True)
+
+    # 新车必带参考图（宝哥规则 2026-09-24）——放在取 refs 之前
+    shot = ensure_new_car_ref(shot)
 
     # 非说话人 → quiet 闭嘴版参考图（防 H3 把情绪图的张嘴表情带歪）
     refs_raw = neutralize_refs_for_silent(shot["cast_refs"], shot["speaker"])
