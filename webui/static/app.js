@@ -1,5 +1,5 @@
 /**
- * 轻便侠·AI视频工厂 控制台前端 v2
+ * 轻便侠·AI视频工厂 控制台前端 v4
  *  · Hermes 控制台：WS 桥接到 hermes serve（与桌面版本体同源）
  *    事件渲染完整对齐桌面版语义：思考过程 / 工具调用 / 回复流 / 交互请求
  *  · 流水线：SSE 实时日志 + 状态轮询
@@ -31,6 +31,30 @@ function fmtBytes(n) {
     return n + ' B';
 }
 
+/* The visual renderer extends this state controller in neural_v4.js. */
+const NeuralStage = {
+    mode: 'idle',
+
+    set(mode, text) {
+        this.mode = mode;
+        const stage = $('#neuralStage');
+        if (!stage) return;
+        stage.dataset.mode = mode;
+        const label = {
+            idle: ['NEURAL CORE / STANDBY', '等待创作指令', '神经网络已同步，随时开始一条视频任务'],
+            running: ['NEURAL CORE / EXECUTING', '正在编排创意信号', '执行摘要与工具进度正在下方实时汇聚'],
+            thinking: ['NEURAL CORE / ANALYSING', '正在解析任务上下文', '公开执行摘要正在同步'],
+            tool: ['NEURAL CORE / TOOL LINK', '正在调度生产工具', '数据流已接入，等待工具回传'],
+            complete: ['NEURAL CORE / COMPLETE', '创作链路已完成', '回复与产出已归档到本次执行记录'],
+            error: ['NEURAL CORE / INTERRUPTED', '执行链路需要注意', '请检查下方错误信息后重新发起任务'],
+        }[mode] || [];
+        $('#neuralPhase').textContent = label[0] || '';
+        $('#neuralTitle').textContent = text || label[1] || '';
+        $('#neuralHint').textContent = label[2] || '';
+    },
+
+};
+
 /* ================================================================
  * 一、Hermes 控制台（核心）
  * ================================================================ */
@@ -44,6 +68,7 @@ const Hermes = {
     toolCards: new Map(),       // tool_id -> {card, body}
     toolsByName: new Map(),     // 兜底：name -> 最近一张卡（tool_id 缺失时）
     reconnectMs: 1000,
+    reconnectTimer: null,
     turnTimer: null,
     turnStartedAt: 0,
     pendingInteractive: null,   // 当前交互请求（approval/clarify）
@@ -53,7 +78,8 @@ const Hermes = {
         this.setConn('connecting');
         let ws;
         try {
-            ws = new WebSocket(`ws://${location.host}/ws/hermes`);
+            const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${scheme}://${location.host}/ws/hermes`);
         } catch (e) {
             this.scheduleReconnect();
             return;
@@ -69,18 +95,25 @@ const Hermes = {
             this.onFrame(obj);
         };
         ws.onclose = () => {
+            // A stale socket can close after a new one has connected.
+            if (this.ws !== ws) return;
             this.setConn('off');
             this.ready = false;
             this.sid = null;
             this.stopTurnTimer();
             this.setLiveStatus('连接断开 · 正在重连…', false);
+            NeuralStage.set('error', '核心链路正在重连');
             this.scheduleReconnect();
         };
         ws.onerror = () => { /* onclose 会跟进 */ };
     },
 
     scheduleReconnect() {
-        setTimeout(() => this.connect(), this.reconnectMs);
+        if (this.reconnectTimer) return;
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.connect();
+        }, this.reconnectMs);
         this.reconnectMs = Math.min(this.reconnectMs * 1.8, 15000);
     },
 
@@ -224,7 +257,10 @@ const Hermes = {
                 break;
 
             case 'thinking.delta':
-                if (p.text) this.setLiveStatus(p.text, true, true);
+                if (p.text) {
+                    this.setLiveStatus(p.text, true, true);
+                    NeuralStage.set('thinking');
+                }
                 break;
 
             case 'reasoning.delta':
@@ -232,6 +268,7 @@ const Hermes = {
                     this.ensureTurn();
                     this.streamPush('think', p.text);
                     this.setLiveStatus('思考中…', true);
+                    NeuralStage.set('thinking');
                 }
                 break;
 
@@ -282,10 +319,13 @@ const Hermes = {
             case 'tool.progress':
                 this.upsertTool(p, type === 'tool.start' ? 'running' : 'running');
                 this.setLiveStatus(`工具执行中：${p.name || ''}`, true);
+                NeuralStage.set('tool', p.name ? `正在调度：${p.name}` : undefined);
+                if (type === 'tool.start') Pipeline.addLog('info', `Hermes 调用工具：${p.name || 'tool'}`);
                 break;
 
             case 'tool.complete':
                 this.upsertTool(p, p.error ? 'failed' : 'done');
+                Pipeline.addLog(p.error ? 'error' : 'success', `工具${p.error ? '失败' : '完成'}：${p.name || 'tool'}`);
                 break;
 
             case 'todo.updated':
@@ -312,6 +352,7 @@ const Hermes = {
             case 'bridge.error':
                 this.addSystem(`⚠ 内核桥接失败：${p.message || ''}`);
                 this.setLiveStatus('内核不可用 · 稍后自动重试', false);
+                Pipeline.addLog('error', `Hermes 桥接失败：${p.message || ''}`);
                 break;
 
             case 'reaction':
@@ -344,6 +385,7 @@ const Hermes = {
         this.turnStartedAt = Date.now();
         this.startTurnTimer();
         this.setLiveStatus('内核已接受指令…', true);
+        NeuralStage.set('running');
         this.pendingInteractive = null;
     },
 
@@ -545,6 +587,7 @@ const Hermes = {
         const d = el('div', 'msg-error', '✗ ' + String(txt).slice(0, 2000));
         $('#chatMessages').appendChild(d);
         this.toBottom(true);
+        NeuralStage.set('error');
     },
 
     /* ---------- 回合结束 ---------- */
@@ -554,18 +597,19 @@ const Hermes = {
         const t = this.turn;
         this.stopTurnTimer();
 
-        // 思考块收尾
-        t.think.classList.remove('live');
-        if (!t.thinkBody.textContent.trim()) {
-            t.think.remove();  // 无思考（如极简回复）→ 隐藏思考块
-        }
-
         // bubble 收尾
         t.bubble.classList.remove('streaming');
         if (!t.bubble.textContent.trim() && p && p.text) {
             t.bubble.textContent = p.text;
         }
         if (!t.bubble.textContent.trim()) t.bubble.remove();
+
+        // Some gateway/model combinations repeat the final answer in the
+        // reasoning event. Do not present that echo as a thought trace.
+        t.think.classList.remove('live');
+        const trace = t.thinkBody.textContent.trim();
+        const answer = t.bubble.textContent.trim();
+        if (!trace || trace === answer) t.think.remove();
 
         // 失败态
         if (p && p.status === 'error') {
@@ -589,7 +633,10 @@ const Hermes = {
         this.busy = false;
         this.turn = null;
         this.toolCards.clear();
-        this.setLiveStatus('standby · 等待指令', false);
+        NeuralStage.set(p && p.status === 'error' ? 'error' : 'complete');
+        this.setLiveStatus(p && p.status === 'error' ? '执行异常 · 请检查记录' : '本次执行已完成', false);
+        Pipeline.addLog(p && p.status === 'error' ? 'error' : 'success',
+            p && p.status === 'error' ? 'Hermes 执行异常' : 'Hermes 已完成本次回复');
         this.toBottom(false);
     },
 
@@ -669,6 +716,7 @@ const Hermes = {
         if (confirmFirst && this.busy) return;
         $('#chatMessages').innerHTML = '';
         this.addSystem('◢ 界面已清屏（会话记忆仍在，刷新页面可恢复历史）');
+        NeuralStage.set('idle');
     },
 
     /* ---------- 发送 ---------- */
@@ -688,9 +736,7 @@ const Hermes = {
             if (r && r.status === 'queued') this.setLiveStatus('已入队…', true);
         } catch (e) {
             this.showError({ message: `发送失败: ${e.message}` });
-            this.busy = false;
-            this.stopTurnTimer();
-            this.setLiveStatus('发送失败', false);
+            this.endTurn({ status: 'error', error: `发送失败: ${e.message}` });
         }
     },
 
@@ -711,10 +757,13 @@ const Pipeline = {
     stages: ['trend', 'copy', 'storyboard', 'generate', 'compose', 'publish'],
     stageNames: {},
     running: false,
+    eventSource: null,
 
     async refresh() {
         try {
-            const data = await fetch('/api/state').then((r) => r.json());
+            const res = await fetch('/api/state');
+            if (!res.ok) throw new Error(`状态读取失败 (${res.status})`);
+            const data = await res.json();
             this.apply(data);
         } catch (e) { /* 网络抖动，跳过 */ }
     },
@@ -740,6 +789,9 @@ const Pipeline = {
         const ring = $('#ringProgress');
         if (ring) ring.style.strokeDashoffset = circ * (1 - prog / 100);
         $('#ringPercent').textContent = Math.round(prog);
+        $('#renderPercent').textContent = `${Math.round(prog)}%`;
+        $('#renderState').textContent = this.running ? (this.stageName(run.current_stage) || '正在启动')
+            : (run.message === '完成' ? '上一任务完成' : '等待任务');
 
         // 阶段状态
         const curIdx = this.stages.indexOf(run.current_stage);
@@ -770,6 +822,7 @@ const Pipeline = {
             $('#statReady').textContent = stats.jobs_ready ?? 0;
             $('#statPublished').textContent = stats.jobs_published ?? 0;
             $('#topToday').textContent = stats.published_today ?? 0;
+            $('#topJobs').textContent = stats.jobs_total ?? 0;
             $('#topReady').textContent = stats.jobs_ready ?? 0;
             $('#engToday').textContent = stats.published_today ?? 0;
             $('#engTrends').textContent = stats.trends_total ?? 0;
@@ -780,24 +833,40 @@ const Pipeline = {
             $('#engKernel').textContent = h.ready ? `在线 :${h.port}` : '离线';
             $('#topKernel').textContent = h.ready ? '就绪' : '离线';
         }
+        if (data.resources) {
+            const resources = data.resources;
+            const fields = [
+                ['gpu', 'Gpu'], ['cpu', 'Cpu'], ['memory', 'Memory'], ['disk', 'Disk'],
+            ];
+            for (const [key, label] of fields) {
+                const value = resources[key];
+                $(`#eng${label}`).textContent = value == null ? '--' : `${Math.round(value)}%`;
+                $(`#ring${label}`).style.setProperty('--value', value == null ? 0 : Math.max(0, Math.min(100, value)));
+            }
+            $('#topGpu').textContent = resources.gpu == null ? '--' : `${Math.round(resources.gpu)}%`;
+            $('#topStorage').textContent = resources.disk_free_gb == null ? '--' : `${resources.disk_free_gb} GB`;
+        }
     },
 
     stageName(id) {
-        const map = { trend: '热点爆款', copy: '文案生成', storyboard: '智能分镜',
-                      generate: '视频生成', compose: '合成字幕', publish: '发布互动' };
+        const map = { trend: '热点雷达', copy: '创意脚本', storyboard: '智能分镜',
+                      generate: '视频生成', compose: '合成发布', publish: '效果追踪' };
         return map[id] || '';
     },
 
     startSSE() {
+        if (this.eventSource) this.eventSource.close();
         const es = new EventSource('/api/logs');
+        this.eventSource = es;
         es.onmessage = (ev) => {
             try {
                 const data = JSON.parse(ev.data);
                 if (data.type === 'status') {
                     // 轻量帧：只更新 run 字段（stats/hermes/console 等由 4s 轮询负责）
+                    const wasRunning = this.running;
                     this.apply({ run: data.data });
-                    if (data.data && data.data.running !== undefined) {
-                        if (data.data.running !== this.running) this.refresh();
+                    if (data.data && data.data.running !== undefined && data.data.running !== wasRunning) {
+                        this.refresh();
                     }
                 } else if (data.type === 'log') {
                     this.addLog(data.level || 'info', data.message || '');
@@ -806,7 +875,10 @@ const Pipeline = {
         };
         es.onerror = () => {
             es.close();
-            setTimeout(() => this.startSSE(), 5000);
+            if (this.eventSource === es) {
+                this.eventSource = null;
+                setTimeout(() => this.startSSE(), 5000);
+            }
         };
     },
 
@@ -825,7 +897,9 @@ const Pipeline = {
  * ================================================================ */
 async function loadOutputs() {
     try {
-        const outputs = await fetch('/api/outputs?limit=6').then((r) => r.json());
+        const response = await fetch('/api/outputs?limit=3');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const outputs = await response.json();
         const grid = $('#outputsGrid');
         if (!outputs.length) {
             grid.innerHTML = '<div class="empty-hint">暂无成片</div>';
@@ -833,14 +907,24 @@ async function loadOutputs() {
         }
         grid.innerHTML = '';
         for (const o of outputs) {
-            const item = el('div', 'output-item');
-            item.title = `${o.name}\n${o.path}`;
-            item.innerHTML =
-                (o.thumb ? `<img src="${esc(o.thumb)}?t=${Date.now()}" alt="" loading="lazy">` : '') +
-                `<div class="output-meta"><div class="output-name">${esc(o.name)}</div>` +
-                `<div class="output-sub">${fmtBytes(o.size)} · ${String(o.mtime).slice(5, 16).replace('T', ' ')}` +
-                `${o.archived ? '' : ' · <span class="output-tag">待归档</span>'}</div></div>`;
-            item.addEventListener('click', () => window.open(o.video || o.path, '_blank'));
+            const item = el('a', 'output-item');
+            item.href = o.video;
+            item.target = '_blank';
+            item.rel = 'noopener noreferrer';
+            item.title = `${o.name} · 新窗口播放`;
+            if (o.thumb) {
+                const img = el('img');
+                img.src = `${o.thumb}?v=${encodeURIComponent(o.mtime || '')}`;
+                img.alt = `${o.name} 缩略图`;
+                img.loading = 'lazy';
+                item.appendChild(img);
+            } else {
+                item.appendChild(el('span', 'output-placeholder'));
+            }
+            const meta = el('div', 'output-meta');
+            meta.appendChild(el('div', 'output-name', o.name));
+            meta.appendChild(el('div', 'output-sub', `${fmtBytes(o.size)} · ${String(o.mtime).slice(5, 16).replace('T', ' ')}`));
+            item.appendChild(meta);
             grid.appendChild(item);
         }
     } catch { /* ignore */ }
@@ -1142,7 +1226,6 @@ function bindUI() {
         box.scrollTop = box.scrollHeight;
         $('#jumpBottom').hidden = true;
     });
-
     // 键盘快捷键：Esc 关设置
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') Settings.close();
@@ -1151,6 +1234,7 @@ function bindUI() {
 
 function boot() {
     bindUI();
+    NeuralStage.init();
     Hermes.connect();
     Pipeline.refresh();
     Pipeline.startSSE();

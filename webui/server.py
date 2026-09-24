@@ -7,13 +7,16 @@
 - 操作：/api/action/*（登录检测 / 扫码 / 清理 / 打开目录）
 """
 import asyncio
+import ctypes
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import time
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 
@@ -22,12 +25,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
 import uvicorn
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
 from hermes_bridge import blog, get_bridge
+
 from lib import OUT_DIR, STATE_DIR
 from lib.state import get_job, get_stats, list_jobs
 
@@ -36,15 +39,84 @@ RUN_STATUS_FILE = STATE_DIR / "run_status.json"
 RUN_PROGRESS_FILE = STATE_DIR / "run_progress.jsonl"
 CONSOLE_STATE_FILE = STATE_DIR / "console.json"
 ENGINE_PID_FILE = STATE_DIR / "engine.pid"
+_resource_cache: dict = {"at": 0.0, "value": {}}
+_cpu_sample: tuple[int, int, int] | None = None
+
+
+def _windows_cpu_percent() -> float | None:
+    """Sample CPU load from GetSystemTimes without requiring psutil."""
+    global _cpu_sample
+    idle = ctypes.c_ulonglong()
+    kernel = ctypes.c_ulonglong()
+    user = ctypes.c_ulonglong()
+    if not ctypes.windll.kernel32.GetSystemTimes(
+        ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
+    ):
+        return None
+    current = (idle.value, kernel.value, user.value)
+    previous, _cpu_sample = _cpu_sample, current
+    if previous is None:
+        return None
+    idle_delta = current[0] - previous[0]
+    total = current[1] - previous[1] + current[2] - previous[2]
+    return round(max(0.0, min(100.0, (1 - idle_delta / total) * 100)), 1) if total > 0 else None
+
+
+def _windows_memory_percent() -> float | None:
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
+                   ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
+                   ("total_page", ctypes.c_ulonglong), ("avail_page", ctypes.c_ulonglong),
+                   ("total_virtual", ctypes.c_ulonglong), ("avail_virtual", ctypes.c_ulonglong),
+                   ("avail_extended", ctypes.c_ulonglong)]
+
+    status = MemoryStatus()
+    status.length = ctypes.sizeof(status)
+    return float(status.load) if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)) else None
+
+
+def resource_stats() -> dict:
+    """Real machine telemetry; unavailable sensors remain null on the UI."""
+    now = time.monotonic()
+    if now - _resource_cache["at"] < 8:
+        return _resource_cache["value"]
+    disk = shutil.disk_usage(WEBUI_DIR)
+    cpu = memory = gpu = None
+    try:
+        import psutil
+        cpu = round(psutil.cpu_percent(interval=None), 1)
+        memory = round(psutil.virtual_memory().percent, 1)
+    except ImportError:
+        if sys.platform == "win32":
+            cpu = _windows_cpu_percent()
+            memory = _windows_memory_percent()
+    except OSError:
+        pass
+    exe = shutil.which("nvidia-smi")
+    if exe:
+        try:
+            result = subprocess.run(
+                [exe, "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=2, check=False)
+            readings = [float(x.strip()) for x in result.stdout.splitlines() if x.strip()]
+            if readings:
+                gpu = round(sum(readings) / len(readings), 1)
+        except (ValueError, OSError, subprocess.TimeoutExpired):
+            pass
+    value = {"gpu": gpu, "cpu": cpu, "memory": memory,
+             "disk": round((1 - disk.free / disk.total) * 100, 1),
+             "disk_free_gb": round(disk.free / 1024 ** 3, 1)}
+    _resource_cache.update(at=now, value=value)
+    return value
 
 # 6阶段定义
 STAGES = [
-    {"id": "trend", "name": "热点爆款", "icon": "🔥", "desc": "抓取平台热点素材"},
-    {"id": "copy", "name": "文案生成", "icon": "📝", "desc": "热点匹配 + 脚本创作"},
-    {"id": "storyboard", "name": "智能分镜", "icon": "🎬", "desc": "模板轮换 + 选角"},
-    {"id": "generate", "name": "视频生成", "icon": "🎥", "desc": "H3 并发出片"},
-    {"id": "compose", "name": "合成字幕", "icon": "🎞️", "desc": "装配 + 烧字幕"},
-    {"id": "publish", "name": "发布互动", "icon": "📤", "desc": "多平台发布 + 评论"},
+    {"id": "trend", "name": "热点雷达", "icon": "◉", "desc": "捕捉全网热点信号"},
+    {"id": "copy", "name": "创意脚本", "icon": "▤", "desc": "策略匹配 + 脚本生成"},
+    {"id": "storyboard", "name": "智能分镜", "icon": "◇", "desc": "镜头编排 + 角色选择"},
+    {"id": "generate", "name": "视频生成", "icon": "▷", "desc": "多模型并发渲染"},
+    {"id": "compose", "name": "合成发布", "icon": "↗", "desc": "装配字幕 + 质量检查"},
+    {"id": "publish", "name": "效果追踪", "icon": "⌁", "desc": "多平台发布 + 数据回流"},
 ]
 
 
@@ -142,10 +214,8 @@ def default_console_state() -> dict:
 def load_console_state() -> dict:
     state = default_console_state()
     if CONSOLE_STATE_FILE.exists():
-        try:
+        with suppress(Exception):
             state.update(json.loads(CONSOLE_STATE_FILE.read_text(encoding="utf-8")))
-        except Exception:
-            pass
     return state
 
 
@@ -200,6 +270,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="轻便侠·AI视频工厂", lifespan=lifespan)
+ENGINE_START_LOCK = asyncio.Lock()
 
 THUMBS_DIR = STATE_DIR / "thumbs"
 THUMBS_DIR.mkdir(parents=True, exist_ok=True)
@@ -234,6 +305,7 @@ async def api_state():
         "stats": get_stats(),
         "stages": STAGES,
         "hermes": get_bridge().status(),
+        "resources": await asyncio.to_thread(resource_stats),
     }
 
 
@@ -243,7 +315,7 @@ async def api_stats():
 
 
 @app.get("/api/jobs")
-async def api_jobs(status: str = None, limit: int = 20):
+async def api_jobs(status: str | None = None, limit: int = Query(default=20, ge=1, le=100)):
     return list_jobs(status, limit)
 
 
@@ -258,7 +330,12 @@ async def api_job(uid: str):
 @app.post("/api/settings")
 async def api_settings(request: Request):
     """更新设置（schema 白名单校验）"""
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象")
     state = load_console_state()
     saved, ignored = {}, {}
     for key, value in (data or {}).items():
@@ -288,30 +365,41 @@ async def api_get_settings():
 async def api_start(request: Request):
     """启动全流程"""
     body = {}
-    try:
+    with suppress(Exception):
         body = await request.json()
-    except Exception:
-        pass
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象")
     stages = body.get("stages")  # 可选：只跑部分阶段
-    dry = bool(body.get("dry"))
+    allowed_stages = {stage["id"] for stage in STAGES}
+    if stages is not None and (not isinstance(stages, list) or not stages or any(s not in allowed_stages for s in stages)):
+        raise HTTPException(status_code=400, detail="stages 必须是非空、有效的阶段列表")
 
-    status = load_run_status()
-    if status.get("running") and engine_alive():
-        return JSONResponse({"error": "已有任务在运行"}, status_code=400)
+    async with ENGINE_START_LOCK:
+        status = load_run_status()
+        if status.get("running") and engine_alive():
+            return JSONResponse({"error": "已有任务在运行"}, status_code=400)
 
-    engine_script = Path(__file__).parent.parent / "tools" / "run_all.py"
-    cmd = [sys.executable, str(engine_script)]
-    if stages:
-        cmd += ["--only", ",".join(stages)]
-    if dry:
-        cmd.append("--dry")
+        # 面板的演练模式应当真正影响“启动生产”，而非只停留在设置文件里。
+        console = load_console_state()
+        dry = bool(body["dry"]) if "dry" in body else bool(console.get("dry_mode"))
+        engine_script = Path(__file__).parent.parent / "tools" / "run_all.py"
+        cmd = [sys.executable, str(engine_script)]
+        if stages:
+            cmd += ["--only", ",".join(stages)]
+        if dry:
+            cmd.append("--dry")
 
-    proc = subprocess.Popen(
-        cmd, cwd=str(Path(__file__).parent.parent),
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-    ENGINE_PID_FILE.write_text(str(proc.pid), encoding="utf-8")
-    return {"ok": True, "message": "已启动全流程", "pid": proc.pid}
+        proc = subprocess.Popen(
+            cmd, cwd=str(Path(__file__).parent.parent),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+        ENGINE_PID_FILE.write_text(str(proc.pid), encoding="utf-8")
+        # run_all.py 可能要数秒才落状态文件；立即写入避免用户双击时重复拉起。
+        RUN_STATUS_FILE.write_text(json.dumps({
+            "running": True, "current_stage": None, "progress": 0,
+            "message": "生产引擎启动中…", "started_at": datetime.now().isoformat(),
+        }, ensure_ascii=False), encoding="utf-8")
+        return {"ok": True, "message": "已启动全流程" + ("（演练模式）" if dry else ""), "pid": proc.pid}
 
 
 @app.post("/api/stop")
@@ -362,7 +450,7 @@ async def api_restart():
         f"taskkill /PID {pid} /F >nul 2>&1\r\n"
         "timeout /t 2 /nobreak >nul\r\n"
         f'cd /d "{root}"\r\n'
-        'start "AYH-MJ Console" ".venv\\Scripts\\python.exe" webui\\server.py\r\n'
+        f'start "AYH-MJ Console" "{sys.executable}" webui\\server.py\r\n'
     )
     bat_path.write_text(content, encoding="ascii")
     subprocess.Popen(
@@ -376,7 +464,8 @@ async def api_restart():
 async def api_logs():
     """SSE 实时日志推送"""
     async def generate() -> AsyncGenerator[str, None]:
-        last_pos = 0
+        # 新连接只回放末尾，避免运行久后一次性推送巨量历史日志。
+        last_pos = max(0, RUN_PROGRESS_FILE.stat().st_size - 12_000) if RUN_PROGRESS_FILE.exists() else 0
         while True:
             if RUN_PROGRESS_FILE.exists():
                 try:
@@ -438,7 +527,7 @@ def collect_finals() -> list[Path]:
 
 
 @app.get("/api/outputs")
-async def api_outputs(limit: int = 6):
+async def api_outputs(limit: int = Query(default=6, ge=1, le=24)):
     """最新产出（只显示最终成片；缩略图按目录+文件名做唯一键）"""
     outputs = []
     for f in collect_finals()[:limit]:
@@ -529,7 +618,7 @@ async def api_douyin_check():
             _write_action_state(kind="douyin_check",
                                 status="ok" if ok else "fail",
                                 message=text.strip()[-300:] or ("登录有效 ✓" if ok else "未登录"))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _write_action_state(kind="douyin_check", status="fail", message="检测超时")
         except Exception as e:
             _write_action_state(kind="douyin_check", status="fail", message=f"检测异常: {e}")
@@ -552,10 +641,10 @@ async def api_douyin_login():
 async def api_cleanup(request: Request):
     """清理项目（默认 dry-run 预览；body {confirm: true} 才真删）"""
     body = {}
-    try:
+    with suppress(Exception):
         body = await request.json()
-    except Exception:
-        pass
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象")
     confirm = bool(body.get("confirm"))
     cmd = [sys.executable, str(Path(__file__).parent.parent / "tools" / "cleanup_project.py")]
     if not confirm:
@@ -563,7 +652,12 @@ async def api_cleanup(request: Request):
     proc = await asyncio.create_subprocess_exec(
         *cmd, cwd=str(Path(__file__).parent.parent),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-    out, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+    try:
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.communicate()
+        raise HTTPException(status_code=504, detail="清理任务超时，已终止") from exc
     text = (out or b"").decode("utf-8", errors="replace")
     return {"ok": True, "confirm": confirm, "output": text.strip()[-3000:]}
 

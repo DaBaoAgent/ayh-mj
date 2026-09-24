@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>轻便侠·AI视频工厂 · 控制台</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/v4.css">
 </head>
 <body>
     <!-- 背景层 -->
     <div class="bg-grid" aria-hidden="true"></div>
+    <canvas class="bg-matrix" id="matrixCanvas" aria-hidden="true"></canvas>
     <div class="bg-scan" aria-hidden="true"></div>
     <div class="bg-noise" aria-hidden="true"></div>
     <div class="bg-glow g1" aria-hidden="true"></div>
@@ -17,28 +19,29 @@
     <!-- 顶栏 -->
     <header class="topbar">
         <div class="brand">
-            <div class="brand-badge">⚡</div>
+            <div class="brand-badge" aria-hidden="true"><svg viewBox="0 0 54 54" fill="none"><path d="M4 9 49 9 29 26Z" fill="#3DDCFF"/><path d="M4 13 25 29 25 48Z" fill="#72EDFF"/><path d="M49 13 29 29 29 48Z" fill="#167ED6"/><path d="M9 18 25 32 25 39Z" fill="#D3FAFF" opacity=".8"/></svg></div>
             <div class="brand-text">
-                <h1 class="glitch" data-text="轻便侠·AI视频工厂">轻便侠·AI视频工厂</h1>
-                <span class="brand-sub">AYH-MJ · AUTONOMOUS VIDEO FACTORY <em>v2</em></span>
+                <h1>轻便侠</h1>
+                <span class="brand-sub">HERMES / VIDEO FACTORY <em>· 让创意更高效地发生</em></span>
             </div>
         </div>
 
         <div class="topbar-center">
             <div class="status-pill" id="statusPill">
                 <span class="pulse-dot"></span>
-                <span class="status-text" id="statusText">就绪</span>
+                <span class="status-text" id="statusText">系统待机</span>
             </div>
             <div class="top-metrics">
-                <div class="top-metric"><label>今日成片</label><b id="topToday">0</b></div>
-                <div class="top-metric"><label>待发布</label><b id="topReady">0</b></div>
-                <div class="top-metric"><label>内核</label><b id="topKernel">--</b></div>
+                <div class="top-metric"><label>今日发布</label><b id="topToday">0</b></div>
+                <div class="top-metric"><label>累计任务</label><b id="topJobs">0</b></div>
+                <div class="top-metric"><label>GPU负载</label><b id="topGpu">--</b></div>
+                <div class="top-metric"><label>剩余空间</label><b id="topStorage">--</b></div>
             </div>
         </div>
 
         <div class="topbar-right">
             <button class="btn btn-primary" id="btnStart">
-                <span class="btn-ico">▶</span> 启动流水线
+                <span class="btn-ico">↗</span> 启动生产
             </button>
             <button class="btn btn-danger" id="btnStop" disabled>
                 <span class="btn-ico">◼</span> 停止
@@ -55,7 +58,7 @@
         <aside class="col col-left">
             <section class="card pipeline-card">
                 <header class="card-head">
-                    <h2><span class="h-ico">◈</span> 能量流水线</h2>
+                    <h2><span class="h-ico">◈</span> AI 视频生产流程 <span class="panel-slashes">////</span></h2>
                     <div class="progress-ring">
                         <svg viewBox="0 0 100 100">
                             <circle class="ring-bg" cx="50" cy="50" r="45"/>
@@ -68,12 +71,14 @@
                     {% for stage in stages %}
                     <div class="stage" data-stage="{{ stage.id }}">
                         <div class="stage-rail">
-                            <div class="stage-node"><span class="stage-icon">{{ stage.icon }}</span></div>
+                            <div class="stage-index">{{ '%02d'|format(loop.index) }}</div>
                             {% if not loop.last %}<div class="stage-link"><span class="link-flow"></span></div>{% endif %}
                         </div>
+                        <div class="stage-node"><span class="stage-icon">{{ stage.icon }}</span></div>
                         <div class="stage-info">
                             <div class="stage-name">{{ stage.name }}</div>
                             <div class="stage-desc">{{ stage.desc }}</div>
+                            <div class="stage-meter"><span></span></div>
                         </div>
                         <div class="stage-state" data-state="idle">·</div>
                     </div>
@@ -85,14 +90,9 @@
                 </div>
             </section>
 
-            <section class="card stats-card">
-                <h2><span class="h-ico">▦</span> 产量看板</h2>
-                <div class="stats-grid">
-                    <div class="stat-cell"><b id="statTrends">0</b><label>热点素材</label></div>
-                    <div class="stat-cell"><b id="statJobs">0</b><label>累计任务</label></div>
-                    <div class="stat-cell hl"><b id="statReady">0</b><label>待发布</label></div>
-                    <div class="stat-cell ok"><b id="statPublished">0</b><label>已发布</label></div>
-                </div>
+            <section class="card mantra-card">
+                <strong>从灵感到世界<br>只需一次启动</strong>
+                <span>IDEAS FLOW. VIDEOS GROW.</span>
             </section>
         </aside>
 
@@ -102,69 +102,109 @@
                 <header class="console-head">
                     <div class="console-title">
                         <span class="holo-dot" id="holoDot"></span>
-                        <h2>HERMES 控制台</h2>
+                        <div><h2>HERMES NEURAL ORCHESTRATOR</h2><small>多模态 · 全链路 · AI 视频智能中枢</small></div>
                         <span class="model-badge" id="modelBadge">connecting…</span>
                     </div>
                     <div class="console-tools">
+                        <span class="console-phases">THINK　›　PLAN　›　GENERATE　›　BEYOND</span>
                         <span class="conn-badge" id="connBadge" data-state="off">离线</span>
                         <button class="mini-btn" id="btnClearView" title="清空界面显示（不影响会话记忆）">清屏</button>
                         <button class="mini-btn accent" id="btnNewChat" title="开启全新会话">＋ 新对话</button>
                     </div>
                 </header>
 
-                <div class="chat-scroll" id="chatScroll">
-                    <div class="chat-inner" id="chatMessages">
-                        <div class="msg msg-system welcome">
-                            <div class="sys-line">◢ 内核直连通道就绪 —— 这里嵌入的是与桌面版本体完全同源的 Hermes（同模型 / 同记忆 / 同技能）</div>
-                            <div class="sys-line dim">直接下指令即可，例如「跑一条样片」「看看今天热点」「重启引擎」；思考过程将实时展示</div>
+                <section class="neural-stage" id="neuralStage" data-mode="idle" aria-label="Hermes 神经编排状态">
+                    <div class="stage-code-rain" aria-hidden="true"><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span></div>
+                    <img class="brain-art" src="/static/neural-brain.png" alt="" aria-hidden="true">
+                    <canvas id="neuralCanvas" aria-hidden="true"></canvas>
+                    <div class="neural-hud neural-hud-left">
+                        <span class="hud-kicker">多源信息输入</span>
+                        <span class="hud-chip">热点资讯</span><span class="hud-chip">行业数据</span>
+                        <span class="hud-chip">用户画像</span><span class="hud-chip">创意灵感</span>
+                        <span class="hud-chip">参考素材</span>
+                    </div>
+                    <div class="neural-core-label">
+                        <span class="core-eyebrow" id="neuralPhase">NEURAL CORE / STANDBY</span>
+                        <strong id="neuralTitle">等待创作指令</strong>
+                        <small id="neuralHint">神经网络已同步，随时开始一条视频任务</small>
+                    </div>
+                    <div class="neural-hud neural-hud-right">
+                        <span class="hud-kicker">视频内容输出</span>
+                        <span class="hud-chip">脚本方案</span><span class="hud-chip">分镜画面</span>
+                        <span class="hud-chip">视频成片</span><span class="hud-chip">多平台发布</span>
+                        <span class="hud-chip">数据反馈</span>
+                    </div>
+                    <span class="neural-phase-label phase-understand">理解 <small>UNDERSTAND</small></span>
+                    <span class="neural-phase-label phase-reason">推理 <small>REASON</small></span>
+                    <span class="neural-phase-label phase-plan">规划 <small>PLAN</small></span>
+                    <span class="neural-phase-label phase-generate">生成 <small>GENERATE</small></span>
+                    <div class="stage-orbit orbit-one" aria-hidden="true"></div>
+                    <div class="stage-orbit orbit-two" aria-hidden="true"></div>
+                    <div class="stage-floor" aria-hidden="true"></div>
+                    <div class="neural-feed">
+                        <div class="chat-scroll" id="chatScroll" role="log" aria-label="Hermes 思考过程、工具进度与回复" aria-live="polite" aria-relevant="additions text">
+                            <div class="chat-inner" id="chatMessages">
+                                <div class="msg msg-system welcome">
+                                    <div class="sys-line">◢ NEURAL LINK READY —— Hermes 已接入视频工厂执行链</div>
+                                    <div class="sys-line dim">输入指令后，这里会呈现公开执行摘要、工具进度与最终回复</div>
+                                </div>
+                            </div>
+                            <button class="jump-btn" id="jumpBottom" hidden>↓ 回到最新</button>
                         </div>
                     </div>
-                    <button class="jump-btn" id="jumpBottom" hidden>↓ 回到最新</button>
-                </div>
+                </section>
 
                 <div class="live-status" id="liveStatus" data-active="0">
                     <span class="ls-icon">▸</span>
-                    <span class="ls-text" id="liveStatusText">standby · 等待指令</span>
+                    <span class="ls-text" id="liveStatusText">standby · 等待创作指令</span>
                     <span class="ls-timer" id="liveTimer"></span>
                 </div>
 
                 <footer class="console-input">
                     <div class="input-wrap">
                         <textarea id="chatInput" rows="1"
-                            placeholder="向 Hermes 下达指令…  Enter 发送 · Shift+Enter 换行"></textarea>
+                            placeholder="描述你要生产的视频，例如：为轻便侠制作一条 15 秒秋日出行短片…  Enter 发送"></textarea>
                     </div>
-                    <button class="btn btn-primary send-btn" id="btnSend" disabled>发送</button>
+                    <button class="btn btn-primary send-btn" id="btnSend" disabled>发送指令　→</button>
                 </footer>
+
+                <div class="production-grid" aria-label="视频生产概览">
+                    <section class="production-card trend-overview"><header><span class="feature-icon">▥</span><div><b>趋势洞察</b><small>捕捉热点，发现创作机会</small></div></header><div class="feature-number"><b id="statTrends">0</b><span>热点素材</span></div><svg class="sparkline" viewBox="0 0 180 35" preserveAspectRatio="none" aria-hidden="true"><path d="M0 29 L15 19 L31 26 L48 8 L65 25 L84 14 L102 27 L119 6 L139 20 L156 11 L180 23"/></svg><footer>HOT TREND INSIGHT <span>↗</span></footer></section>
+                    <section class="production-card script-overview"><header><span class="feature-icon">▤</span><div><b>脚本生成</b><small>根据目标自动生成脚本</small></div></header><div class="feature-number"><b id="statJobs">0</b><span>累计任务</span></div><div class="feature-lines"><i></i><i></i><i></i></div><footer>SCRIPT GENERATION <span>↗</span></footer></section>
+                    <section class="production-card board-overview"><header><span class="feature-icon">◇</span><div><b>镜头编排</b><small>智能生成分镜，自动匹配素材</small></div></header><div class="feature-number"><b id="statReady">0</b><span>待发布成片</span></div><div class="feature-frames"><i></i><i></i><i></i></div><footer>STORYBOARD <span>↗</span></footer></section>
+                    <section class="production-card render-overview"><header><span class="feature-icon">▷</span><div><b>视频渲染</b><small>多模态生成，高清渲染成片</small></div></header><div class="feature-progress"><b id="renderPercent">0%</b><span id="renderState">等待任务</span></div><span class="visually-hidden" id="statPublished">0</span><footer>VIDEO RENDERING <span>↗</span></footer></section>
+                </div>
             </div>
         </section>
 
         <!-- 右列：引擎 + 产出 + 日志 -->
         <aside class="col col-right">
             <section class="card engine-card">
-                <h2><span class="h-ico">◍</span> 引擎状态</h2>
-                <div class="engine-grid">
-                    <div class="engine-cell"><label>内核进程</label><b id="engKernel">—</b></div>
-                    <div class="engine-cell"><label>流水线</label><b id="engRun">待命</b></div>
-                    <div class="engine-cell"><label>今日发布</label><b id="engToday">0</b></div>
-                    <div class="engine-cell"><label>热点库</label><b id="engTrends">0</b></div>
+                <h2><span class="h-ico">✧</span> 系统资源 <span class="mini-live">REAL-TIME</span></h2>
+                <div class="resource-rings">
+                    <div class="resource-ring" id="ringGpu" style="--value:0"><b id="engGpu">--</b><small>GPU</small></div>
+                    <div class="resource-ring" id="ringCpu" style="--value:0"><b id="engCpu">--</b><small>CPU</small></div>
+                    <div class="resource-ring" id="ringMemory" style="--value:0"><b id="engMemory">--</b><small>内存</small></div>
+                    <div class="resource-ring" id="ringDisk" style="--value:0"><b id="engDisk">--</b><small>存储</small></div>
                 </div>
-            </section>
-
-            <section class="card outputs-card">
-                <h2><span class="h-ico">▶</span> 最新产出</h2>
-                <div class="outputs-grid" id="outputsGrid">
-                    <div class="empty-hint">暂无成片</div>
-                </div>
+                <div class="engine-meta"><span>内核 <b id="engKernel">—</b></span><span>流水线 <b id="engRun">待命</b></span><span hidden id="engToday">0</span><span hidden id="engTrends">0</span><span hidden id="topReady">0</span><span hidden id="topKernel">--</span></div>
             </section>
 
             <section class="card logs-card">
-                <h2><span class="h-ico">≡</span> 实时日志 <span class="log-live">LIVE</span></h2>
+                <h2><span class="h-ico">≡</span> 实时数据流 <span class="log-live">LIVE</span></h2>
+                <div class="data-waterfall" aria-hidden="true"><span>01001 10110 01011 11001 00101</span><span>11010 00111 10101 01110 11011</span><span>01101 11001 00101 10110 01001</span><span>10110 01010 11001 00111 01101</span><span>00101 11100 01011 10010 11010</span></div>
                 <div class="logs-box" id="logsBox">
                     <div class="log-line info"><span class="log-t">--:--:--</span> 系统就绪</div>
                 </div>
             </section>
+
+            <section class="card outputs-card">
+                <h2><span class="h-ico">▶</span> 最新生成作品 <span class="mini-live">RECENT OUTPUT</span></h2>
+                <div class="outputs-grid" id="outputsGrid"><div class="empty-hint">暂无成片</div></div>
+            </section>
         </aside>
     </main>
+    <footer class="page-footer"><span>◈ 轻便侠　|　HERMES / VIDEO FACTORY</span><span>AI 让每个创意都有更大的可能</span><span>VERSION 3.0.0　|　KEEP CREATING ∞</span></footer>
 
     <!-- 设置抽屉 -->
     <div class="drawer-mask" id="drawerMask"></div>
@@ -183,5 +223,6 @@
     </aside>
 
     <script src="/static/app.js"></script>
+    <script src="/static/neural_v4.js"></script>
 </body>
 </html>
