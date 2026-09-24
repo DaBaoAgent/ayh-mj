@@ -36,6 +36,8 @@ HARD = ("CRITICAL — NO ON-SCREEN TEXT: the video must contain absolutely NO te
 
 PROMPT_SYSTEM = """你是 H3 视频提示词工程师。把分镜镜头字段扩写成 MiniMax H3 三段式提示词。
 
+先理解 creative_design：开场钩子、逐镜节拍、反转与新意要体现在可见动作、人物反应和音效里；不要只换对白却把画面拍成旧模板。保持每镜信息密度，动作衔接利落，但必须遵守下面的构图、人物与产品硬约束。
+
 【构图（宽严标准：人物全身占画面高度约1/2，允许±30%偏差；重点是叙事与对白，不为构图反复重跑）】
 每镜 integrated_multimodal_description 的镜头语言以大全景描述开头（英文）：
 "Wide shot: camera at a far distance, every person's full body from head to toe fully visible with environment around; each figure occupies roughly half of the frame height."
@@ -140,6 +142,7 @@ def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
         })
     payload = {
         "concept": storyboard.get("concept", ""),
+        "creative_design": storyboard.get("creative_design", {}),
         "cast": cast_ctx,
         "shots": shots_ctx,
         "HARD_SECTION": HARD,
@@ -322,6 +325,8 @@ def concat_shots(shots: list[dict], out_dir: Path, final_name: str = "final.mp4"
 def run(storyboard_path: str, skip_prompt_build: bool = False,
         concurrency: int = 6) -> Path:
     sb = json.loads(Path(storyboard_path).read_text(encoding="utf-8"))
+    if not (sb.get("template_id") and sb.get("creative_research") and sb.get("creative_design")):
+        raise RuntimeError("仅支持已完成知识库研究与创意设计的模板分镜；旧分镜禁止直接出片")
     uid = sb.get("job_uid") or Path(storyboard_path).stem
     out_dir = ROOT / "out" / f"gen_{uid}"
     (out_dir / "shots").mkdir(parents=True, exist_ok=True)

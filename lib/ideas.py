@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
+from difflib import SequenceMatcher
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -46,6 +48,29 @@ def ideas_block(limit: int = 12) -> str:
         lines.append(f"  {i}. " + "；".join(bits))
     lines.append("新文案必须换全新的创意角度/梗/说法，禁止任何形式的重复或近似改写。")
     return "\n".join(lines)
+
+
+def novelty_issue(lines: dict, standard_lines: dict | None = None) -> str:
+    """Reject recycled dialogue before rendering, not after a video has cost money."""
+    def norm(value: str) -> str:
+        return re.sub(r"[\W_]+", "", value or "").lower()
+
+    ordered = [norm(str(v)) for _, v in sorted(lines.items(), key=lambda item: int(item[0]))]
+    candidate = "".join(ordered)
+    if standard_lines and candidate == "".join(
+        norm(str(v)) for _, v in sorted(standard_lines.items(), key=lambda item: int(item[0]))
+    ):
+        return "台词与模板标准版完全相同"
+    for idea in load_ideas():
+        previous = [norm(str(v)) for v in (idea.get("lines") or [])]
+        old_script = "".join(previous)
+        if old_script and SequenceMatcher(None, candidate, old_script).ratio() >= .78:
+            return f"整体台词与历史作品 {idea.get('template', '')} 过于相似"
+        # Brand sign-offs are naturally similar; compare the opening hook only.
+        if ordered and previous and min(len(ordered[0]), len(previous[0])) >= 5:
+            if SequenceMatcher(None, ordered[0], previous[0]).ratio() >= .85:
+                return f"开场钩子与历史作品 {idea.get('template', '')} 重复"
+    return ""
 
 
 def record_idea(template_id: str, template_name: str, hotspot_title: str,

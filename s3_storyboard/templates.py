@@ -3,7 +3,7 @@
 流程：
   1. load_templates()   → 10 套模板（YAML）
   2. pick_template()    → 按历史轮换选一套（最近用过的排除）
-  3. adapt_lines()      → 用 LLM 把热点话题融入台词（保持字数/结构约束；失败回退标准版）
+  3. adapt_lines()      → 先消化创意研究简报，再生成并校验台词（失败停止，不复用标准版）
   4. to_storyboard()    → 输出标准分镜 JSON（含每镜参考图/音色/时长）
 
 约束（adapt_lines 强制）：
@@ -79,8 +79,8 @@ def mark_used(template_id: str) -> None:
     _save_history(hist)
 
 
-ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜头台词（标准版）和一个热点话题。
-你的任务：在【不改镜头结构、不改单镜字数上限、不改角色关系】的前提下，把热点话题自然融入台词（融入开场钩子最优先）。
+ADAPT_SYSTEM = """你是短剧导演兼创意策划。先研读热点、爆款案例、短剧结构、同行与跨赛道对标，再用模板镜头拍出一个新故事。
+你的任务：在【不改镜头数、不改单镜字数上限、不改角色关系】的前提下，重新设计开场钩子、节拍、反转和自然对白。知识库只借鉴结构，不照搬原桥段。
 
 【角色铁律（违反=失败）】
 1. 每个镜头的 speaker 标注了说话人身份——台词必须符合该身份
@@ -101,19 +101,20 @@ ADAPT_SYSTEM = """你是短剧台词改写师。给你一套视频模板的镜�
 - 数字用中文读音写（218→二幺八，"一"读"幺"；13.8→十三点八）
 - 不改变说话人分配
 - 参考 product_points 把真实卖点自然融入（数字/功能/场景，不硬广）
-- **必须遵循 drama_structure_rules（短剧结构库）创作**：
+- **必须遵循 research_brief 中的短剧结构、爆款与对标参考**：
   · 前3秒开场有冲突/悬念钩子；单句台词尽量 8-12 字
-  · 有质疑→打脸的反转结构；台词大白话零修饰（拒绝解释性长句）
+  · 每2-4秒有新信息或动作，节奏明快；反转可以是惊喜/误解澄清/身份/玩法，不要总是质疑→打脸
+  · 台词必须能一口气自然说出，人物接话有因果，拒绝解释性长句
   · 禁止与已用创意清单重复的桥段/梗
-- **最后一镜台词必须包含品牌"爱优护轻便侠"**（CTA 硬要求；若超字数就把该镜拆两段：前半回应+后半品牌）
-- 如果热点完全不适用，原样返回（宁可不动）
+- **最后一镜台词必须包含品牌"爱优护轻便侠"**（CTA 硬要求；在单镜字数上限内压缩表达，不能拆出额外镜头）
+- 如果某条热点不适用，要换研究简报里的相关话题来化用；绝不能照搬模板标准台词
 - **场景微调（可选字段）**：若某镜台词涉及的动作/地点无法用现有 scene 表达，可输出 `scene_tweaks` 微调
   （例：主打"手机遥控"但场景是"拎车甩开"→改成"掏出手机轻按，新车自动滑到脚边"；
   或按本期思路**更换场景地点/背景**，如"机场候机楼门口/地铁站口/公园"）——
   只改动作细节与地点背景（start_state/end_state），**不改人数/机位/景别/情绪基调**；不需要就省略
 - 输出 JSON 可含：`"scene_tweaks": {"2": {"start_state": "…", "end_state": "…"}}`（只列需要改的镜）
 
-返回 JSON：{"lines": {"1": "第1镜台词", "2": "...", ...}, "reason": "改写说明一句话"}"""
+返回 JSON：{"creative_design": {"hook": "前三秒具体钩子", "beat": "每镜节拍概述", "twist": "新反转", "novelty": "与历史套路具体有何不同", "reference_use": "如何化用热点/爆款/短剧/对标"}, "lines": {"1": "第1镜台词", "2": "...", ...}, "scene_tweaks": {}, "reason": "改写说明一句话"}"""
 
 # 角色引用 → 可读描述（给 LLM 理解角色关系）
 _CAST_READABLE = {
@@ -160,19 +161,21 @@ def _bridges() -> str:
         return ""
 
 
-def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> dict:
-    """热点融入台词；失败回退标准版"""
+def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "",
+                research_brief: dict | None = None) -> dict:
+    """研究驱动的模板改编；质检失败即停，避免重复标准版被送去出片。"""
     std = {str(s["seq"]): s["narration"] for s in template["shots"]}
-    if not hotspot_text:
-        return {"lines": std, "reason": "无热点，用标准版"}
+    if not research_brief:
+        from lib.creative_research import build_research_brief
+        research_brief = build_research_brief()
+    hotspot_text = hotspot_text or research_brief["hotspot"]["title"]
 
     payload = {
         "template": template["name"],
         "hot_topic": hotspot_title or hotspot_text[:60],
         "hot_context": hotspot_text[:400],
         "product_points": _product_points(),
-        "drama_structure_rules": _drama_rules(),
-        "trend_bridges": _bridges(),
+        "research_brief": research_brief,
         "shots": [
             {"seq": s["seq"], "duration": s["duration"],
              "max_chars": int(int(s["duration"]) * 4.5)
@@ -205,7 +208,7 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
     last_err = ""
     for attempt in range(1, 4):
         try:
-            from lib.ideas import ideas_block
+            from lib.ideas import ideas_block, novelty_issue
             user_msg = "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1)
             ib = ideas_block()
             if ib:
@@ -213,13 +216,14 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
             out = chat_json([
                 {"role": "system", "content": ADAPT_SYSTEM},
                 {"role": "user", "content": user_msg},
-            ], temperature=0.5, max_tokens=2000)
+            ], temperature=0.75, max_tokens=2600, retries=0)
             lines = out.get("lines", {})
+            design = out.get("creative_design") or {}
             # 校验：字数上限
             ok = True
             for s in template["shots"]:
                 seq = str(s["seq"])
-                if seq not in lines:
+                if not isinstance(lines.get(seq), str) or not lines[seq].strip():
                     ok = False
                     last_err = f"缺镜{seq}"
                     break
@@ -235,18 +239,24 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "") -> d
                     ok = False
                     last_err = f"镜{last_seq}缺品牌CTA"
             if ok:
+                required = ("hook", "beat", "twist", "novelty", "reference_use")
+                if not isinstance(design, dict) or any(not str(design.get(k) or "").strip() for k in required):
+                    ok = False
+                    last_err = "缺创意设计或知识库化用说明"
+            if ok:
+                last_err = novelty_issue(lines, std)
+                ok = not last_err
+            if ok:
                 if attempt > 1:
-                    print(f"  ✓ 台词改写第{attempt}次成功", flush=True)
+                    print(f"  [OK] 台词改写第{attempt}次成功", flush=True)
                 return {"lines": lines, "reason": out.get("reason", "热点已融入"),
                         "sales_point": pt, "scene_tweaks": out.get("scene_tweaks", {}) or {},
-                        "angle": ang}
-            print(f"  ⚠ 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
+                        "angle": ang, "creative_design": design}
+            print(f"  [WARN] 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
         except Exception as e:
             last_err = str(e)[:80]
-            print(f"  ⚠ 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
-    # 回退也要带上思路/场景微调，否则思路轮换会丢（2026-09-24 修：曾导致"换车"套路反复重现）
-    return {"lines": std, "reason": f"校验未过回退标准版({last_err})",
-            "sales_point": pt, "scene_tweaks": {}, "angle": ang}
+            print(f"  [WARN] 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
+    raise RuntimeError(f"创意台词质检未通过，已停止本条视频以免重复旧套路：{last_err}")
 
 
 def to_storyboard(template: dict, lines: dict | None = None,

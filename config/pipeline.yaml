@@ -25,16 +25,6 @@ trend:
   pages_per_keyword: 3
   min_likes: 1000
 
-# 文案生成 (s2)
-copy:
-  model: "deepseek-chat"
-  temperature: 0.7
-  max_tokens: 2000
-  style: "轻快科普风"
-  word_count:
-    min: 150
-    max: 300  # 10-20秒视频对应字数
-
 # 分镜 (s3)
 storyboard:
   shots_count:
@@ -56,10 +46,6 @@ generate:
 
 # 合成 (s5)
 compose:
-  tts:
-    provider: "edge-tts"
-    voice: "zh-CN-YunxiNeural"
-    rate: "+10%"
   subtitle:
     font: "Microsoft YaHei"
     font_size: 48

@@ -49,11 +49,13 @@ def _used() -> dict:
 
 
 def next_angle() -> dict:
-    """选本期叙事思路：未用优先（回填的 A 组视为已用）"""
+    """选本期叙事思路：只用未使用框架，耗尽时停止而非重复旧套路。"""
     used = _used()
     pool = [a for a in ANGLES if not a.get("used_up")]
     fresh = [a for a in pool if not used.get(a["id"])]
-    return (fresh or pool or ANGLES)[0]
+    if not fresh:
+        raise RuntimeError("未使用的叙事思路已耗尽；请扩充思路库，不能重复旧套路")
+    return fresh[0]
 
 
 def record_angle(angle_id: str, tag: str) -> None:
