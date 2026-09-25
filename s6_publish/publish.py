@@ -26,8 +26,8 @@ import yaml
 from lib import CONFIG_DIR, STATE_DIR
 from lib.state import connect, get_job, list_jobs, update_job
 
-# PostFlow CLI（AutoAYH vendor）
-POSTFLOW_DIR = Path("D:/@kaifa/AutoAYH/pipeline/vendor/postflow")
+# PostFlow CLI（ayh-mj 自有 vendor，2026-09-25 从 AutoAYH 迁入）
+POSTFLOW_DIR = Path("D:/@kaifa/ayh-mj/vendor/postflow")
 POSTFLOW_EXE = POSTFLOW_DIR / ".venv" / "Scripts" / "postflow.exe"
 
 # 平台映射：我们的名字 → (通道, PostFlow子命令)

@@ -24,10 +24,65 @@ from lib.tools import ffmpeg
 # 转写用系统 Python（.venv 无 faster-whisper）
 SYS_PYTHON = Path("C:/Users/xxx13/AppData/Local/Programs/Python/Python312/python.exe")
 
-# 竖版字幕样式（1080 宽基准；白字黑边、底部居中、微软雅黑）
+# 竖版字幕样式（白字黑边、居中、微软雅黑）
+# 垂直位置（宝哥规则 2026-09-24）：字幕底边落在画面「下方三分之一」处（原来贴在画面最底部 8% 会被抖音 UI 压住）
+#   · ffmpeg subtitles 滤镜把 SRT 转 ASS 时 PlayResY 固定 288（实测 768x1344 / 1080x1920 都按此比例缩放）
+#   · MarginV = 288 × 比例 → 实测字幕底边距画面底部 = 画面高度 × 比例（1/3 时实测 33.9%）
+#   · 2026-09-24 宝哥验收「再低一点」→ 1/3 → 0.28（实测底边距底部 28.4%）
+#   · 想微调只改 SUBTITLE_BOTTOM_RATIO（更大=更高，更小=更低；0.25 更低、0.33 回到三分之一）
+ASS_PLAY_RES_Y = 288
+SUBTITLE_BOTTOM_RATIO = 0.25
+SUBTITLE_MARGIN_V = round(ASS_PLAY_RES_Y * SUBTITLE_BOTTOM_RATIO)
+
 SUB_STYLE = ("FontName=Microsoft YaHei,FontSize=13,PrimaryColour=&HFFFFFF,"
              "OutlineColour=&H000000,BorderStyle=1,Outline=1.5,Shadow=0,"
-             "Alignment=2,MarginV=28,Bold=1")
+             f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=1")
+
+# ── 字幕动效（2026-09-25 宝哥令：关键词高亮+弹跳）──
+HIGHLIGHT_WORDS = ["爱优护", "轻便侠", "医疗级", "锂电", "13.8", "单手", "一秒",
+                   "说走就走", "放心睡", "听您的", "屋里充", "没白请"]
+HL_COLOR = r"&H00FFFF&"      # 黄（ASS BGR）
+RESTORE = r"&HFFFFFF&"
+
+
+def _hl(text: str) -> str:
+    """行内关键词高亮：黄色 + 小幅放大"""
+    for w in HIGHLIGHT_WORDS:
+        if w in text:
+            text = text.replace(w, r"{\c" + HL_COLOR + r"\fscx115\fscy115}" + w + r"{\c" + RESTORE + r"\fscx100\fscy100}")
+    return text
+
+
+def _ass_ts(seconds: float) -> str:
+    cs = int(round(seconds * 100))
+    h, cs = divmod(cs, 360000)
+    m, cs = divmod(cs, 6000)
+    s, cs = divmod(cs, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def write_ass_with_effects(rows: list[tuple[float, float, str]], ass_path: Path) -> Path:
+    """写带动效的 ASS：关键词高亮 + 每行出场弹跳（130%→100%）"""
+    header = (
+        "[Script Info]\nScriptType: v4.00+\n"
+        f"PlayResX: 162\nPlayResY: {ASS_PLAY_RES_Y}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
+        "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,Microsoft YaHei,13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+        f"-1,0,0,0,100,100,0,0,1,1.5,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+    lines = [header]
+    for start, end, text in rows:
+        body = _hl(text)
+        # 弹跳：开场 0.12s 从 130% 缩回 100%
+        body = r"{\fscx130\fscy130\t(0,120,\fscx100\fscy100)}" + body
+        lines.append(f"Dialogue: 0,{_ass_ts(start)},{_ass_ts(end)},Default,,0,0,0,,{body}\n")
+    ass_path.write_text("".join(lines), encoding="utf-8")
+    return ass_path
 
 
 def _srt_ts(seconds: float) -> str:
@@ -372,25 +427,55 @@ def burn_by_storyboard(video: str, shots_dir: Path, expected_lines: list[str],
 
 
 def burn(video: str, srt: str = None, suffix: str = "_sub",
-         expected_lines: list[str] = None) -> Path:
+         expected_lines: list[str] = None, effects: bool = True) -> Path:
     """烧字幕，返回新文件路径
 
     expected_lines：分镜台词（已知文本）——用其替换转写文本修正同音字
+    effects：True=ASS 动效（关键词高亮+弹跳）；False=旧 SRT 路径
     """
     video_p = Path(video).resolve()
+    rows: list[tuple[float, float, str]] = []
+
     if srt:
         srt_path = Path(srt).resolve()
+        # 解析 SRT → rows（用于 ASS 动效路径）
+        import re as _re
+        raw = srt_path.read_text(encoding="utf-8")
+        for block in _re.split(r"\n\s*\n", raw.strip()):
+            ls = block.strip().splitlines()
+            if len(ls) >= 3 and "-->" in ls[1]:
+                t0s, t1s = [x.strip() for x in ls[1].split("-->")]
+                def _p(ts: str) -> float:
+                    hh, mm, rest = ts.split(":")
+                    ss, ms = rest.split(",")
+                    return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000
+                rows.append((_p(t0s), _p(t1s), "".join(ls[2:])))
     else:
         segments = transcribe_segments(str(video_p))
-        srt_path = video_p.parent / f"{video_p.stem}.srt"
-        segments_to_srt(segments, srt_path, expected_lines=expected_lines)
-        print(f"✓ SRT: {srt_path}（{len(segments)} 条）", flush=True)
+        texts = None
+        if expected_lines:
+            aligned = _try_align(segments, expected_lines)
+            if aligned:
+                segments, texts = aligned
+        rows = _no_overlap(_explode_rows(segments, texts, max_chars=10))
+        print(f"✓ 字幕 {len(rows)} 条", flush=True)
 
     out = video_p.with_name(f"{video_p.stem}{suffix}.mp4")
 
-    # Windows 路径转义：subtitles 滤镜需把盘符冒号转义
-    srt_arg = str(srt_path).replace("\\", "/").replace(":", "\\:")
-    vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}'"
+    if effects and rows:
+        ass_path = write_ass_with_effects(rows, video_p.parent / f"{video_p.stem}.ass")
+        ass_arg = str(ass_path).replace("\\", "/").replace(":", "\\:")
+        vf = f"subtitles='{ass_arg}'"
+        print(f"✓ 动效字幕（高亮+弹跳）: {ass_path.name}", flush=True)
+    else:
+        # 旧路径：SRT + force_style
+        if srt:
+            srt_path = Path(srt).resolve()
+        vf = None
+
+    if vf is None:
+        srt_arg = str(srt_path).replace("\\", "/").replace(":", "\\:")
+        vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}'"
 
     cmd = [ffmpeg(), "-y", "-i", str(video_p), "-vf", vf,
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
