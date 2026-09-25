@@ -41,7 +41,7 @@ FONTS_DIR_ARG = "D\\:/@kaifa/fonts-douyin"  # ffmpeg filter 内用的转义路�
 
 SUB_STYLE = (f"FontName={FONT_NAME},FontSize=13,PrimaryColour=&HFFFFFF,"
              "OutlineColour=&H000000,BorderStyle=1,Outline=1.5,Shadow=0,"
-             f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=1")
+             f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=0")
 
 # ── 字幕动效（2026-09-25 宝哥令：关键词高亮+弹跳）──
 HIGHLIGHT_WORDS = ["爱优护", "轻便侠", "医疗级", "锂电", "13.8", "单手", "一秒",
@@ -76,13 +76,13 @@ def write_ass_with_effects(rows: list[tuple[float, float, str]], ass_path: Path)
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,{FONT_NAME},13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
-        f"-1,0,0,0,100,100,0,0,1,1.5,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
+        f"0,0,0,0,100,100,0,0,1,1.5,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
     lines = [header]
     for start, end, text in rows:
-        body = _hl(text)
+        body = _hl(_cn_to_arabic(_strip_punct(text)))
         # 弹跳：开场 0.12s 从 130% 缩回 100%
         body = r"{\fscx130\fscy130\t(0,120,\fscx100\fscy100)}" + body
         lines.append(f"Dialogue: 0,{_ass_ts(start)},{_ass_ts(end)},Default,,0,0,0,,{body}\n")
