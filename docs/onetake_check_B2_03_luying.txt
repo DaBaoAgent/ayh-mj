@@ -1,0 +1,23 @@
+integrated_multimodal_description: Live-action fun commercial in vertical framing. Pacing is tight and bouncy; everyone speaks at a natural, brisk conversational pace. The first line starts within the first quarter second, every line begins immediately after the previous line's last word and immediately after each cut, gaps between lines stay under a quarter second, no pause exceeds a third of a second, and the final line ends right at the last moment of the video, with no trailing silence. The camera is always gently moving — a sideways sweep, a push-in, a slight sway and a pull-back — never static. Shot like real documentary footage: natural available light with soft realistic shadows, lifelike skin texture with visible pores and fine lines, natural hair detail, true-to-life colors, shallow depth of field like an 85mm lens at f/2, photorealistic and candid — no plastic skin, no over-smoothing.
+
+CAST (STRICTLY BIND — exactly 2 people and exactly ONE wheelchair; each person appears EXACTLY ONCE per shot, never duplicated; no extra bystanders): both Chinese, speaking standard Mandarin; their clothing colors are clearly DIFFERENT and never swapped.
+- (S1) a 75-year-old Chinese grandpa with white hair and deep wrinkles, a grey knit sweater, exactly as in reference image 1. VOICE (S1): an ELDERLY man's voice — low, deep and slow (reference audio 1).
+- (S2) a 30-year-old Chinese man in a green work jacket, tired but friendly, exactly as in reference image 2. VOICE (S2): a YOUNG man's voice — lighter, quicker and casual (reference audio 2).
+The two voices are clearly DIFFERENT in pitch and age; never swap them.
+WHEELCHAIR: the small silver-grey LIGHTWEIGHT electric wheelchair (matching reference images 3, 4 and 5: silver-grey frame, black cushion seat, red springs, brand lettering as in references). The SAME single wheelchair in every shot.
+
+[Shot 1, 0 to 4 seconds] The young man drags a suitcase whose wheels get stuck between stones with a thud; the grandpa rolls past him on the wheelchair over the same gravel, smooth as a breeze. (S2) says: <d>[Chinese] 这破石子路，箱子轮子要废了。</d> (S1) replies: <d>[Chinese] 我这车，专走这种路。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 2, 4 to 8 seconds] The young man looks down at the wheelchair's solid tires; the grandpa pats the wheel. (S2) says: <d>[Chinese] 实心的？扎不扎？</d> (S1) replies: <d>[Chinese] 镁合金实心胎，钉子都扎不动。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 3, 8 to 11 seconds] The young man crouches and taps the tire with a bottle-opener key — a hard clink; he looks impressed. (S2) says: <d>[Chinese] 还真硬！维护呢？</d> (S1) replies: <d>[Chinese] 零维护，不爆胎。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 4, 11 to 14.5 seconds] The grandpa rolls toward the tent unhurried; the young man jogs two steps after him. (S2) says: <d>[Chinese] 链接发我一个。</d> (S1) replies: <d>[Chinese] 搜轻便侠，自己找。</d> (S2) replies: <d>[Chinese] 这个真不赖。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. 
+
+Scene: a campsite with tents, a gravel path with small stones, string lights at dusk. Only these people speak, taking turns with no overlap, in exactly this order. All dialogue spoken verbatim, no extra words, no omissions, no repeated lines. No on-screen text; dialogue is audio only.
+
+overall_soundscape: Ambient outdoor/indoor room tone fitting the scene, clear natural voices.
+
+non_diegetic_music: N/A
+
+Hard constraints: exactly ONE wheelchair, always the small silver-grey lightweight one; each person appears exactly once per shot and is never duplicated; the two people never swap clothes, faces, voices or roles; no extra people; no background music; render no watermarks, subtitles or text anywhere; looks stay exactly consistent with the reference images; hard cuts only, no fades.

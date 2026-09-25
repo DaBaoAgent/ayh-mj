@@ -1,0 +1,23 @@
+integrated_multimodal_description: Live-action fun commercial in vertical framing. Pacing is tight and bouncy; everyone speaks at a natural, brisk conversational pace. The first line starts within the first quarter second, every line begins immediately after the previous line's last word and immediately after each cut, gaps between lines stay under a quarter second, no pause exceeds a third of a second, and the final line ends right at the last moment of the video, with no trailing silence. The camera is always gently moving — a sideways sweep, a push-in, a slight sway and a pull-back — never static. Shot like real documentary footage: natural available light with soft realistic shadows, lifelike skin texture with visible pores and fine lines, natural hair detail, true-to-life colors, shallow depth of field like an 85mm lens at f/2, photorealistic and candid — no plastic skin, no over-smoothing.
+
+CAST (STRICTLY BIND — exactly 2 people and exactly ONE wheelchair; each person appears EXACTLY ONCE per shot, never duplicated; no extra bystanders): both Chinese, speaking standard Mandarin; their clothing colors are clearly DIFFERENT and never swapped.
+- (S1) a 70-year-old Chinese grandma with silver permed hair, a purple cardigan and a pearl necklace, exactly as in reference image 1. VOICE (S1): an ELDERLY woman's voice — warm, low and unhurried (reference audio 1).
+- (S2) a 10-year-old Chinese boy with a buzz cut and a red-white sporty jacket, lively, exactly as in reference image 2. VOICE (S2): a BOY's voice — bright and chirpy (reference audio 2).
+The two voices are clearly DIFFERENT in pitch and age; never swap them.
+WHEELCHAIR: the small silver-grey LIGHTWEIGHT electric wheelchair (matching reference images 3, 4 and 5: silver-grey frame, black cushion seat, red springs, brand lettering as in references). The SAME single wheelchair in every shot.
+
+[Shot 1, 0 to 4 seconds] The grandma hangs red shopping bags on both handlebar sides of the wheelchair, one after another; the boy watches with a candy in his mouth. (S2) says: <d>[Chinese] 奶奶，这些年货能装下吗？</d> (S1) replies: <d>[Chinese] 挂上，都挂上，两边都挂。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 2, 4 to 8 seconds] The boy climbs onto the wheelchair's footrest and sits on the seat edge; the grandma steadies him by the arm. (S2) says: <d>[Chinese] 我也要坐！</d> (S2) replies: <d>[Chinese] 压得坏吗？</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 3, 8 to 11 seconds] The grandma pats the frame, thumps it once with her fist; the wheelchair does not budge, bags swaying gently. (S1) says: <d>[Chinese] 一百公斤承重，压不坏。</d> (S2) replies: <d>[Chinese] 那我坐，奶奶推我，稳着呢。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. Hard cut. 
+
+[Shot 4, 11 to 14.5 seconds] The grandma pushes the loaded wheelchair toward the gate; the boy waves both hands, bags swinging. (S1) says: <d>[Chinese] 坐稳喽，扶好。</d> (S2) replies: <d>[Chinese] 走喽走喽！</d> (S1) replies: <d>[Chinese] 爱优护轻便侠，扛造。</d> ONLY the speaker's mouth moves; the other person's lips stay closed. 
+
+Scene: the ground floor of an old residential building at New Year, red couplets on doorways, shopping bags everywhere. Only these people speak, taking turns with no overlap, in exactly this order. All dialogue spoken verbatim, no extra words, no omissions, no repeated lines. No on-screen text; dialogue is audio only.
+
+overall_soundscape: Ambient outdoor/indoor room tone fitting the scene, clear natural voices.
+
+non_diegetic_music: N/A
+
+Hard constraints: exactly ONE wheelchair, always the small silver-grey lightweight one; each person appears exactly once per shot and is never duplicated; the two people never swap clothes, faces, voices or roles; no extra people; no background music; render no watermarks, subtitles or text anywhere; looks stay exactly consistent with the reference images; hard cuts only, no fades.

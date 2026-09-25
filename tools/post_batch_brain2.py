@@ -43,10 +43,13 @@ def main() -> None:
             print(f"✗ {uid} 缺文件，跳过"); continue
         print(f"\n{'='*50}\n▶ {uid} {s['title']}")
 
-        # 1) trim
+        # 1) trim（若无需裁剪则复制原片作为 trim 版）
         if not (g / "onetake_trim.mp4").exists():
             r = run([PY, str(ROOT / "tools/trim_onetake.py"), str(src), "--apply"])
             print("  trim:", r.stdout.strip().splitlines()[-1] if r.stdout else r.stderr[-120:])
+        if not (g / "onetake_trim.mp4").exists():
+            shutil.copy(src, g / "onetake_trim.mp4")
+            print("  trim: 无裁剪，已复制原片为 trim 版")
 
         # 2) 转写 trim 版（small 快）
         tr_dir = g / "transcripts"
@@ -55,28 +58,42 @@ def main() -> None:
         if not trj.exists():
             run([PY, str(ROOT / "tools/transcribe_local.py"), str(g / "onetake_trim.mp4")], timeout=900)
 
-        # 3) 对齐生成 SRT（转写段 vs 原始句）
+        # 3) 对齐生成 SRT（转写段 vs 原始句——贪心对齐+段内按字数比例拆分）
+        import re as _re
         from faster_whisper import WhisperModel
         lines_all = [t for sh in s["shots"] for _, t in sh["lines"]]
         model = WhisperModel("medium", device="cpu", compute_type="int8")
         segs, _ = model.transcribe(str(g / "onetake_trim.mp4"), language="zh", vad_filter=True)
         segs = list(segs)
         print(f"  转写 {len(segs)} 段 vs 台词 {len(lines_all)} 句")
+
+        def _cjk(x: str) -> int:
+            return len(_re.findall(r"[\u3400-\u9fff]", x))
+
         if len(segs) == len(lines_all):
             srt_rows = [(sg.start, sg.end, txt) for sg, txt in zip(segs, lines_all)]
         else:
-            # 按段合并/拆分：段数少于句数时按字数均匀分；多于时合并相邻
+            # 贪心：转写段 i 覆盖台词句子 [cur, cur+n)，按每段实际字数贴近
+            seg_chars = [max(_cjk(sg.text), 1) for sg in segs]
+            line_chars = [max(_cjk(li), 1) for li in lines_all]
+            cur = 0
             srt_rows = []
-            if len(segs) < len(lines_all):
-                # 每段按字数拆成多句
-                for sg in segs:
-                    seg_txt = sg.text.strip()
-                    # 把 lines_all 顺序并入段：按累计字数切
-                    srt_rows.append((sg.start, sg.end, seg_txt))
-                print("  ⚠️ 段数不足，暂用转写原文（人工复核）")
-            else:
-                print("  ⚠️ 段数过多，暂用转写原文（人工复核）")
-                srt_rows = [(sg.start, sg.end, sg.text.strip()) for sg in segs]
+            for i, sg in enumerate(segs):
+                acc, group = 0, []
+                while cur < len(lines_all) and (acc < seg_chars[i] or not group):
+                    acc += line_chars[cur]; group.append(cur); cur += 1
+                if not group:
+                    group = [min(cur, len(lines_all) - 1)]
+                # 段内多句按字数比例拆分时间
+                total = sum(line_chars[c] for c in group)
+                t = sg.start
+                span = sg.end - sg.start
+                for c in group:
+                    share = span * line_chars[c] / total
+                    srt_rows.append((round(t, 2), round(t + share, 2), lines_all[c]))
+                    t += share
+            if len(srt_rows) != len(lines_all):
+                print(f"  ⚠️ 对齐后 {len(srt_rows)} 行 vs {len(lines_all)} 句——需人工复核")
 
         def ts(t: float) -> str:
             h, r = divmod(t, 3600); m, sec = divmod(r, 60)
