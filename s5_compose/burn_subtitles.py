@@ -40,7 +40,7 @@ FONTS_DIR = "D:/@kaifa/fonts-douyin"  # 字体文件所在目录（libass fontsd
 FONTS_DIR_ARG = "D\\:/@kaifa/fonts-douyin"  # ffmpeg filter 内用的转义路径（冒号需 \:）
 
 SUB_STYLE = (f"FontName={FONT_NAME},FontSize=13,PrimaryColour=&HFFFFFF,"
-             "OutlineColour=&H000000,BorderStyle=1,Outline=1.5,Shadow=0,"
+             "OutlineColour=&H000000,BorderStyle=1,Outline=1.0,Shadow=0,"
              f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=0")
 
 # ── 字幕动效（2026-09-25 宝哥令：关键词高亮+弹跳）──
@@ -76,7 +76,7 @@ def write_ass_with_effects(rows: list[tuple[float, float, str]], ass_path: Path)
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,{FONT_NAME},13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
-        f"0,0,0,0,100,100,0,0,1,1.5,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
+        f"0,0,0,0,100,100,0,0,1,1.0,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
