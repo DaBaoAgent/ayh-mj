@@ -186,7 +186,17 @@ def poll_task(task_id: str, label: str = "", interval: int = POLL_INTERVAL,
 
 
 def download(url: str, out_path: str, retries: int = 4) -> str:
-    """下载成片（URL 短时效，须立即下载）"""
+    """下载成片（URL 短时效，须立即下载）。
+
+    url 可传直链（http/https 开头），也可传 task_id —— 后者会自动 query_task 取
+    results[0].url 再下载（2026-09-25 增强：防呆，避免误传 task_id 报 URL 缺协议）。
+    """
+    if not url.lower().startswith("http"):
+        st = query_task(url)
+        results = st.get("results") or []
+        if not results or not results[0].get("url"):
+            raise RuntimeError(f"任务无可用产物（status={st.get('status')}）")
+        url = results[0]["url"]
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(out.suffix + ".part")
