@@ -27,6 +27,7 @@ VOICE_CHAIN = f"{REVERB},{LOUDNORM}"
 
 BGM_LIB = Path("D:/BaiduSyncdisk/3 艾伦和艾薇/免费音乐")
 BGM_PREFERRED = ["轻快", "清新", "爵士-片头"]
+BGM_TRENDING = ROOT / "assets/bgm_trending"  # 抖音热门库（宝哥 2026-09-25 精选 36 首）
 SFX_DIR = ROOT / "assets/sfx"
 
 # 音效自动插入规则：(关键词, 音效文件名)
@@ -40,7 +41,11 @@ SFX_RULES = [
 
 
 def pick_bgm() -> Path | None:
-    """从宝哥音乐库随机选轻快类"""
+    """选曲优先级：①抖音热门库（bgm_trending）②宝哥免费音乐"轻快"类"""
+    if BGM_TRENDING.exists():
+        cands = [p for p in BGM_TRENDING.glob("*.mp3") if p.stat().st_size > 200_000]
+        if cands:
+            return random.choice(cands)
     if not BGM_LIB.exists():
         return None
     for sub in BGM_PREFERRED:
