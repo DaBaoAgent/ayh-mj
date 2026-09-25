@@ -32,8 +32,10 @@ SFX_DIR = ROOT / "assets/sfx"
 # 音效自动插入规则：(关键词, 音效文件名)
 SFX_RULES = [
     ("？！", "ding.mp3"), ("?!", "ding.mp3"), ("?", "ding.mp3"), ("！", "ding.mp3"),
-    ("走就走", "whoosh.mp3"), ("拎", "whoosh.mp3"), ("提", "whoosh.mp3"),
-    ("修不动", "pop.mp3"), ("没白请", "pop.mp3"), ("换新", "pop.mp3"),
+    ("走就走", "whoosh.mp3"), ("拎", "whoosh.mp3"), ("提", "whoosh.mp3"), ("往上走", "whoosh.mp3"),
+    ("等等我", "whoosh.mp3"), ("上去", "whoosh.mp3"),
+    ("修不动", "pop.mp3"), ("没白请", "pop.mp3"), ("换新", "pop.mp3"), ("坡", "pop.mp3"),
+    ("听话", "ding.mp3"), ("点头", "ding.mp3"),
 ]
 
 

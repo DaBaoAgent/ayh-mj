@@ -158,7 +158,7 @@ def query_task(task_id: str, retries: int = 5) -> dict:
             if body.get("code") != "Success":
                 raise RuntimeError(f"查询失败: {body.get('msg') or body}")
             return body.get("data", {})
-        except (httpx.SSLError, httpx.ConnectError, httpx.TimeoutException) as e:
+        except (httpx.TransportError, httpx.ConnectError, httpx.TimeoutException) as e:
             last_err = e
             if attempt < retries - 1:
                 time.sleep(10)
@@ -199,7 +199,7 @@ def download(url: str, out_path: str, retries: int = 4) -> str:
                     f.writelines(resp.iter_bytes(chunk_size=1 << 16))
             tmp.replace(out)
             return str(out)
-        except (httpx.SSLError, httpx.ConnectError, httpx.TimeoutException,
+        except (httpx.TransportError, httpx.ConnectError, httpx.TimeoutException,
                 httpx.HTTPStatusError) as e:
             last_err = e
             if attempt < retries - 1:

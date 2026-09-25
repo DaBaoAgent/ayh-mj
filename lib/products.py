@@ -19,6 +19,16 @@ SALES_POINTS = [
     {"id": "brake_light", "name": "刹车自动亮灯", "hook": "高亮尾灯自动亮，防追尾"},
     {"id": "range_39", "name": "续航39公里", "hook": "充一次跑39公里"},
     {"id": "light_13.8", "name": "13.8公斤", "hook": "单手可提"},
+    # ── 扩充 9 个（2026-09-25 宝哥令：卖点池→20） ──
+    {"id": "cushion_comfy", "name": "加厚坐垫", "hook": "4cm/7cm海绵加透气网布，久坐不闷不硌"},
+    {"id": "tire_puncture", "name": "防扎防爆胎", "hook": "镁合金轮毂实心胎，0维护不爆胎"},
+    {"id": "lithium_safe", "name": "医疗级锂电", "hook": "可室内放心充电，安全可靠"},
+    {"id": "voice_ai", "name": "AI语音播报", "hook": "语音提示1分钟学会，老人上手零门槛"},
+    {"id": "joystick_360", "name": "360°操纵杆", "hook": "转向灵活，窄处也能轻松调头"},
+    {"id": "lcd_screen", "name": "液晶屏显示", "hook": "速度电量一目了然，日光下可见"},
+    {"id": "speed_6", "name": "2-6km/h调速", "hook": "快慢随心，慢档更安心"},
+    {"id": "load_100", "name": "承重100kg", "hook": "结实能扛，全家人都能用"},
+    {"id": "warranty_life", "name": "终身售后", "hook": "车架终身售后，2年电机质保"},
 ]
 
 

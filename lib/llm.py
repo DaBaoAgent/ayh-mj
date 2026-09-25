@@ -149,6 +149,14 @@ def chat_json(
     for attempt in range(retries + 1):
         mt = max_tokens * (2 ** attempt)  # 每次翻倍
         text = chat(messages, model=model, temperature=temperature, max_tokens=mt)
+        if not (text or "").strip():
+            # DeepSeek 思考模型会把预算全烧在 reasoning_content 上 → 正文为空
+            # （实测 prompt 9002 字时 reasoning 5713 字、finish_reason=length）
+            # 必须当成"可翻倍重试"的失败，否则直接判死
+            last_err = ValueError(f"响应为空：思考过程吃满 max_tokens={mt}，未输出正文")
+            if attempt < retries:
+                continue
+            break
         try:
             return _extract_json(text)
         except ValueError as e:

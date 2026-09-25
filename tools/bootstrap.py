@@ -92,10 +92,10 @@ def check_uploadpost() -> tuple[bool, str]:
 
 def check_postflow() -> tuple[bool, str]:
     """检查 PostFlow CLI（国内发布依赖）"""
-    exe = Path("D:/@kaifa/AutoAYH/pipeline/vendor/postflow/.venv/Scripts/postflow.exe")
+    exe = Path("D:/@kaifa/ayh-mj/vendor/postflow/.venv/Scripts/postflow.exe")
     if exe.exists():
         return True, f"PostFlow 就绪: {exe}"
-    return False, "PostFlow 缺失（国内发布才需要，从 AutoAYH 仓库部署）"
+    return False, "PostFlow 缺失（国内发布才需要，vendor/postflow 应随仓库存在）"
 
 
 def main() -> int:

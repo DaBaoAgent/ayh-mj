@@ -48,8 +48,8 @@ def transcribe(video_path: str) -> str:
 
 
 def check_take(json_path: str, expected: str) -> int:
-    """check-take.mjs 比对（AutoAYH 脚本）"""
-    checker = Path("D:/@kaifa/AutoAYH/scripts/check-take.mjs")
+    """check-take.mjs 比对（ayh-mj 自带脚本，2026-09-25 从 AutoAYH 迁入）"""
+    checker = Path("D:/@kaifa/ayh-mj/tools/check-take.mjs")
     if not checker.exists():
         print(f"⚠ check-take.mjs 不存在: {checker}", file=sys.stderr)
         return 1
