@@ -93,13 +93,7 @@ def run_stage_copy(dry: bool = False):
 
 
 def run_stage_storyboard(dry: bool = False):
-    """阶段3: 模板分镜【已停用·2026-09-25 宝哥令】——默认流程改用 pick_combo 智能组合。"""
-    import os as _os
-    if not _os.environ.get("AYH_USE_TEMPLATE"):
-        log("⏭️ 模板链路已停用（2026-09-25 宝哥令：删掉模板，除非指定）。")
-        log("   默认出片流程：tools/pick_combo.py 智能选组合（角色组×卖点×角度×片型）→ 精工脚本 → prep → 快测 → 正式。")
-        log("   如需模板链路请设环境变量 AYH_USE_TEMPLATE=1")
-        return True
+    """阶段3: 每条作品独立研究、选新模板、质检对白并落标准分镜。"""
     target = load_console_state().get("daily_target", 3)
     log("🎬 模板分镜：逐条挖掘知识库、设计新钩子与对白...")
     from lib.creative_research import build_research_brief

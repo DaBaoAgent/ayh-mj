@@ -16,8 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib.cast import (CAST, LIBRARY_ROLES, PROPS, cast_shot, cast_menu,
-                      neutralize_refs_for_silent, resolve_refs, resolve_voice)
+from lib.cast import cast_shot, neutralize_refs_for_silent, resolve_refs, resolve_voice
 from lib.llm import chat_json
 from lib.tools import ffmpeg
 from s4_generate.autodl_client import generate_video, generate_video_smart
@@ -77,14 +76,10 @@ non_diegetic_music: N/A
 8. **禁画面字幕（硬要求）**：H3 常把对白"画"成画面内字幕——每镜 integrated 段必须附上：
    "No on-screen text or subtitles anywhere in frame; the dialogue is audio only, never visualized as text."
    （后期统一烧录字幕，生成画面必须无任何文字）
-9. **人物外貌规则（硬要求）**：每个人物的年龄/族裔/发型/服装一律从**本镜 cast_archives** 里该角色那一行取（cast_archives 已按角色组解析成本镜实际出演的角色）：
-   - **禁止沿用别的角色的档案**（历史事故：@elder_male 解析成 "外国爷爷 western_grandpa_70" 后，LLM 仍照抄核心卡司的「65岁中国男性·深蓝夹克」→ 提示词自相矛盾，H3 画出克隆人/混族裔）
+9. **人物外貌规则（硬要求）**：每个人物的族裔/年龄/发型/服装必须从 cast 清单中该角色档案取：
    - 角色 id 以 western_ 开头（或 region=欧美）→ 必须写 **Caucasian/European**（如 "A 45-year-old Caucasian man with brown hair and grey temples"），**严禁写成 Chinese**
    - 中国角色 → Chinese
    - 每镜写 "the appearance must exactly match the reference photo"（参考图优先于文字）
-10. **画面人数（硬要求，事故高发）**：每镜 integrated 段必须明确写出「画面里正好有几个人、分别是谁、各自只出现一次」，并把该镜 cast_count 那句话**原样附在提示词里**（"CAST COUNT — exactly N people appear in this shot: ... Each person appears EXACTLY ONCE ... never duplicate, clone, mirror, split or twin any person into a second figure ..."）。
-    - 画面里除了 cast_refs 名单上的人，**不得出现长相相同的第二个人**——参考图有几个人就只能画几个人
-    - 配角也必须有明显区分（年龄/服装/位置各写清楚），避免 H3 把同一个配角复制成两个人
 
 返回 JSON：{"prompts": {"1": "...第1镜完整提示词...", "2": "...", ...}}"""
 
@@ -112,92 +107,38 @@ def ensure_new_car_ref(shot: dict) -> dict:
     return patched
 
 
-# ── 防「克隆人」（宝哥 2026-09-24 事故：第3镜同一个配角被 H3 复制成两个人）──
-# 根因两层：① 提示词没写死画面人数，H3 自由复制配角；② @slot 解析成演员库角色后，
-# LLM 仍照抄核心卡司的中文档案（"65岁中国男性·深蓝夹克"），与欧美参考图矛盾 → 画歪/画多。
-# 修法：逐镜解析出实际角色 → 给 LLM 权威档案（cast_archives）+ 代码级强制附「画面人数」句。
-_GENDER_EN = {"男": "man", "女": "woman"}
-_ETH_EN = {"中国男性": "Chinese man", "中国女性": "Chinese woman",
-           "中国男性儿童": "Chinese boy", "中国女性儿童": "Chinese girl"}
-
-
-def person_label(ref: str) -> str:
-    """角色引用 → 一句英文人物标签（年龄/族裔/性别），用于「画面人数」硬约束"""
-    import re as _re
-    if ref in LIBRARY_ROLES:
-        r = LIBRARY_ROLES[ref]
-        eth = "Caucasian" if str(r.get("region")) == "欧美" else "Chinese"
-        return f'{r.get("age")}-year-old {eth} {_GENDER_EN.get(str(r.get("gender")), "person")}'
-    base = ref.split("_", 1)[0]
-    cfg = CAST.get(base)
-    if cfg:
-        m = _re.match(r"(\d+)岁(.+)", cfg["desc"])
-        if m:
-            return f'{m.group(1)}-year-old {_ETH_EN.get(m.group(2), "Chinese person")}'
-        return cfg["name"]
-    return "person"
-
-
-def person_archive(ref: str) -> str:
-    """角色档案（权威）：本镜实际出演角色的年龄/族裔/服装/气质"""
-    if ref in LIBRARY_ROLES:
-        r = LIBRARY_ROLES[ref]
-        region = "欧美" if str(r.get("region")) == "欧美" else "中国"
-        return (f'{r.get("name")} {ref}，{r.get("age")}岁{region}{r.get("gender")}，'
-                f'{r.get("trait")}')
-    base = ref.split("_", 1)[0]
-    cfg = CAST.get(base)
-    if cfg:
-        return f'{cfg["name"]} {ref}，{cfg["desc"]}'
-    return ""
-
-
-def cast_count_constraint(shot: dict) -> str:
-    """代码级「画面人数」硬约束（逐镜写入提示词，禁止复制人物）"""
-    people = [r for r in shot.get("cast_refs", []) if r not in PROPS]
-    seen, labels = set(), []
-    for r in people:
-        if r not in seen:
-            seen.add(r)
-            labels.append(person_label(r))
-    if not labels:
-        return ""
-    if len(labels) == 1:
-        return (f"CAST COUNT — exactly one person appears in this shot: {labels[0]}. "
-                "No second person, no double, no stand-in anywhere in the frame.")
-    listed = "; ".join(f"({i}) {lb}" for i, lb in enumerate(labels, 1))
-    return (f"CAST COUNT — exactly {len(labels)} people appear in this shot: {listed}. "
-            "Each person appears EXACTLY ONCE, in one place only: never duplicate, clone, "
-            "mirror, split or twin any person into a second figure anywhere in the frame "
-            "(foreground, background, edge, doorway, glass or blur); no extra bystanders, "
-            "no stand-ins.")
-
-
-def build_prompts(storyboard: dict, retries: int = 3, job_key: str = ""):
+def build_prompts(storyboard: dict, retries: int = 3) -> dict[str, str]:
     """LLM 基于分镜字段生成每镜完整 H3 提示词（不合格自动重试）"""
-    from lib.cast import cast_menu
+    import re as _re
+
+    from lib.cast import _apply_role_group, _role_group_for, cast_menu
     cast_ctx = cast_menu()
-    job_key = job_key or storyboard.get("job_uid", "")
-    # @slot 与核心卡司一律解析成本镜实际出演角色（cast_shot 内部含角色组替换）
+    # 角色组替换：给 LLM 看替换后的角色（欧美组→western_* 档案，避免写"中国男性"矛盾）
+    _group = _role_group_for(storyboard.get("job_uid", ""))
+    _core = ("son", "mother", "elder")
+
+    def _grp_text(t: str) -> str:
+        if not _group:
+            return t
+        for b in _core:
+            repl = _group.get(b)
+            if repl:
+                t = _re.sub(rf"(?<![a-z_]){b}(?![a-z_])", repl, t)
+                t = t.replace({"son": "S1", "mother": "S2", "elder": "S3"}[b], repl)
+        return t
 
     shots_ctx = []
-    per_shot_refs: dict[str, list[str]] = {}
     for s in storyboard["shots"]:
         s = ensure_new_car_ref(s)
-        resolved = cast_shot(s, job_key)  # job 级缓存 → 与 gen_shot 选出同一批角色
-        refs = resolved.get("cast_refs", [])
-        people = [r for r in refs if r not in PROPS]
-        per_shot_refs[str(s["seq"])] = people
         shots_ctx.append({
             "seq": s["seq"], "duration": s["duration"],
             "purpose": s["purpose"], "shot_size": s["shot_size"], "camera": s["camera"],
             "start_state": s["start_state"], "end_state": s["end_state"],
-            "speaker": resolved["speaker"], "narration": s["narration"],
-            "cast_refs": refs,
-            "cast_archives": {r: person_archive(r) for r in people},
-            "cast_count": cast_count_constraint({"cast_refs": people}),
+            "speaker": _grp_text(s["speaker"]), "narration": s["narration"],
+            "cast_refs": [_apply_role_group(r, _group) if not r.startswith("@") else r
+                          for r in s.get("cast_refs", [])],
             "sound_design": s["sound_design"],
-            "has_product": bool(resolved.get("product_ref")),
+            "has_product": bool(s.get("product_ref")),
         })
     payload = {
         "concept": storyboard.get("concept", ""),
@@ -224,19 +165,15 @@ def build_prompts(storyboard: dict, retries: int = 3, job_key: str = ""):
                 # 代码层强制附 HARD 段（LLM 经常漏附——硬约束必须进 H3 提示词）
                 if "NO ON-SCREEN TEXT" not in p:
                     p = p.rstrip() + "\n\n" + HARD
-                # 代码层强制附「画面人数」句（防 H3 复制/克隆人物——宝哥 2026-09-24）
-                cc = cast_count_constraint({"cast_refs": per_shot_refs.get(seq, [])})
-                if cc and "CAST COUNT" not in p:
-                    p = p.rstrip() + "\n\n" + cc
-                # 族裔兜底：本镜解析出的角色含 western_/欧美 → 禁止 Chinese 描述
-                refs_str = " ".join(per_shot_refs.get(seq, []))
+                # 族裔兜底：欧美组角色禁止 Chinese 描述（LLM 惯性照抄模板）
+                # 注意：storyboard 的 cast_refs 是原始核心名（组替换发生在 cast_shot），
+                # 所以以 storyboard 的 role_group 字段判断
+                refs_str = " ".join(s.get("cast_refs", []))
                 group_name = str(storyboard.get("role_group", ""))
                 if "western_" in refs_str or "欧美" in group_name:
                     p = (p.replace("Chinese man", "Caucasian man")
                           .replace("Chinese woman", "Caucasian woman")
-                          .replace("Chinese person", "Caucasian person")
-                          .replace("中国男性", "Caucasian man")
-                          .replace("中国女性", "Caucasian woman"))
+                          .replace("Chinese person", "Caucasian person"))
                 cleaned[seq] = p
         except RuntimeError as e:
             last_err = e
@@ -399,7 +336,7 @@ def run(storyboard_path: str, skip_prompt_build: bool = False,
         prompts = json.loads(prompts_file.read_text(encoding="utf-8"))
     else:
         print("📝 LLM 生成 H3 提示词...", flush=True)
-        prompts = build_prompts(sb, job_key=uid)
+        prompts = build_prompts(sb)
         prompts_file.write_text(json.dumps(prompts, ensure_ascii=False, indent=1),
                                 encoding="utf-8")
         print(f"  ✓ {len(prompts)} 镜提示词就绪", flush=True)

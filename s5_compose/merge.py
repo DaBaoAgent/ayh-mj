@@ -25,15 +25,10 @@ from s5_compose.subtitle import cues_from_tts, make_srt
 from s5_compose.tts import gen_tts_for_shots
 
 TARGET_W, TARGET_H = 1080, 1920
-# 字幕垂直位置（宝哥规则 2026-09-24）：底边落在画面「下方三分之一」处，验收后下调到 0.28
-# ffmpeg subtitles 滤镜 PlayResY 固定 288 → MarginV = 288×比例（0.28 实测底边距底部 28.4%）
-ASS_PLAY_RES_Y = 288
-SUBTITLE_BOTTOM_RATIO = 0.25
-SUBTITLE_MARGIN_V = round(ASS_PLAY_RES_Y * SUBTITLE_BOTTOM_RATIO)
 SUBTITLE_STYLE = (
     "FontName=Microsoft YaHei,FontSize=15,PrimaryColour=&HFFFFFF&,"
     "OutlineColour=&H000000&,BorderStyle=1,Outline=2,Shadow=0,"
-    f"Alignment=2,MarginV={SUBTITLE_MARGIN_V}"
+    "Alignment=2,MarginV=160"
 )
 
 

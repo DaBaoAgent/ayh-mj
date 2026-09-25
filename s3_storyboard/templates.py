@@ -161,27 +161,6 @@ def _bridges() -> str:
         return ""
 
 
-def _correction(last_err: str, template: dict) -> str:
-    """把上一轮的失败原因变成下一轮的明确修正指令（盲重试会让模型犯同样的错）"""
-    budget = "、".join(f"镜{s['seq']}≤{int(float(s['duration']) * 4.5)}字" for s in template["shots"])
-    head = f"【上一轮未通过，本轮必须修正】{last_err}\n"
-    if "超字数" in last_err:
-        return head + (
-            f"硬性要求：每镜台词必须压进各自上限（{budget}）。"
-            "超了就删字——去掉修饰词和虚词、换更短的口语词（如「非常轻」→「贼轻」），"
-            "不许改故事框架、不许改角色关系、不许丢信息点。"
-            "输出前逐镜数字数（标点也算），确认没超再输出。")
-    if "缺镜" in last_err:
-        return head + f"硬性要求：每一镜都要给台词（{budget}），一镜都不能少。"
-    if "CTA" in last_err:
-        return head + "硬性要求：最后一镜台词必须含「爱优护」三个字（品牌 CTA），且不超该镜字数上限。"
-    if "创意设计" in last_err:
-        return head + ("硬性要求：creative_design 的 hook/beat/twist/novelty/reference_use 五个字段"
-                       "都要写具体内容，不能留空。")
-    return head + ("硬性要求：上一轮被判与旧作品雷同。必须换一套全新的开场钩子和故事走向，"
-                   "禁止照抄模板标准版台词；对照已用清单，避开所有出现过的钩子与台词。")
-
-
 def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "",
                 research_brief: dict | None = None) -> dict:
     """研究驱动的模板改编；质检失败即停，避免重复标准版被送去出片。"""
@@ -227,20 +206,17 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "",
     if ab:
         payload["已用思路（禁止再用）"] = ab
     last_err = ""
-    feedback = ""
     for attempt in range(1, 4):
         try:
             from lib.ideas import ideas_block, novelty_issue
             user_msg = "模板与热点：\n" + json.dumps(payload, ensure_ascii=False, indent=1)
-            if feedback:
-                user_msg += "\n\n" + feedback
             ib = ideas_block()
             if ib:
                 user_msg += "\n\n" + ib
             out = chat_json([
                 {"role": "system", "content": ADAPT_SYSTEM},
                 {"role": "user", "content": user_msg},
-            ], temperature=0.75, max_tokens=8000, retries=1)
+            ], temperature=0.75, max_tokens=2600, retries=0)
             lines = out.get("lines", {})
             design = out.get("creative_design") or {}
             # 校验：字数上限
@@ -277,12 +253,10 @@ def adapt_lines(template: dict, hotspot_text: str, hotspot_title: str = "",
                         "sales_point": pt, "scene_tweaks": out.get("scene_tweaks", {}) or {},
                         "angle": ang, "creative_design": design}
             print(f"  [WARN] 台词改写校验未过（{last_err}），重试 {attempt}/3", flush=True)
-            feedback = _correction(last_err, template)
         except Exception as e:
             last_err = str(e)[:80]
             print(f"  [WARN] 台词改写异常（{last_err}），重试 {attempt}/3", flush=True)
-            feedback = f"【上一轮调用异常】{last_err}\n请严格按系统提示的输出格式，只返回一个 JSON 对象。"
-    raise RuntimeError(f"创意台词质检未通过，已停止本条视频（不回退标准版）：{last_err}")
+    raise RuntimeError(f"创意台词质检未通过，已停止本条视频以免重复旧套路：{last_err}")
 
 
 def to_storyboard(template: dict, lines: dict | None = None,
