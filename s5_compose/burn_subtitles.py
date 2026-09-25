@@ -34,7 +34,12 @@ ASS_PLAY_RES_Y = 288
 SUBTITLE_BOTTOM_RATIO = 0.25
 SUBTITLE_MARGIN_V = round(ASS_PLAY_RES_Y * SUBTITLE_BOTTOM_RATIO)
 
-SUB_STYLE = ("FontName=Microsoft YaHei,FontSize=13,PrimaryColour=&HFFFFFF,"
+# 字幕字体（2026-09-25 宝哥令：统一改为「新青年体」= 文悦新青年体，抖音/剪映同款）
+FONT_NAME = "文悦新青年体 (非商用) W8"
+FONTS_DIR = "D:/@kaifa/fonts-douyin"  # 字体文件所在目录（libass fontsdir 扫描）
+FONTS_DIR_ARG = "D\\:/@kaifa/fonts-douyin"  # ffmpeg filter 内用的转义路径（冒号需 \:）
+
+SUB_STYLE = (f"FontName={FONT_NAME},FontSize=13,PrimaryColour=&HFFFFFF,"
              "OutlineColour=&H000000,BorderStyle=1,Outline=1.5,Shadow=0,"
              f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=1")
 
@@ -70,7 +75,7 @@ def write_ass_with_effects(rows: list[tuple[float, float, str]], ass_path: Path)
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,Microsoft YaHei,13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+        f"Style: Default,{FONT_NAME},13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
         f"-1,0,0,0,100,100,0,0,1,1.5,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -414,7 +419,7 @@ def burn_by_storyboard(video: str, shots_dir: Path, expected_lines: list[str],
     print(f"✓ SRT（按镜头对齐）: {srt_path}（{len(rows)} 条 / {n} 镜）", flush=True)
     out = video_p.with_name(f"{video_p.stem}{suffix}.mp4")
     srt_arg = str(srt_path).replace("\\", "/").replace(":", "\\:")
-    vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}'"
+    vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}':fontsdir='{FONTS_DIR_ARG}'"
     cmd = [ffmpeg(), "-y", "-i", str(video_p), "-vf", vf,
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",
            "-c:a", "copy", str(out)]
@@ -465,7 +470,7 @@ def burn(video: str, srt: str = None, suffix: str = "_sub",
     if effects and rows:
         ass_path = write_ass_with_effects(rows, video_p.parent / f"{video_p.stem}.ass")
         ass_arg = str(ass_path).replace("\\", "/").replace(":", "\\:")
-        vf = f"subtitles='{ass_arg}'"
+        vf = f"subtitles='{ass_arg}':fontsdir='{FONTS_DIR_ARG}'"
         print(f"✓ 动效字幕（高亮+弹跳）: {ass_path.name}", flush=True)
     else:
         # 旧路径：SRT + force_style
@@ -475,7 +480,7 @@ def burn(video: str, srt: str = None, suffix: str = "_sub",
 
     if vf is None:
         srt_arg = str(srt_path).replace("\\", "/").replace(":", "\\:")
-        vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}'"
+        vf = f"subtitles='{srt_arg}':force_style='{SUB_STYLE}':fontsdir='{FONTS_DIR_ARG}'"
 
     cmd = [ffmpeg(), "-y", "-i", str(video_p), "-vf", vf,
            "-c:v", "libx264", "-crf", "20", "-preset", "veryfast",

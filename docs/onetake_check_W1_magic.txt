@@ -1,0 +1,29 @@
+subject_definitions:
+<Subject 1> is the 55-year-old Chinese neighbor aunt in <Picture 2>, with curly hair, a purple sportswear jacket, and a chatty, curious look.
+<Subject 2> is the 70-year-old foreign grandpa in <Picture 1>, with white hair, blue eyes, glasses and a beige cardigan; he speaks standard Mandarin.
+<Subject 3> is the silver-grey lightweight electric wheelchair in <Picture 3>, <Picture 4> and <Picture 5>, with a black cushion seat and red springs.
+<Audio 1> is the voice-timbre reference for <Subject 1> (S1).
+<Audio 2> is the voice-timbre reference for <Subject 2> (S2).
+
+summary:
+[reference generation + audio reference] The target video is a fun 15-second vertical commercial in which <Subject 1> mistakes <Subject 2>'s one-second-folding wheelchair for a magic trick; <Subject 2> folds and unfolds <Subject 3> to show off, and the two speak in turn using <Audio 1> and <Audio 2> as voice-timbre references.
+
+retention_analysis:
+<Subject 1> (appears in [Shot 1], [Shot 2], [Shot 3], [Shot 4]): fully_preserved - the aunt's identity, curly hair and purple jacket are retained.
+<Subject 2> (appears in [Shot 1], [Shot 2], [Shot 3], [Shot 4]): fully_preserved - the foreign grandpa's identity, white hair, glasses and beige cardigan are retained.
+<Subject 3> (appears in [Shot 1], [Shot 2], [Shot 3], [Shot 4]): fully_preserved - the wheelchair's silver-grey frame, black cushion seat and red springs are retained.
+<Audio 1>: reference - its mature female timbre guides <Subject 1>'s delivery without copying the original signal.
+<Audio 2>: reference - its elderly male timbre guides <Subject 2>'s delivery without copying the original signal.
+
+detailed_description:
+The target video is a live-action vertical commercial with tight, bouncy pacing, bright afternoon light, lifelike skin texture and shallow depth of field.
+[Shot 1] A wide shot of a community square on a bright afternoon frames <Subject 2>, the white-haired foreign grandpa in the beige cardigan and glasses, standing beside <Subject 3>, the folded silver-grey lightweight wheelchair standing upright on the pavement. <Subject 1>, the curly-haired neighbor aunt in the purple sportswear jacket, walks up and studies him with curious eyes. The camera trucks right with small amplitude at slow speed. <Subject 1> (S1) asks in a bright, chatty voice: <d>[Chinese] 哎，老外大爷，您还会变魔术呢？</d> <Subject 2> (S2) looks up, puzzled, in a low, calm elderly voice: <d>[Chinese] 什么魔术啊？</d>
+[Shot 2] At 00:04.000, the shot cuts to a closer view: <Subject 1> points at the folded wheelchair standing on the ground and says: <d>[Chinese] 你看你这车，说没就没了！</d> — <Subject 2> crouches slightly, presses the frame down with one quick motion, and the wheelchair folds flat in about one second; he lifts it with one hand, and says: <d>[Chinese] 一按，一压，这就好了。</d> The camera pushes in with small amplitude at slow speed toward his hands.
+[Shot 3] At 00:08.000, the shot cuts to <Subject 1>'s amazed face, eyes wide: <d>[Chinese] 好家伙，一秒都不到！</d> — <Subject 2> sets the folded wheelchair down and pulls it open with one smooth motion: <d>[Chinese] 想让它变出来也容易。</d> The camera pans right with small amplitude at normal speed to follow the unfolding motion.
+[Shot 4] At 00:10.500, the shot cuts to a wider two-shot: <Subject 1> claps her hands, laughing: <d>[Chinese] 哎哟，又变回来了！</d> — <Subject 2> pats the seat, proud, and says, finishing right before the video ends: <d>[Chinese] 爱优护轻便侠，会魔术。</d> The camera pulls out with small amplitude at slow speed, ending on the two of them with the unfolded wheelchair between them.
+
+overall_soundscape:
+Bright outdoor community-square ambience continues throughout, with distant birdsong, light wind, and the clear mechanical click of the wheelchair frame folding and snapping open. Footsteps on pavement are audible under the dialogue.
+
+non_diegetic_music:
+N/A
