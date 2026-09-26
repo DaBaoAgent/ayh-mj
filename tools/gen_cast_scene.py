@@ -73,10 +73,12 @@ ROLES = {
     "blue_hero": dict(
         label="红蓝紧身衣侠（hero 组）",
         ref=None,
-        desc="a 35-year-old clean-shaven man with a square jaw, dark hair with a single curl falling on his "
-             "forehead and a calm steady gaze, wearing a deep-blue fitted suit with a high collar, a red "
-             "cape falling to his knees, red boots and a red belt, and an abstract red diamond emblem "
-             "centred on his chest; no mask, no glasses; tall and athletic with an open chest",
+        desc="a 35-year-old clean-shaven man with a square jaw, short dark hair brushed back with no curl on "
+             "the forehead, and a calm steady gaze, wearing an ORIGINAL deep-blue fitted suit with a high "
+             "silver collar, a red cape falling to his knees, red knee-high boots and a red belt. His chest "
+             "is PLAIN UNBROKEN DEEP-BLUE FABRIC with NO emblem, NO badge, NO logo, NO symbol, NO lettering "
+             "and NO marking of any kind anywhere on the suit or the cape; a completely unadorned costume; "
+             "no mask, no glasses; tall and athletic, chest open",
         wardrobe="red knee-high boots and a thick red cape",
     ),
 }
