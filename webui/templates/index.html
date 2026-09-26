@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>爱优护AI视频工厂 · 控制台</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link rel="stylesheet" href="/static/v4.css">
+    <link rel="stylesheet" href="/static/style.css?v=brain-depth-20260925">
+    <link rel="stylesheet" href="/static/v4.css?v=brain-depth-20260925">
 </head>
 <body>
     <!-- 背景层 -->
@@ -113,7 +113,30 @@
                     </div>
                 </header>
 
-                <section class="neural-stage" id="neuralStage" data-mode="idle" aria-label="Hermes 神经编排状态">
+                <div class="orchestrator-workspace">
+                    <section class="chat-panel" aria-label="HERMES控制台">
+                        <header class="panel-head">
+                            <span class="panel-mark">◈</span>
+                            <div><h2>HERMES控制台</h2><small>对话、思考过程与执行反馈</small></div>
+                        </header>
+                        <div class="neural-feed">
+                            <div class="chat-scroll" id="chatScroll" role="log" aria-label="Hermes 思考过程、工具进度与回复" aria-live="polite" aria-relevant="additions text">
+                                <div class="chat-inner" id="chatMessages">
+                                    <div class="msg msg-system welcome">
+                                        <div class="sys-line">◢ NEURAL LINK READY —— Hermes 已接入视频工厂执行链</div>
+                                        <div class="sys-line dim">输入指令后，这里会呈现公开执行摘要、工具进度与最终回复</div>
+                                    </div>
+                                </div>
+                                <button class="jump-btn" id="jumpBottom" hidden>↓ 回到最新</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="neural-stage brain-panel" id="neuralStage" data-mode="idle" aria-label="Hermes 神经编排状态">
+                        <header class="panel-head brain-panel-head">
+                            <span class="panel-mark">✦</span>
+                            <div><h2>大脑中枢</h2><small>多模块协同 · 实时推理</small></div>
+                        </header>
                     <div class="stage-code-rain" aria-hidden="true"><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span><span>010110101011011001011001010101</span><span>101011001101011010100101101100</span><span>001101011010110101100101010011</span><span>101101010010101011001101011010</span></div>
                     <img class="brain-art" src="/static/neural-brain.png" alt="" aria-hidden="true">
                     <canvas id="neuralCanvas" aria-hidden="true"></canvas>
@@ -141,18 +164,8 @@
                     <div class="stage-orbit orbit-one" aria-hidden="true"></div>
                     <div class="stage-orbit orbit-two" aria-hidden="true"></div>
                     <div class="stage-floor" aria-hidden="true"></div>
-                    <div class="neural-feed">
-                        <div class="chat-scroll" id="chatScroll" role="log" aria-label="Hermes 思考过程、工具进度与回复" aria-live="polite" aria-relevant="additions text">
-                            <div class="chat-inner" id="chatMessages">
-                                <div class="msg msg-system welcome">
-                                    <div class="sys-line">◢ NEURAL LINK READY —— Hermes 已接入视频工厂执行链</div>
-                                    <div class="sys-line dim">输入指令后，这里会呈现公开执行摘要、工具进度与最终回复</div>
-                                </div>
-                            </div>
-                            <button class="jump-btn" id="jumpBottom" hidden>↓ 回到最新</button>
-                        </div>
-                    </div>
-                </section>
+                    </section>
+                </div>
 
                 <div class="live-status" id="liveStatus" data-active="0">
                     <span class="ls-icon">▸</span>
@@ -222,7 +235,7 @@
         </footer>
     </aside>
 
-    <script src="/static/app.js"></script>
-    <script src="/static/neural_v4.js"></script>
+    <script src="/static/app.js?v=brain-depth-20260925"></script>
+    <script src="/static/neural_v4.js?v=brain-depth-20260925"></script>
 </body>
 </html>

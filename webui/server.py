@@ -109,14 +109,15 @@ def resource_stats() -> dict:
     _resource_cache.update(at=now, value=value)
     return value
 
-# 6阶段定义
+# 阶段定义（id 与前端进度条绑定，勿改；名称/说明已对齐 2026-09-26 现行 15 秒 one-take 管线）
+# 现行用法：spec 放进 state/queue_15s/ → 本控制台「启动生产」→ tools/run_all.py 队列调度
 STAGES = [
-    {"id": "trend", "name": "热点雷达", "icon": "◉", "desc": "捕捉全网热点信号"},
-    {"id": "copy", "name": "创意策划", "icon": "▤", "desc": "热点/爆款/短剧/对标知识库预检"},
-    {"id": "storyboard", "name": "智能分镜", "icon": "◇", "desc": "镜头编排 + 角色选择"},
-    {"id": "generate", "name": "视频生成", "icon": "▷", "desc": "多模型并发渲染"},
-    {"id": "compose", "name": "合成发布", "icon": "↗", "desc": "装配字幕 + 质量检查"},
-    {"id": "publish", "name": "效果追踪", "icon": "⌁", "desc": "多平台发布 + 数据回流"},
+    {"id": "trend", "name": "热点雷达", "icon": "◉", "desc": "抖音热榜/关键词/对标（s1_trend）"},
+    {"id": "copy", "name": "创意策划", "icon": "▤", "desc": "四池选角（角色/卖点/角度/片型）+ 台词"},
+    {"id": "storyboard", "name": "分镜策划", "icon": "◇", "desc": "Ref2VA 六段式提示词 + 门禁 0 ERROR"},
+    {"id": "generate", "name": "视频生成", "icon": "▷", "desc": "H3 15s/768p one-take（约 ¥0.9/条）"},
+    {"id": "compose", "name": "后期合成", "icon": "↗", "desc": "明快档裁剪 + 字幕 + BGM/音效 + 归档"},
+    {"id": "publish", "name": "发布互动", "icon": "⌁", "desc": "PostFlow / Upload-Post 多平台发布"},
 ]
 
 

@@ -20,7 +20,7 @@ if (!input || !transcriptOrFactor || !output) {
 const targetIndex = rest.indexOf("--target");
 const target = targetIndex === -1 ? 4.8 : Number(rest[targetIndex + 1]);
 
-/** 从 hypit.transcript@1 算净说词时长与语速 */
+/** 从逐词转写 JSON（whisperx）算净说词时长与语速 */
 function measure(value) {
   const words = Array.isArray(value?.passages)
     ? value.passages.flatMap((passage) => (Array.isArray(passage?.words) ? passage.words : []))

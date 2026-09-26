@@ -497,6 +497,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="成片烧字幕")
     parser.add_argument("video", help="视频路径")
     parser.add_argument("--srt", help="已有 SRT（跳过转写）")
+    parser.add_argument("--expected-file", help="台词文件（每行一句）——走转写+DP 最优对齐（质量高于 --srt）")
     parser.add_argument("--suffix", default="_sub", help="输出文件后缀")
     args = parser.parse_args()
-    burn(args.video, args.srt, args.suffix)
+    if args.expected_file:
+        lines = [ln.strip() for ln in
+                 Path(args.expected_file).read_text(encoding="utf-8").splitlines() if ln.strip()]
+        burn(args.video, expected_lines=lines, suffix=args.suffix)
+    else:
+        burn(args.video, args.srt, args.suffix)

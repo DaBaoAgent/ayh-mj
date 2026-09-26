@@ -78,7 +78,8 @@ ERROR 必须改完再 build；WARN 要人工确认。
 > **R22 现在可自动执行**（本机 WhisperX 已装好）：
 >
 > ```bash
-> hypit transcribe out/xxx.mp4 --language zh --to out/xxx.json --workspace "$P"
+> # 转写用项目自带通道（hypit 已于 2026-09-26 卸载，勿再引用）
+> .venv/Scripts/python.exe scripts/tr_medium.py out/xxx.mp4 out/xxx.json
 > node scripts/check-take.mjs out/xxx.json "这台车一只手就能提起来，出门不求人。"
 > ```
 >

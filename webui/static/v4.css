@@ -151,3 +151,113 @@ body { min-height:620px; background:#030811; color:#d9f4ff; overflow:hidden; }
 @media(prefers-reduced-motion:reduce) { .neural-hud .hud-chip { animation: none; } }
 
 .pipeline-only-note { margin:4px 0 12px; padding:9px 11px; color:#83eadd; font:10px/1.55 var(--mono); border:1px solid rgba(63,219,195,.3); background:rgba(18,94,86,.11); }
+
+/* Approved split console: keep the chat legible and the neural center independent. */
+.orchestrator-workspace {
+    display:grid;
+    grid-template-columns:minmax(0, 1.08fr) minmax(0, .92fr);
+    flex:1 1 auto;
+    min-height:300px;
+    overflow:hidden;
+    border-top:1px solid rgba(58,192,234,.26);
+}
+.chat-panel,
+.brain-panel {
+    min-width:0;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+}
+.chat-panel {
+    background:#061523;
+    border-right:1px solid rgba(73,209,249,.48);
+}
+.panel-head {
+    flex:0 0 58px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 15px;
+    border-bottom:0;
+    background:transparent;
+}
+.panel-mark { color:#52e6ff; font-size:22px; text-shadow:0 0 13px rgba(61,218,255,.65); }
+.panel-head h2 { margin:0; color:#d9f7ff; font-size:16px; letter-spacing:.8px; }
+.panel-head small { display:block; margin-top:2px; color:#78aec5; font-size:10px; letter-spacing:.5px; }
+.chat-panel .neural-feed {
+    position:relative;
+    inset:auto;
+    z-index:auto;
+    flex:1 1 auto;
+    min-height:0;
+    width:auto;
+    height:auto;
+    background:transparent;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+    backdrop-filter:none;
+}
+.chat-panel .chat-scroll { scrollbar-color:rgba(86,220,255,.55) #061523; }
+.chat-panel .chat-inner { padding:16px; gap:12px; }
+.chat-panel .sys-line,
+.chat-panel .msg-bubble,
+.chat-panel .think-block,
+.chat-panel .tool-card,
+.chat-panel .msg-meta { opacity:1; }
+.chat-panel .sys-line { color:#93cddd; font:11px/1.55 var(--mono); }
+.chat-panel .sys-line.dim { color:#739ab1; }
+.chat-panel .msg-user .msg-bubble,
+.chat-panel .msg-assistant .msg-bubble,
+.chat-panel .msg-bubble {
+    max-width:92%;
+    padding:10px 12px 10px 45px;
+    border:1px solid #227f9f;
+    border-radius:5px;
+    background:#0a2a3d;
+    box-shadow:inset 0 1px rgba(184,246,255,.08);
+    color:#e1f8ff;
+    font:12px/1.65 var(--sans);
+}
+.chat-panel .msg-user .msg-bubble { margin-left:auto; border-color:#258eac; background:#0b3446; color:#e9fcff; }
+.chat-panel .msg-assistant .msg-bubble { color:#d6f6ff; }
+.chat-panel .msg-user .msg-bubble::before,
+.chat-panel .msg-assistant .msg-bubble::before { top:11px; left:11px; color:#51e4ff; font:9px var(--mono); }
+.chat-panel .msg-assistant .msg-bubble::before { color:#88b8ff; }
+.chat-panel .think-block {
+    width:100%;
+    border:1px solid #3e5385;
+    border-left:3px solid #8d80e9;
+    border-radius:5px;
+    background:#111d36;
+    box-shadow:none;
+}
+.chat-panel .think-head,
+.chat-panel .think-head:hover { padding:8px 10px; background:#19294a; color:#d2caff; }
+.chat-panel .think-body { padding:8px 11px; max-height:180px; overflow:auto; color:#d4dcf6; font:11px/1.6 var(--sans); }
+.chat-panel .tool-card { width:100%; border:1px solid #1d766d; border-radius:4px; background:#092b2b; box-shadow:none; }
+.chat-panel .tool-head { padding:7px 10px; color:#9df5da; }
+.chat-panel .tool-body { padding:7px 10px; color:#b4e8d5; }
+.brain-panel { flex:1 1 auto; min-height:0; border:0; background:radial-gradient(ellipse 45% 52% at 50% 53%,rgba(25,108,174,.38),transparent 76%),linear-gradient(90deg,#051321,#071b2c); }
+.brain-panel::before { top:58px; }
+.brain-panel .brain-panel-head { position:relative; z-index:7; background:transparent; }
+.brain-panel .neural-hud { top:55%; }
+.brain-panel .neural-core-label { top:17%; }
+.brain-panel .stage-floor { bottom:4%; width:min(88%,420px); }
+.brain-panel .stage-orbit { top:58%; }
+.brain-panel .neural-phase-label { top:55%; }
+.brain-panel .phase-reason,.brain-panel .phase-generate { top:73%; }
+.brain-panel { perspective:950px; }
+.brain-panel .brain-art { top:55%; width:min(58%,360px); opacity:.96; transform:translate(-50%,-50%) translateZ(14px); transform-style:preserve-3d; filter:drop-shadow(0 14px 16px rgba(1,22,48,.72)) drop-shadow(0 0 18px rgba(25,149,255,.52)); animation:brainRotateRight 11s ease-in-out infinite; }
+/* A restrained right-facing yaw retains the dimensional brain form at every frame. */
+@keyframes brainRotateRight { from, to { transform:translate(-50%,-50%) translateZ(14px) rotateY(0deg) scale(1); } 50% { transform:translate(-50%,-50%) translateZ(24px) rotateY(22deg) scale(1.025); } }
+@media (max-width:1120px) {
+    .orchestrator-workspace { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+}
+@media (max-width:760px) {
+    .orchestrator-workspace { display:flex; flex-direction:column; overflow:auto; }
+    .chat-panel { min-height:310px; border-right:0; border-bottom:1px solid rgba(73,209,249,.48); }
+    .brain-panel { min-height:360px; }
+    .brain-panel .brain-art { animation:none; }
+}
+@media (prefers-reduced-motion:reduce) { .brain-panel .brain-art { animation:none; } }

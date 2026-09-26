@@ -5,7 +5,8 @@
  *   node scripts/check-take.mjs <transcript.json> "这台车一只手就能提起来，出门不求人。"
  *   node scripts/check-take.mjs <transcript.json> --expect-file script.txt
  *
- * transcript.json 由 `hypit transcribe <video> --language zh --to <file>` 生成（逐词带时间）。
+ * transcript.json 由项目转写通道生成：逐词时间用 whisperx（`node scripts/check-take.mjs` 兼容
+ * passages[].words[] 与 segments[] 两种结构）；纯段落级用 `scripts/tr_medium.py <video> <out.json>`。
  * 校验逻辑：去掉标点与空白后逐字比对；用「编辑距离 / 期望长度」算一致率，
  * 100% 才算过；否则打印第几个字开始不一致、漏字/多字/错字，供重跑决策。
  */
@@ -37,7 +38,7 @@ function levenshtein(a, b) {
   return table[a.length][b.length];
 }
 
-/** hypit transcribe 的 JSON：hypit.transcript@1 用 passages[].words[]；另兼容常见结构 */
+/** 逐词转写 JSON（whisperx 输出）：passages[].words[] / segments[].words[] 都认 */
 function transcriptText(json) {
   if (typeof json === "string") return json;
   if (Array.isArray(json?.passages)) {

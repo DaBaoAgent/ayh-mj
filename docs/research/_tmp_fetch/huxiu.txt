@@ -1,0 +1,2 @@
+appkey: "CF_APP_WAF", // 应用标识var AC_Opt = {userUserId: requestInfo.userUserId 
+ var requestInfo = {"data":"","region":"cn","sceneId":"19x5u7lo","token":"f4e81d9910560aa245928ecddbd533c7","traceid":"2f5e3b8017903290913612631e991f","type":"GET","userId":"HpadJlQnz2zSKcSmjXBaqQvjYUvP4jMJIk/ZwGNDNiM=","userUserId":"z2sSI1lCSPT4LVQYDAFLOSh5Pu7mTIHsG0EpLm16bEw="};

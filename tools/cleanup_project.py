@@ -1,103 +1,139 @@
-"""项目清理 — 保留验收成片，删除中间过程素材/脚本/未通过成片
+"""项目清理（现行版，2026-09-26 重写）
 
-保留：
-  · out/approved/ 下两个验收成片（T04 已验收 + T01）
-  · state/jobs.db（流水线任务库）/ console.json / casting_history.json
-  · 全部流水线脚本（tools/ 中非一次性探测脚本）
+⚠️ 为什么重写
+  旧版（2026-09-23）规则是「删除 out/ 下除 approved 外的一切」。在 15 秒 one-take 管线里这是**破坏性的**：
+  它会把 `out/_archive_onetake/`（生片母版，重烧唯一依赖）与当前管线目录里的
+  `onetake.mp4 / onetake_trim.mp4 / onetake_trim.srt / transcripts/`（重烧三件套）一起删掉，
+  还依赖一批早已不存在的 `gen_job_2026...` 老目录。前端「清理」按钮（POST /api/action/cleanup）调的就是它。
+  现改为**白名单保护式**：只删中间件与缓存，进保护清单的一律不动。
 
-删除：
-  · out/ 下除 approved 外的一切（老成片/中间 shots/transcripts/检查图）
-  · state/frames/（抽帧检查图）、storyboard_job_*.json（过程分镜）、workflows_*.json（探测产物）
-  · tools/probe_workflows*.py（一次性探测脚本）、tools/archive/（旧版脚本归档）
+保护（永不删）
+  · out/approved/**                成片 + _superseded 留档（50 条）
+  · out/_archive_onetake/**        生片母版（重新做后期的唯一来源）
+  · out/gen_<uid>/                 以下四类保留：onetake.mp4 / onetake_trim.mp4 / onetake_trim.srt / transcripts/
+  · state/                         thumbs(前端缩略图) / browser-profile(抖音登录态) / console.json /
+                                   hermes_bridge.json / chat_session.json / chat.json / logs/ / _archive/ /
+                                   casting_history.json / combos_used.json / groups_used.json /
+                                   sales_points_used.json / story_angles_used.json / genres_used.json /
+                                   used_ideas.json / approved_order.json / pipeline.db / run_status.json
+  · assets/ vendor/ webui/ tools/ lib/ s1_trend/ s4_generate/ s5_compose/ s6_publish/ scripts/ 整目录
+
+删除（中间件 / 缓存 / 一次性产物）
+  · out/gen_*/ 派生文件：*_sub*.mp4 *_polished*.mp4 *_final*.mp4 *.ass *_frames_tmp/ _frames_tmp/ *.trimmed
+  · state/frames/  state/before_fix/
+  · 全项目 __pycache__/、.ruff_cache/
+  · %LOCALAPPDATA%/Temp/trim_onetake_*
+
+用法
+  .venv/Scripts/python.exe tools/cleanup_project.py --dry     # 预览
+  .venv/Scripts/python.exe tools/cleanup_project.py           # 执行
 """
+from __future__ import annotations
+
+import os
+import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
-APPROVED = OUT / "approved"
 STATE = ROOT / "state"
-TOOLS = ROOT / "tools"
+APPROVED = OUT / "approved"
+ARCHIVE = OUT / "_archive_onetake"
 
-# 验收成片清单：(job目录, 归档名, storyboard存档名)
-APPROVE_LIST = [
-    ("gen_job_20260923_203050_696002_0", "T04_路人疑惑三连_20260923.mp4", "storyboard_T04.json"),
-    ("gen_job_20260923_211932_580932_0", "T01_母子换车_20260923.mp4", "storyboard_T01.json"),
-    ("gen_job_20260923_214420_385094_0", "T02_魔性循环_20260923.mp4", "storyboard_T02.json"),
-    ("gen_job_20260923_220754_942374_0", "T03_反差王者_20260923.mp4", "storyboard_T03.json"),
-    ("gen_job_20260923_221422_559217_0", "T04b_拆车误会_20260923.mp4", "storyboard_T04b.json"),
-    ("gen_job_20260923_223542_194042_0", "T03b_中秋赶集_20260923.mp4", "storyboard_T03b.json"),
-    ("gen_job_20260923_224619_868328_0", "T04c_秋分静养_20260923.mp4", "storyboard_T04c.json"),
-    ("gen_job_20260923_230005_851075_0", "T01b_旧物安全感_20260923.mp4", "storyboard_T01b.json"),
-    ("gen_job_20260923_231804_807115_0", "B1_机场托运_欧美版_20260923.mp4", "storyboard_B1.json"),
-    ("gen_job_20260923_234330_459411_0", "B2_地铁通勤_20260923.mp4", "storyboard_B2.json"),
-    ("gen_job_20260923_235047_259507_0", "B3_暴雨突袭_20260923.mp4", "storyboard_B3.json"),
-]
+# 管线目录里必须保留的四类（重烧三件套 + 生片）
+KEEP_IN_GEN = {"onetake.mp4", "onetake_trim.mp4", "onetake_trim.srt", "onetake_task.json",
+               "onetake_result.json", "transcripts"}
+DERIVED_RE = re.compile(r"(_sub|_polished|_final|_fx|\.ass$|\.trimmed$|_frames_tmp|^_frames)", re.I)
+STATE_KEEP = {
+    "thumbs", "browser-profile", "console.json", "hermes_bridge.json", "chat_session.json", "chat.json",
+    "logs", "_archive", "casting_history.json", "combos_used.json", "groups_used.json",
+    "sales_points_used.json", "story_angles_used.json", "genres_used.json", "used_ideas.json",
+    "approved_order.json", "pipeline.db", "run_status.json", "run_progress.jsonl",
+    "console_action.json", "queue_15s", "restart_console.bat",
+}
+
+MB = 1024 * 1024
+size = 0
+actions: list[str] = []
+
+
+def rm(p: Path, dry: bool) -> None:
+    global size
+    try:
+        s = p.stat().st_size if p.is_file() else 0
+        if p.is_dir():
+            s = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
+        if not dry:
+            shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+        size += s
+        try:
+            label = p.relative_to(ROOT)
+        except ValueError:          # 项目外（如 %TEMP%）路径
+            label = p
+        actions.append(f"  🗑 {label}  ({s / MB:.2f}MB)")
+    except OSError as e:
+        actions.append(f"  ! 跳过 {p}（{e}）")
 
 
 def main(dry: bool = False) -> None:
-    print("=" * 60)
-    print("清理预览" if dry else "开始清理")
-    print("=" * 60)
+    print("=" * 64)
+    print(("清理预览（不改动）" if dry else "开始清理（白名单保护式）"))
+    print("=" * 64)
 
-    # 1. 归档验收成片（+ 分镜元数据）
-    APPROVED.mkdir(exist_ok=True)
-    for job, name, sb_name in APPROVE_LIST:
-        src = OUT / job / "final_sub.mp4"
-        dst = APPROVED / name
-        if not src.exists():
-            print(f"  ✗ 缺成片: {src}（跳过归档）")
-        elif dst.exists():
-            print(f"  ↻ 已归档: {name}")
-        else:
-            if not dry:
-                shutil.copy2(src, dst)
-            print(f"  ✓ 归档: {name} ({src.stat().st_size / 1024 / 1024:.1f}MB)")
-        # 分镜元数据（state 文件名 = storyboard_<uid>.json，uid 无 gen_ 前缀）
-        uid = job.removeprefix("gen_")
-        sb_src = STATE / f"storyboard_{uid}.json"
-        if sb_src.exists():
-            sb_dst = APPROVED / sb_name
-            if not dry:
-                shutil.copy2(sb_src, sb_dst)
-            print(f"  ✓ 归档: {sb_name}")
-
-    # 2. 删除 out/ 下除 approved 外的一切
-    if OUT.exists():
-        for item in OUT.iterdir():
-            if item.name == "approved":
+    # ① out/gen_*/ 只删派生中间件
+    for g in sorted(OUT.glob("gen*")):
+        if not g.is_dir():
+            continue
+        for item in sorted(g.iterdir()):
+            if item.name in KEEP_IN_GEN:
                 continue
-            if not dry:
-                shutil.rmtree(item, ignore_errors=True) if item.is_dir() else item.unlink()
-            print(f"  🗑 out/{item.name}")
+            if item.is_dir() and "transcript" in item.name.lower():
+                continue
+            if item.is_dir() or DERIVED_RE.search(item.name):
+                rm(item, dry)
 
-    # 3. state 过程文件
-    deletes_state = [STATE / "frames"]
-    deletes_state += list(STATE.glob("storyboard_job_*.json"))
-    deletes_state += [STATE / "workflows_meta.json", STATE / "workflows_matrix.json"]
-    for p in deletes_state:
+    # ② state 过程产物
+    for name in ["frames", "before_fix"]:
+        p = STATE / name
         if p.exists():
-            if not dry:
-                shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink()
-            print(f"  🗑 state/{p.name}")
+            rm(p, dry)
+    for item in sorted(STATE.iterdir()):
+        if item.name in STATE_KEEP or item.name.startswith("."):
+            continue
+        # 现行管线的 spec / 预筛稿保留
+        if item.name.startswith(("onetake_prompt_job_", "prescreen_job_")):
+            continue
+        if item.is_file() and item.suffix in {".tmp", ".part", ".log"}:
+            rm(item, dry)
 
-    # 4. 一次性脚本
-    for p in [TOOLS / "probe_workflows.py", TOOLS / "probe_workflows_v2.py",
-              TOOLS / "archive"]:
-        if p.exists():
-            if not dry:
-                shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink()
-            print(f"  🗑 tools/{p.name}")
+    # ③ 缓存
+    for r, dirs, _ in os.walk(ROOT):
+        if any(x in r for x in (".venv", ".git", os.sep + "vendor", "node_modules")) or r.endswith("_deprecated_20260925"):
+            dirs[:] = []
+            continue
+        for d in list(dirs):
+            if d in {"__pycache__", ".ruff_cache", ".pytest_cache"}:
+                rm(Path(r) / d, dry)
+                dirs.remove(d)
 
-    # 5. 清点
-    print()
-    print("=== 保留清单 ===")
-    if APPROVED.exists():
-        for f in sorted(APPROVED.iterdir()):
-            print(f"  ✓ out/approved/{f.name} ({f.stat().st_size / 1024 / 1024:.1f}MB)")
-    print("  ✓ state/jobs.db 等流水线状态")
-    print("  ✓ tools/ 流水线脚本")
+    # ④ ffmpeg 临时残留
+    tmp = Path(tempfile.gettempdir())
+    for p in tmp.glob("trim_onetake_*"):
+        rm(p, dry)
+
+    # ⑤ 回执
+    print("\n".join(actions[:60]) + ("\n  ... 另 %d 项" % (len(actions) - 60) if len(actions) > 60 else ""))
+    print(f"\n{'（dry）' if dry else ''}共 {len(actions)} 项 / {size / MB:.1f}MB")
+    print("\n=== 保护清单（一律不删）===")
+    n_app = len(list(APPROVED.glob("*.mp4"))) if APPROVED.exists() else 0
+    n_arch = len(list(ARCHIVE.glob("*.mp4"))) if ARCHIVE.exists() else 0
+    print(f"  ✓ out/approved/ 成片 {n_app} 条 ｜ out/_archive_onetake/ 生片 {n_arch} 条")
+    print("  ✓ out/gen_*/ 的 onetake.mp4 · onetake_trim.mp4 · onetake_trim.srt · transcripts/")
+    print("  ✓ state/thumbs（前端缩略图）· browser-profile（抖音登录态）· _archive/（老 spec）")
+    print("  ✓ state/console.json · hermes_bridge.json · 四池轮换状态 · queue_15s/")
 
 
 if __name__ == "__main__":

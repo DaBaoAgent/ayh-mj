@@ -57,6 +57,9 @@ const MatrixRain = {
 
 Object.assign(NeuralStage, {
     brainNodes: [], brainEdges: [], signalAnchors: [], outline: null, lastFrame: 0, reduced: false,
+    // The supplied brain artwork is the single source of the brain form.  Keep the
+    // canvas only for the incoming/outgoing signal paths, not a second dot-cloud.
+    showSyntheticBrain: false,
     init() {
         this.canvas = document.getElementById('neuralCanvas');
         this.ctx = this.canvas && this.canvas.getContext('2d');
@@ -244,6 +247,7 @@ Object.assign(NeuralStage, {
         const cx = w * .5, cy = h * .40;
         const bw = Math.min(w * .155, 160), bh = Math.min(h * .27, 92);
         this.drawSignalLinks(c, t, speed, cx, cy, bw);
+        if (this.showSyntheticBrain) {
         c.save(); c.translate(cx,cy); c.scale(bw,bh);
         // A lumpy two-hemisphere silhouette anchors the constellation.
         const fill = c.createRadialGradient(-.08,-.2,.08,0,0,1.2);
@@ -287,6 +291,7 @@ Object.assign(NeuralStage, {
             c.beginPath(); c.arc(x,y,p.r*(active?1.23:1),0,Math.PI*2); c.fill();
         }
         c.shadowBlur=0;
+        }
         // The thought wave crossing the brain is the visual centerpiece.
         for (let j=0;j<4;j++) {
             c.beginPath();
