@@ -1,0 +1,63 @@
+Phase 12 证据补充 —— 验证记录（ruff + pytest，全部实测）
+
+$ python -m ruff check lib tests tools webui s6_publish s7_learn
+All checks passed!
+
+$ python -m pytest -q tests/unit/test_jobview.py tests/unit/test_webui_jobs_api.py \
+        tests/unit/test_web_console_source.py
+55 passed, 1 warning in 2.55s
+
+$ python -m pytest -q tests/frontend
+.........                                                                [100%]
+9 passed in 10.00s          # 3 条 Phase 0 smoke + 6 条 Phase 12 任务台用例
+
+$ python -m pytest -q        # 全量（Phase 11 结束为 571 passed / 1 skipped）
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 62%]
+........................................................................ [ 75%]
+........................................................................ [ 88%]
+....................................................................     [100%]
+============================== warnings summary ===============================
+tests/unit/test_webui_jobs_api.py::test_system_health_endpoint
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+632 passed, 1 skipped, 1 warning in 320.20s (0:05:20)
+
+$ python logs/_p12_evidence.py
+evidence written -> docs/codex/phase12_web_console.txt     # 17 段实测（10 个 API + SSE + 护栏 + 落盘）
+
+$ python -m pytest --collect-only -q
+633 tests collected in 0.40s                                # 632 passed + 1 skipped
+
+——————————————————————————————————————————————————————————————
+Phase 12 新增测试（+61 条，全部通过）
+
+  tests/unit/test_jobview.py               23  只读投影层：blocked 从 event.data/repairs 取错误码、
+                                                动作矩阵随状态机、dry 只认 config_snapshot、
+                                                QA 不编造分数、artifacts 缺文件如实报告、
+                                                events 增量 last_id、materials 只列已产出状态、
+                                                物料卡带视频/QA/标题封面/发布/表现、
+                                                /media URL 只对 out 目录内文件开放
+
+  tests/unit/test_webui_jobs_api.py        21  10 个 REST 端点：列表/过滤/limit 边界、详情与 404、
+                                                blocked 人话、artifacts、events since、
+                                                SSE 路由注册顺序（必须在 /api/jobs/{uid} 之前）、
+                                                SSE 帧格式与 snapshot、
+                                                cancel/retry/resume 的真实状态迁移与守卫拒绝、
+                                                POST /api/jobs 与 /api/start 同内核、
+                                                settings 的 runtime 与 ignored 原因、materials、health
+
+  tests/unit/test_web_console_source.py    11  前端静态护栏：禁止中文字面量做状态比较/包含、
+                                                禁止解析 message/日志、app.js 只做装配、
+                                                store 是唯一前端状态容器、各模块导出契约、
+                                                前端 canonical 状态与后端 JobState 一致、
+                                                模板锚点齐全、neural_v4 复用共享 UI 模块
+
+  tests/frontend/test_web_console.py        6  Playwright 端到端（真实 uvicorn + 真实浏览器）：
+                                                启动按钮产生真实任务且刷新后仍在、
+                                                running 任务刷新后按 canonical 恢复（含 PAUSED）、
+                                                取消与 DB 一致、失败 -> 需要人工 -> 重试回 READY、
+                                                READY 物料卡展示生产事实、发布阻断说明为什么需要人工

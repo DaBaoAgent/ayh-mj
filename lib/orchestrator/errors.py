@@ -166,6 +166,78 @@ REPAIR_MAP: dict[str, str] = {
     UNKNOWN: ABORT,
 }
 
+# ── 人工干预提示（Phase 12：BLOCKED 必须说明"为什么需要人工"）──────────────
+# 前端只读这张表，绝不解析中文 message 猜原因（文案一改，提示就哑）。
+HUMAN_HINTS: dict[str, str] = {
+    CONFIG_MISSING: "缺少必需的配置项：请在设置里补齐后重试。",
+    AUTH_EXPIRED: "平台登录已失效：请重新扫码登录该平台；系统已暂停该平台，不会反复重试。",
+    PUBLISH_AUTH: "发布凭据无效：请重新登录对应平台后再发布。",
+    NETWORK_TRANSIENT: "网络抖动：稍后重试即可（会自动退避，不需要人工处理）。",
+    RATE_LIMIT: "触发平台/供应商限流：等窗口过去后再重试。",
+    PROMPT_TOO_LONG: "提示词超长：需要压缩提示词或拆分镜头后重试。",
+    ASSET_MISSING: "缺少素材（角色/产品/字体/参考图）：请补齐资产后重试。",
+    PROVIDER_REJECTED: "生成供应商拒绝了本次请求：请人工检查提示词/内容合规后重试。",
+    GENERATION_FAILED: "生成失败：可重试；连续失败请检查供应商额度与模型可用性。",
+    GENERATION_TIMEOUT: "生成超时：可换工作流或稍后重试。",
+    DOWNLOAD_FAILED: "产物下载失败：检查网络/磁盘后重试。",
+    ASR_MISMATCH: "字幕与语音不一致：需要重建字幕或重出镜头。",
+    SUBTITLE_ALIGN_FAIL: "字幕对齐失败：需要重建字幕。",
+    VISUAL_QA_FAIL: "画面质检不合格：需要按要求重出成片。",
+    PRODUCT_DEFORMED: "产品外形被 AI 画坏：必须重出该镜头（不能直接发布）。",
+    WRONG_SPEAKER: "说话人不对：必须重出该镜头。",
+    HUMAN_ANATOMY_FAIL: "人物肢体异常：必须重出该镜头。",
+    COMPLIANCE_BLOCK: "合规拦截：文案触碰红线，需人工改写后再走一遍 Gate。",
+    PUBLISH_QUOTA: "发布配额用尽：等下一个发布窗口自动续发，不需要人工。",
+    PACKAGING_INCOMPLETE: "发布物料不完整：需人工补齐标题/描述/话题等字段。",
+    AI_DISCLOSURE_UNCONFIRMED: "AI 生成声明无法确认：只能走草稿或人工发布，禁止直发。",
+    REQUIRE_HUMAN_PUBLISH: "该平台没有草稿通道：只能由人工确认发布。",
+    PLATFORM_PAUSED: "平台已被熔断暂停：请先处理账号/凭据问题再解除暂停。",
+    NOT_READY: "任务还没到 READY：等成片归档、物料齐备后再发布。",
+    ENGAGE_CIRCUIT_OPEN: "自动互动已熔断：请人工检查近期回复后复位。",
+    NO_SPEC: "没有可执行的 StorySpec：需要先完成创意规划。",
+    PLAN_FAILED: "自主规划失败：请人工确认目标后重新规划。",
+    PROMPT_NOT_COMPILED: "提示词还没编译：需要先跑编译阶段。",
+    PROMPT_BUDGET_EXCEEDED: "提示词预算超限：需要压缩或减少镜头。",
+    WORKFLOW_INCOMPATIBLE: "没有工作流能保住全部关键能力：需要人工调整工作流/镜头。",
+    PRESCREEN_REQUIRED: "高风险新构图必须先过 5 秒预筛：需要先跑预筛。",
+    PRESCREEN_FAILED: "预筛未通过：不允许直接跑 15 秒正式片，需要人工确认。",
+    CLAIM_UNMAPPED: "文案出现未登记的产品承诺：需登记为 claim 或改写文案。",
+    CLAIM_NEEDS_VERIFICATION: "文案命中待核验口径：需人工核对来源后放行。",
+    CLAIM_FORBIDDEN: "文案命中禁用改写/绝对化/价格红线：必须改写。",
+    MISSING_INPUT: "缺少必需输入：请补齐后重试。",
+    PREFLIGHT_FAILED: "分镜预检未过：需要修正分镜再提交。",
+    QA_FAILED: "质检未通过：需要按要求修复或重出。",
+    COMPOSE_FAILED: "后期合成失败：检查素材/字体/音频后重试。",
+    PACKAGE_FAILED: "打包物料失败：需要人工检查后重跑打包。",
+    STAGE_TIMEOUT: "阶段超时：可重试（可能是供应商慢）。",
+    STAGE_NOT_REGISTERED: "该阶段没有注册实现：需要人工检查部署。",
+    UNEXPECTED_ERROR: "未预期错误：请人工查看日志后再决定是否重试。",
+    BLOCKED_BUDGET: "成本超过单次上限：需要人工确认预算后再继续（不会自动花钱）。",
+    CAPABILITY_BLOCKED: "环境能力缺失（模型/工具/凭据）：请按体检结果补齐能力。",
+    CANCEL_REQUESTED: "任务已被人工取消。",
+    UNKNOWN_JOB: "任务不存在：请刷新任务台。",
+    JOB_NOT_RESUMABLE: "该状态不支持恢复：只能取消或重试。",
+    ORCHESTRATOR_ERROR: "编排层错误：请人工查看日志。",
+    STAGE_FAILED: "阶段执行失败：可重试；请查看错误码对应处理方式。",
+}
+
+
+def human_action_hint(error_code: str | None, message: str = "") -> str:
+    '''error_code 映射到人工提示；表外按动作兜底，绝不编造。'''
+    code = str(error_code or UNKNOWN)
+    hint = HUMAN_HINTS.get(code)
+    if hint:
+        return hint
+    action = repair_action_for(code)
+    fallback = {
+        WAIT_AND_RESUME: "属于可等待类问题：等窗口过去后系统会自动续跑，不需要人工。",
+        REQUIRE_HUMAN: "需要人工介入：请检查该错误的上下文后手动处理。",
+        ABORT: "该错误没有自动修复动作：请人工检查后再决定是否重试。",
+    }
+    tail = fallback.get(action, "请人工查看任务事件后再决定。")
+    return f"{tail}（错误码 {code}）" if not message else f"{tail}（错误码 {code}：{message[:120]}）"
+
+
 # 白名单动作 → 终止/暂停语义
 ACTION_STATE: dict[str, str | None] = {
     WAIT_AND_RESUME: "PAUSED",

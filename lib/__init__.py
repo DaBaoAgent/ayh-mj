@@ -10,9 +10,10 @@ OUT_DIR = PROJECT_ROOT / "out"
 LOGS_DIR = PROJECT_ROOT / "logs"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 
-# 运行状态目录可用 AYHMJ_STATE_DIR 覆盖（测试隔离 / 多实例并存）。
-# 默认仍是仓库内的 state/，不改变任何现有行为。
+# 运行状态目录 / 成片输出目录可用环境变量覆盖（测试隔离 / 多实例并存）。
+# 默认仍是仓库内的 state/ 与 out/，不改变任何现有行为。
 STATE_DIR = Path(os.environ.get("AYHMJ_STATE_DIR") or (PROJECT_ROOT / "state"))
+OUT_DIR = Path(os.environ.get("AYHMJ_OUT_DIR") or OUT_DIR)
 
 # 确保目录存在
 for d in [STATE_DIR, OUT_DIR, LOGS_DIR]:

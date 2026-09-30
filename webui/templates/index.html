@@ -6,6 +6,7 @@
     <title>爱优护AI视频工厂 · 控制台</title>
     <link rel="stylesheet" href="/static/style.css?v=brain-depth-20260925">
     <link rel="stylesheet" href="/static/v4.css?v=brain-depth-20260925">
+    <link rel="stylesheet" href="/static/phase12.css?v=phase12">
     <script>window.__AYHMJ_ROOT__ = {{ root_json | safe }};</script>
 </head>
 <body>
@@ -89,6 +90,32 @@
                     <div class="meta-cell"><label>当前阶段</label><b id="currentStage">—</b></div>
                     <div class="meta-cell"><label>运行信息</label><b id="runMessage">待命</b></div>
                 </div>
+                <div class="state-strip-wrap">
+                    <label class="state-strip-label">真实任务状态机（JobStore）</label>
+                    <div class="state-strip" id="stateStrip"></div>
+                </div>
+            </section>
+
+            <section class="card jobs-card">
+                <header class="card-head">
+                    <h2><span class="h-ico">☰</span> 任务台 <span class="panel-slashes">////</span></h2>
+                    <div class="jobs-tools">
+                        <span class="jobs-count" id="jobsCount">0 / 0</span>
+                        <select id="jobsFilter" class="jobs-filter" aria-label="按状态过滤任务">
+                            <option value="">全部状态</option>
+                            <option value="READY">待发布</option>
+                            <option value="PUBLISHING">发布中</option>
+                            <option value="LEARNING">表现学习</option>
+                            <option value="DONE">已完成</option>
+                            <option value="PAUSED">已暂停</option>
+                            <option value="BLOCKED">需人工</option>
+                            <option value="FAILED">失败</option>
+                            <option value="CANCELLED">已取消</option>
+                        </select>
+                        <button class="mini-btn" id="jobsRefresh" title="刷新任务列表">刷新</button>
+                    </div>
+                </header>
+                <div class="jobs-list" id="jobsList"><div class="empty-hint">加载任务中…</div></div>
             </section>
 
             <section class="card mantra-card">
@@ -204,6 +231,11 @@
                 <div class="engine-meta"><span>内核 <b id="engKernel">—</b></span><span>流水线 <b id="engRun">待命</b></span><span hidden id="engToday">0</span><span hidden id="engTrends">0</span><span hidden id="topReady">0</span><span hidden id="topKernel">--</span></div>
             </section>
 
+            <section class="card health-card">
+                <h2><span class="h-ico">✚</span> 系统体检 <span class="health-badge" id="healthStatus">加载中</span></h2>
+                <div class="health-grid" id="healthGrid"><div class="empty-hint">正在体检…</div></div>
+            </section>
+
             <section class="card logs-card">
                 <h2><span class="h-ico">≡</span> 实时数据流 <span class="log-live">LIVE</span></h2>
                 <div class="data-waterfall" aria-hidden="true"><span>01001 10110 01011 11001 00101</span><span>11010 00111 10101 01110 11011</span><span>01101 11001 00101 10110 01001</span><span>10110 01010 11001 00111 01101</span><span>00101 11100 01011 10010 11010</span></div>
@@ -215,6 +247,8 @@
             <section class="card outputs-card">
                 <h2><span class="h-ico">▶</span> 最新生成作品 <span class="mini-live">RECENT OUTPUT</span></h2>
                 <div class="outputs-grid" id="outputsGrid"><div class="empty-hint">暂无成片</div></div>
+                <h3 class="materials-title">成片物料（视频 · QA · 标题封面 · 发布 · 表现）</h3>
+                <div class="materials-list" id="materialsList"><div class="empty-hint">加载物料中…</div></div>
             </section>
         </aside>
     </main>
@@ -230,13 +264,25 @@
         <div class="drawer-body" id="settingsBody">
             <div class="drawer-loading">加载设置中…</div>
         </div>
+        <div class="runtime-box" id="runtimeBox"></div>
         <footer class="drawer-foot">
             <span class="save-hint" id="saveHint"></span>
             <button class="btn btn-primary" id="btnSaveSettings">保存设置</button>
         </footer>
     </aside>
 
-    <script src="/static/app.js?v=brain-depth-20260925"></script>
-    <script src="/static/neural_v4.js?v=brain-depth-20260925"></script>
+    <!-- 任务详情抽屉（Phase 12） -->
+    <div class="drawer-mask" id="jobMask"></div>
+    <aside class="drawer job-drawer" id="jobDrawer" aria-hidden="true">
+        <header class="drawer-head">
+            <h2 id="jobDrawerTitle">任务详情</h2>
+            <button class="drawer-close" id="btnCloseJob">×</button>
+        </header>
+        <div class="drawer-body" id="jobDrawerBody">
+            <div class="drawer-loading">选择左侧任务查看详情</div>
+        </div>
+    </aside>
+
+    <script type="module" src="/static/app.js?v=phase12"></script>
 </body>
 </html>

@@ -1,4 +1,6 @@
 /* Animated neural brain and falling information rain for the approved UI. */
+/* Phase 12：作为 ES module 被 app.js 导入，共享 ui.js 里的 NeuralStage。 */
+import { NeuralStage } from './js/ui.js';
 'use strict';
 
 const MatrixRain = {
@@ -313,3 +315,5 @@ Object.assign(NeuralStage, {
         }
     },
 });
+
+export { MatrixRain };

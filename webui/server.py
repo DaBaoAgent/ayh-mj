@@ -30,12 +30,14 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from hermes_bridge import blog, get_bridge
+from jobview import artifacts_view, detail_view, events_view, job_summary, materials
 
 from lib import OUT_DIR, STATE_DIR
+from lib.jobstore import store
 from lib.orchestrator import orchestrator, start_production
-from lib.orchestrator.models import FRONTEND_STAGES, FRONTEND_TO_STAGES
+from lib.orchestrator.models import FRONTEND_STAGES, FRONTEND_TO_STAGES, RunConfig
 from lib.settings import get_settings
-from lib.state import get_stats, list_jobs
+from lib.state import get_stats
 
 WEBUI_DIR = Path(__file__).parent
 CONSOLE_STATE_FILE = STATE_DIR / "console.json"
@@ -321,18 +323,58 @@ async def api_stats():
 
 
 @app.get("/api/jobs")
-async def api_jobs(status: str | None = None, limit: int = Query(default=20, ge=1, le=100)):
-    return list_jobs(status, limit)
+async def api_jobs(status: str | None = None, limit: int = Query(default=20, ge=1, le=100),
+                   q: str | None = None):
+    """任务列表与过滤（canonical 状态机字段 + 当前可执行动作）。"""
+    jobs = await asyncio.to_thread(store.list_jobs, status, limit)
+    if q:
+        needle = str(q).lower()
+        jobs = [j for j in jobs
+                if needle in str(j.get("uid") or "").lower()
+                or needle in str(j.get("goal") or "").lower()]
+    return {"count": len(jobs), "total": await asyncio.to_thread(store.counts),
+            "jobs": [job_summary(j) for j in jobs]}
+
+
+# 注意顺序：`/api/jobs/events` 必须注册在 `/api/jobs/{uid}` **之前**，
+# 否则 FastAPI 会把它当成 uid="events" 的详情请求（实测返回 404）。
+@app.get("/api/jobs/events")
+async def api_jobs_events():
+    """结构化 job 事件流（SSE）：只推 canonical events，前端不再解析日志字符串。"""
+    async def generate() -> AsyncGenerator[str, None]:
+        try:
+            last_id = max(0, await asyncio.to_thread(store.max_event_id) - 20)
+        except Exception:
+            last_id = 0
+        while True:
+            try:
+                events = await asyncio.to_thread(store.recent_events, last_id, 200)
+            except Exception:
+                events = []
+            for ev in events:
+                last_id = max(last_id, int(ev.get("id") or 0))
+                yield ("event: job\ndata: "
+                       + json.dumps(ev, ensure_ascii=False) + "\n\n")
+            status = await asyncio.to_thread(orchestrator.status)
+            yield ("event: snapshot\ndata: "
+                   + json.dumps(status, ensure_ascii=False) + "\n\n")
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        generate(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 
 @app.get("/api/job/{uid}")
+@app.get("/api/jobs/{uid}")
 async def api_job(uid: str):
-    """完整任务视图：job + attempts + artifacts + events + evaluations + publishes。"""
-    from lib.jobstore import store
-    detail = store.detail(uid)
-    if not detail:
+    """完整任务详情：job/attempts/artifacts/events/evaluations/publishes + CreativeDNA +
+    QA + repair + provider task + blocked（为什么需要人工）。"""
+    view = await asyncio.to_thread(detail_view, store, uid,
+                                   state_dir=STATE_DIR, out_dir=OUT_DIR)
+    if not view:
         return JSONResponse({"error": "任务不存在"}, status_code=404)
-    return detail
+    return view
 
 
 @app.post("/api/settings")
@@ -357,7 +399,12 @@ async def api_settings(request: Request):
         else:
             ignored[key] = reason
     save_console_state(state)
-    return {"ok": True, "saved": saved, "ignored": ignored, "state": state}
+    # Phase 12：保存后必须能看到"下一单真正会用的运行时值"（RunConfig 快照），
+    # 而不是只回一个"已保存"。被忽略的字段直接带原因，前端不再猜。
+    runtime = RunConfig.from_console(state).to_dict()
+    return {"ok": True, "saved": saved, "ignored": ignored, "state": state,
+            "runtime": runtime,
+            "runtime_applies_to": "下一次「启动生产」/POST /api/jobs 的任务快照"}
 
 
 @app.get("/api/settings")
@@ -518,6 +565,66 @@ async def api_job_resume(uid: str):
     """从断点恢复任务（含重启后收敛为 PAUSED 的任务）。"""
     result = await asyncio.to_thread(orchestrator.resume, uid)
     return JSONResponse(result, status_code=200 if result.get("ok") else 400)
+
+
+# ============ Phase 12：任务台 API（canonical 任务 + 结构化事件流） ============
+
+@app.post("/api/jobs")
+async def api_jobs_create(request: Request):
+    """创建生产 job —— 与 /api/start 同一个执行内核，返回 canonical job 视图。
+
+    前端不再"猜脚本状态"：创建后直接拿 JobStore 的 uid/状态/当前阶段。
+    """
+    body: dict = {}
+    with suppress(Exception):
+        body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象")
+    stages = body.get("stages")
+    if stages is not None and (not isinstance(stages, list) or not stages
+                               or any(s not in FRONTEND_STAGES for s in stages)):
+        raise HTTPException(status_code=400, detail="stages 必须是非空、有效的阶段列表")
+    async with ENGINE_START_LOCK:
+        if (await asyncio.to_thread(orchestrator.status)).get("running"):
+            return JSONResponse({"ok": False, "error": "已有任务在运行"}, status_code=400)
+        console = load_console_state()
+        result = await asyncio.to_thread(
+            start_production, goal=str(body.get("goal") or ""), count=body.get("count"),
+            dry=bool(body["dry"]) if "dry" in body else None, source="webui", console=console,
+            stages=_canonical_stages(stages), background=True)
+        if not result.get("ok"):
+            return JSONResponse(result, status_code=400)
+        created = [job_summary(store.get_job(u))
+                   for u in result.get("jobs", []) if store.get_job(u)]
+        return {"ok": True, "count": len(created), "jobs": created,
+                "run": await asyncio.to_thread(orchestrator.status)}
+
+
+@app.get("/api/jobs/{uid}/artifacts")
+async def api_job_artifacts(uid: str):
+    """任务产物清单（spec/creative_dna/video/final/qa_report/packaging/archive）。"""
+    view = await asyncio.to_thread(artifacts_view, store, uid)
+    if view.get("error"):
+        return JSONResponse(view, status_code=404)
+    return view
+
+
+@app.get("/api/jobs/{uid}/events")
+async def api_job_events(uid: str, since: int = Query(default=0, ge=0),
+                         limit: int = Query(default=200, ge=1, le=1000)):
+    """任务事件（状态转换 / 阶段起止 / provider 尝试 / 错误码），支持 since 增量拉取。"""
+    view = await asyncio.to_thread(events_view, store, uid, since=since, limit=limit)
+    if view.get("error"):
+        return JSONResponse(view, status_code=404)
+    return view
+
+
+@app.get("/api/materials")
+async def api_materials(limit: int = Query(default=12, ge=1, le=50)):
+    """成片区物料：视频 + QA 摘要 + 标题/封面方案 + 发布状态 + 表现数据。"""
+    items = await asyncio.to_thread(materials, store, state_dir=STATE_DIR,
+                                    out_dir=OUT_DIR, limit=limit)
+    return {"count": len(items), "materials": items}
 
 
 def _job_final_label(jobdir: Path) -> str:

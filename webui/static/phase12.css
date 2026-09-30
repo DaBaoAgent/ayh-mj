@@ -1,0 +1,157 @@
+/* ============================================================
+   Phase 12：任务台 / 真实状态机 / 系统体检 / 成片物料 / 运行时值
+   （全部复用 style.css 与 v4.css 的设计变量，不覆盖既有样式）
+   ============================================================ */
+
+/* ---------- 真实状态机条 ---------- */
+.state-strip-wrap { margin-top: 12px; }
+.state-strip-label {
+    display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+    color: var(--text-faint); margin-bottom: 6px;
+}
+.state-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.state-chip {
+    font-family: var(--mono); font-size: 10px; padding: 3px 7px; border-radius: 4px;
+    border: 1px solid var(--line); color: var(--text-faint); background: rgba(0, 240, 255, 0.03);
+    transition: all 0.25s;
+}
+.state-chip.on {
+    color: var(--bg0); background: var(--cyan); border-color: var(--cyan);
+    box-shadow: var(--glow-cyan); font-weight: 700;
+}
+.state-chip.side { color: var(--amber); border-color: rgba(255, 176, 32, 0.45); }
+.state-chip.side[data-state="BLOCKED"],
+.state-chip.side[data-state="FAILED"] { color: var(--red); border-color: rgba(255, 51, 85, 0.5); }
+
+/* ---------- 任务台 ---------- */
+.jobs-card .jobs-tools { display: flex; align-items: center; gap: 8px; }
+.jobs-count { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.jobs-filter {
+    background: rgba(6, 14, 28, 0.9); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; font-size: 11px; padding: 4px 6px; font-family: var(--sans);
+}
+.jobs-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.jobs-list::-webkit-scrollbar { width: 6px; }
+.jobs-list::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); border-radius: 3px; }
+
+.job-row {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: rgba(8, 18, 36, 0.7); border: 1px solid var(--line); border-left-width: 3px;
+    border-radius: 8px; padding: 8px 10px; color: var(--text); font-family: var(--sans);
+    transition: border-color 0.2s, background 0.2s;
+}
+.job-row:hover { border-color: var(--line-strong); background: rgba(12, 26, 50, 0.85); }
+.job-row.selected { border-color: var(--cyan); box-shadow: 0 0 14px rgba(0, 240, 255, 0.14); }
+.job-row[data-tone="ok"] { border-left-color: var(--green); }
+.job-row[data-tone="warn"] { border-left-color: var(--amber); }
+.job-row[data-tone="bad"] { border-left-color: var(--red); }
+.job-row[data-tone="idle"] { border-left-color: var(--text-faint); }
+
+.job-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.job-state { font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.job-row[data-tone="ok"] .job-state { color: var(--green); }
+.job-row[data-tone="warn"] .job-state { color: var(--amber); }
+.job-row[data-tone="bad"] .job-state { color: var(--red); }
+.job-uid { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+.job-goal {
+    font-size: 11px; color: var(--text-dim); margin: 3px 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+}
+.job-row-tail { display: flex; gap: 8px; align-items: center; }
+.job-stage, .job-cost { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+.job-flag {
+    font-family: var(--mono); font-size: 9px; padding: 1px 5px; border-radius: 3px;
+    color: var(--red); border: 1px solid rgba(255, 51, 85, 0.45);
+}
+
+/* ---------- 任务详情抽屉 ---------- */
+.job-drawer { width: 560px; }
+.job-section { margin-bottom: 16px; }
+.job-section h4 {
+    font-size: 11px; letter-spacing: 2px; color: var(--cyan); margin-bottom: 6px;
+    font-family: var(--mono); text-transform: uppercase;
+}
+.job-kv { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px dashed rgba(0, 240, 255, 0.08); }
+.job-kv .k {
+    flex: 0 0 132px; font-size: 11px; color: var(--text-faint); font-family: var(--mono);
+    overflow: hidden; text-overflow: ellipsis;
+}
+.job-kv .v { flex: 1; font-size: 12px; color: var(--text); word-break: break-all; }
+.job-empty { font-size: 11px; color: var(--text-faint); padding: 4px 0; }
+.job-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.job-blocked {
+    border: 1px solid rgba(255, 51, 85, 0.5); background: rgba(255, 51, 85, 0.07);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 16px;
+}
+.job-blocked-head { color: var(--red); font-weight: 700; font-size: 12px; letter-spacing: 1px; }
+.job-blocked-msg { font-size: 11px; color: var(--text-dim); margin: 6px 0; }
+.job-blocked-action { font-size: 12px; color: var(--text); }
+.job-blocked-hint { font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-top: 6px; }
+
+/* ---------- 系统体检 ---------- */
+.health-badge {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px; padding: 2px 8px;
+    border-radius: 4px; border: 1px solid var(--line); color: var(--text-dim);
+}
+.health-badge[data-tone="ready"] { color: var(--green); border-color: rgba(0, 255, 157, 0.5); }
+.health-badge[data-tone="degraded"] { color: var(--amber); border-color: rgba(255, 176, 32, 0.5); }
+.health-badge[data-tone="blocked"] { color: var(--red); border-color: rgba(255, 51, 85, 0.5); }
+.health-grid { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; }
+.health-row {
+    border-left: 3px solid var(--text-faint); background: rgba(8, 18, 36, 0.6);
+    border-radius: 6px; padding: 6px 9px;
+}
+.health-row[data-tone="ready"] { border-left-color: var(--green); }
+.health-row[data-tone="degraded"] { border-left-color: var(--amber); }
+.health-row[data-tone="blocked"] { border-left-color: var(--red); }
+.health-head { display: flex; align-items: center; gap: 6px; }
+.health-head b { font-family: var(--mono); font-size: 11px; }
+.health-chip { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+.health-row[data-tone="ready"] .health-chip { color: var(--green); }
+.health-row[data-tone="degraded"] .health-chip { color: var(--amber); }
+.health-row[data-tone="blocked"] .health-chip { color: var(--red); }
+.health-req { font-family: var(--mono); font-size: 9px; color: var(--purple); }
+.health-detail { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
+.health-fix { font-size: 10px; color: var(--amber); margin-top: 2px; }
+
+/* ---------- 成片物料 ---------- */
+.materials-title {
+    font-size: 11px; letter-spacing: 2px; color: var(--cyan); margin: 14px 0 8px;
+    font-family: var(--mono); font-weight: 600;
+}
+.materials-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+.material-card {
+    border: 1px solid var(--line); border-left: 3px solid var(--text-faint);
+    background: rgba(8, 18, 36, 0.7); border-radius: 8px; padding: 9px 11px;
+}
+.material-card[data-tone="ok"] { border-left-color: var(--green); }
+.material-card[data-tone="warn"] { border-left-color: var(--amber); }
+.material-card[data-tone="bad"] { border-left-color: var(--red); }
+.material-head { display: flex; justify-content: space-between; gap: 8px; }
+.material-state { font-size: 11px; font-weight: 700; }
+.material-video { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+.material-title, .material-cover { font-size: 11px; color: var(--text); margin-top: 4px; }
+.material-qa, .material-publish, .material-perf {
+    font-family: var(--mono); font-size: 10px; color: var(--text-dim); margin-top: 3px;
+}
+.material-blocked { font-size: 10px; color: var(--red); margin-top: 4px; }
+.material-actions { display: flex; gap: 8px; align-items: center; margin-top: 7px; }
+.material-link { font-size: 11px; color: var(--cyan); text-decoration: none; }
+.material-link:hover { text-decoration: underline; }
+.action-btn.small { font-size: 10px; padding: 3px 8px; }
+
+/* ---------- 设置抽屉：运行时生效值 ---------- */
+.runtime-box { display: none; padding: 0 20px 12px; }
+.runtime-box.show { display: block; }
+.runtime-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 1px; color: var(--cyan);
+    margin-bottom: 6px;
+}
+.runtime-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; margin-bottom: 8px; }
+.runtime-cell { display: flex; justify-content: space-between; gap: 8px; }
+.runtime-cell .rk { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+.runtime-cell .rv { font-size: 11px; color: var(--text); text-align: right; }
+.runtime-saved { font-size: 10px; color: var(--green); margin-bottom: 6px; }
+.runtime-ignored { border-top: 1px dashed rgba(255, 176, 32, 0.3); padding-top: 6px; }
+.runtime-ignored .runtime-title { color: var(--amber); }
+.runtime-ignored-row { font-size: 10px; color: var(--amber); }

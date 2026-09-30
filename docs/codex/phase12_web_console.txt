@@ -1,0 +1,290 @@
+
+====================================================================================================
+① 环境与隔离（演练模式：0 付费 / 0 外发 / 0 真实社媒动作）
+====================================================================================================
+  临时工作目录 : C:\Users\ADMINI~1\AppData\Local\Temp\p12ev_p8979to6
+  STATE_DIR    : C:\Users\ADMINI~1\AppData\Local\Temp\p12ev_p8979to6\state
+  OUT_DIR      : C:\Users\ADMINI~1\AppData\Local\Temp\p12ev_p8979to6\out
+  事实源       : JobStore(sqlite) + Orchestrator —— 前端只读投影，不解析日志字符串
+
+====================================================================================================
+② 造数：四条 canonical 任务（READY / FAILED / BLOCKED / PAUSED）
+====================================================================================================
+  job_p12_ready    status=READY     dry=True cost=2.5
+  job_p12_failed   status=FAILED    dry=True cost=0.0
+  job_p12_blocked  status=BLOCKED   dry=True cost=0.0
+  job_p12_paused   status=PAUSED    dry=True cost=0.0
+
+====================================================================================================
+③ GET /api/jobs —— 列表 + 状态分布（前端首屏唯一数据源）
+====================================================================================================
+  HTTP 200  count=4  total={"total": 4, "by_status": {"BLOCKED": 1, "FAILED": 1, "PAUSED": 1, "READY": 1}}
+  单条原始投影：
+{
+  "uid": "job_p12_paused",
+  "goal": "重启收敛用例",
+  "status": "PAUSED",
+  "stage": "paused",
+  "error_code": "ENGINE_RESTART",
+  "created_at": "2026-09-30T15:40:02",
+  "updated_at": "2026-09-30T15:40:02",
+  "cost_spent": 0.0,
+  "cost_estimate": 0.0,
+  "budget_cap": null,
+  "priority": 5,
+  "dry": true,
+  "actions": {
+    "cancel": true,
+    "retry": false,
+    "resume": true
+  }
+}
+  过滤 status=FAILED -> HTTP 200 count=1 uids=['job_p12_failed']
+  关键字 q=发布 -> HTTP 200 uids=['job_p12_blocked']
+
+====================================================================================================
+④ GET /api/jobs/{uid} —— 完整详情（CreativeDNA / QA / repair / blocked / 动作）
+====================================================================================================
+  job_p12_ready: HTTP 200  keys=['artifacts', 'attempts', 'blocked', 'creative', 'evaluations', 'events', 'job', 'performance', 'provider_tasks', 'publishes', 'qa', 'repair_summary', 'repairs', 'summary']
+    summary.actions = {"cancel": true, "retry": false, "resume": false}
+    creative: 骨架=双人对撞 genre=G1 hook=冲突开场 卖点=单手提起
+    qa = {"count": 1, "latest_kind": "qa_critic", "latest_score": 0.91, "latest_passed": true, "min_score": 0.91, "detail": {"checks": ["ok"]}}
+    attempts=1 artifacts=1 repairs=0 repair_summary={"count": 0, "cost": 0, "by_code": {}, "by_action": null, "last": null}
+    blocked = null
+  job_p12_failed: HTTP 200  keys=['artifacts', 'attempts', 'blocked', 'creative', 'evaluations', 'events', 'job', 'performance', 'provider_tasks', 'publishes', 'qa', 'repair_summary', 'repairs', 'summary']
+    summary.actions = {"cancel": true, "retry": true, "resume": false}
+    qa = {"count": 0, "latest_kind": null, "latest_score": null, "latest_passed": null, "min_score": null, "detail": null}
+    attempts=1 artifacts=0 repairs=1 repair_summary={"count": 1, "cost": 0.2, "by_code": {"VISUAL_QA_FAIL": 1}, "by_action": "REGENERATE_SHOT", "last": {"id": 1, "job_id": 2, "stage": "generate", "error_code": "VISUAL_QA_FAIL", "action": "REGENERATE_SHOT", "rewind_to": "", "target_shot": null, "attempt": 1, "budget": 0, "cost": 0.2, "status": "DONE", "detail": {"reason": "测试夹具"}, "created_at": "2026-09-30T15:40:02"}}
+    blocked = {"code": "VISUAL_QA_FAIL", "message": "✗ qa：VISUAL_QA_FAIL", "human_action": "画面质检不合格：需要按要求重出成片。", "next_action": "REGENERATE_SHOT", "retryable": false, "at": "2026-09-30T15:40:02", "stage": "qa"}
+  job_p12_blocked: HTTP 200  keys=['artifacts', 'attempts', 'blocked', 'creative', 'evaluations', 'events', 'job', 'performance', 'provider_tasks', 'publishes', 'qa', 'repair_summary', 'repairs', 'summary']
+    summary.actions = {"cancel": true, "retry": true, "resume": false}
+    qa = {"count": 0, "latest_kind": null, "latest_score": null, "latest_passed": null, "min_score": null, "detail": null}
+    attempts=0 artifacts=1 repairs=0 repair_summary={"count": 0, "cost": 0, "by_code": {}, "by_action": null, "last": null}
+    blocked = {"code": "AI_DISCLOSURE_UNCONFIRMED", "message": "✗ publishing：AI_DISCLOSURE_UNCONFIRMED", "human_action": "AI 生成声明无法确认：只能走草稿或人工发布，禁止直发。", "next_action": "ABORT", "retryable": false, "at": "2026-09-30T15:40:02", "stage": "publishing"}
+  不存在的任务 -> HTTP 404 {"error": "任务不存在"}
+
+====================================================================================================
+⑤ GET /api/jobs/{uid}/artifacts —— 产物清单（含落盘存在性 / 可播放 URL）
+====================================================================================================
+  HTTP 200
+{
+  "uid": "job_p12_ready",
+  "count": 1,
+  "artifacts": [
+    {
+      "type": "final",
+      "version": 1,
+      "stage": "package",
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\p12ev_p8979to6\\out\\ready_case.mp4",
+      "bytes": 17,
+      "sha256": "b5b263abe3e95816d8d67b066bfdec189b80a77d0e47dc6523f71ee400b20301",
+      "meta": null,
+      "created_at": "2026-09-30T15:40:02",
+      "exists": true,
+      "name": "ready_case.mp4"
+    }
+  ]
+}
+
+====================================================================================================
+⑥ GET /api/jobs/{uid}/events —— 结构化事件（status/stage/attempt/error 全在里面）
+====================================================================================================
+  HTTP 200 count=7 last_id=17
+    # 12 status_change      stage=researching PLANNING -> RESEARCHING  PLANNING → RESEARCHING（system）
+    # 13 status_change      stage=scripting  RESEARCHING -> SCRIPTING  RESEARCHING → SCRIPTING（system）
+    # 14 status_change      stage=preflight  SCRIPTING -> PREFLIGHT  SCRIPTING → PREFLIGHT（system）
+    # 15 status_change      stage=generating PREFLIGHT -> GENERATING  PREFLIGHT → GENERATING（system）
+    # 16 status_change      stage=failed     GENERATING -> FAILED  GENERATING → FAILED（system）
+    # 17 stage_failed       stage=qa         - -> -  ✗ qa：VISUAL_QA_FAIL
+  增量 since=17 -> count=0（无新事件必须为空，前端据此增量刷新）
+
+====================================================================================================
+⑦ GET /api/system/health —— 能力矩阵（READY / DEGRADED / BLOCKED 三档）
+====================================================================================================
+  HTTP 200  status=DEGRADED
+  capabilities: 11 项，前 6 项：
+    {"name": "python", "status": "READY", "detail": "3.12.9 @ D:\\@kaifa\\ayh-mj\\.venv\\Scripts\\python.exe", "required": true, "fix": "安装 Python ≥ 3.11"}
+    {"name": "ffmpeg", "status": "READY", "detail": "C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.1-essentials_build\\bin\\ffmpeg.EXE | C:\\Users\\Administrator\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.1-essentials_build\\bin\\ffprobe.EXE", "required": true, "fix": ""}
+    {"name": "font", "status": "READY", "detail": "msyh.ttc @ C:\\Windows\\Fonts", "required": false, "fix": ""}
+    {"name": "whisper", "status": "DEGRADED", "detail": "faster_whisper 未安装：转写/字级字幕不可用", "required": false, "fix": "uv pip install faster-whisper（或 pip install -e '.[asr]'）"}
+    {"name": "autodl", "status": "READY", "detail": "来源 keyfile(legacy)", "required": false, "fix": ""}
+    {"name": "deepseek", "status": "READY", "detail": "来源 dotenv", "required": false, "fix": ""}
+
+====================================================================================================
+⑧ GET /api/jobs/events —— SSE 结构化事件流（前端不再解析日志字符串）
+====================================================================================================
+  HTTP content-type=text/event-stream; charset=utf-8 cache-control=no-cache
+  原始帧（client 断开会话即停，不留守护线程）：
+    event: job
+    data: {"id": 12, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "PLANNING", "to_status": "RESEARCHING", "stage": "researching", 
+    event: job
+    data: {"id": 13, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "RESEARCHING", "to_status": "SCRIPTING", "stage": "scripting", "
+    event: job
+    data: {"id": 14, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "SCRIPTING", "to_status": "PREFLIGHT", "stage": "preflight", "me
+    event: job
+    data: {"id": 15, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "PREFLIGHT", "to_status": "GENERATING", "stage": "generating", "
+    event: job
+    data: {"id": 16, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "GENERATING", "to_status": "FAILED", "stage": "failed", "message
+    event: job
+    data: {"id": 17, "ts": "2026-09-30T15:40:02", "type": "stage_failed", "from_status": null, "to_status": null, "stage": "qa", "message": "✗ qa：VISUAL_Q
+  第一帧解码 = canonical 事件: {"id": 12, "ts": "2026-09-30T15:40:02", "type": "status_change", "from_status": "PLANNING", "to_status": "RESEARCHING", "stage": "researching", "message": "PLANNING → RESEARCHING（system）", "data": {"a
+  快照帧 source_of_truth=jobstore keys=['active', 'cancelled', 'current_stage', 'dry', 'failed', 'finished', 'jobs_by_status', 'message', 'progress', 'run_id', 'running', 'source', 'source_of_truth', 'stage', 'total']
+  快照 jobs_by_status={"BLOCKED": 1, "FAILED": 1, "PAUSED": 1, "READY": 1}
+
+====================================================================================================
+⑨ POST /api/jobs/{uid}/cancel —— 动作结果与 DB 状态必须一致
+====================================================================================================
+  动作前 DB: job_p12_ready = READY
+  HTTP 200  {"ok": true, "uid": "job_p12_ready", "requested": false, "mode": "immediate"}
+  动作后 DB: job_p12_ready = CANCELLED
+  API 详情再确认: status=CANCELLED
+  终态任务不可再 cancel -> HTTP 404
+
+====================================================================================================
+⑩ POST /api/jobs/{uid}/retry —— 真重跑（演练），回到 READY 并清掉旧错误码
+====================================================================================================
+  动作前 DB: job_p12_failed = FAILED error_code=VISUAL_QA_FAIL
+  HTTP 200  {"ok": true, "uid": "job_p12_failed", "run_id": "run_20260930_154003", "from_stage": "generate", "config": {"goal": "", "source": "cli", "daily_target": 1, "gen_concurrency": 6, "dry_mode": true, "real_publish": false, "real_engage": false, "publish_platforms": ["douyin"], "stages": ["plan", "preflight", "generate", "qa", "compose", "package"], "max_attempts": 3, "max_repairs": 3, "budget_cap": null, "force": false, "created_at": "2026-09-30T15:40:03"}}
+  执行结束后 DB: status=READY error_code=None cost_spent=0.0
+
+====================================================================================================
+⑪ POST /api/jobs/{uid}/resume —— 从断点继续（PAUSED 是重启收敛态）
+====================================================================================================
+  动作前 DB: job_p12_paused = PAUSED
+  HTTP 200  {"ok": true, "uid": "job_p12_paused", "run_id": "run_20260930_154003", "from_stage": "generate", "config": {"goal": "", "source": "cli", "daily_target": 1, "gen_concurrency": 6, "dry_mode": true, "real_publish": false, "real_engage": false, "publish_platforms": ["douyin"], "stages": ["plan", "preflight", "generate", "qa", "compose", "package"], "max_attempts": 3, "max_repairs": 3, "budget_cap": null, "force": false, "created_at": "2026-09-30T15:40:03"}}
+  执行结束后 DB: job_p12_paused = READY
+
+====================================================================================================
+⑫ 守卫：非法动作必须被拒，且 DB 状态一个字节都不动
+====================================================================================================
+  READY 任务 retry -> HTTP 400 {"ok": false, "error_code": "JOB_NOT_RESUMABLE", "error": "只有 FAILED/BLOCKED 的任务可重试（当前 READY）"}（只有 FAILED/BLOCKED 可重试）
+    DB 未变: READY -> READY
+  终态(CANCELLED)任务 resume -> HTTP 400 {"ok": false, "error_code": "JOB_NOT_RESUMABLE", "error": "任务已终结（CANCELLED），不可恢复"}
+    DB 未变: CANCELLED
+
+====================================================================================================
+⑬ POST /api/jobs —— 与 /api/start 同一执行内核，返回 canonical 视图（演练）
+====================================================================================================
+  HTTP 200 ok=True count=1
+  新任务 job_20260930_Phase12证据演练任务_20260930_154003_01  status=PLANNING  dry=True
+  run = {"running": true, "current_stage": null, "stage": "", "progress": 16.7, "message": "出片 job_20260930_Phase12证据演练任务_20260930_154003_01（1/1）· ", "active": ["job_20260930_Phase12证据演练任务_20260930_154003_01"], "total": 1, "finished": 0, "failed": 0, "cancelled": 0, "run_id": "run_20260930_154003", "source": "webui", "dry": true, "source_of_truth": "jobstore", "jobs_by_status": {"BLOCKED": 1, "CANCELLED": 1, "PLANNING": 1, "READY": 2}}
+  演练执行结束: status=READY cost_spent=0.0
+  非法 stages -> HTTP 400 {"detail": "stages 必须是非空、有效的阶段列表"}
+
+====================================================================================================
+⑭ POST /api/settings —— 保存后必须能看到 runtime 生效值 + 被忽略字段的原因
+====================================================================================================
+  HTTP 200 ok=True
+  saved   = {"daily_target": 3, "real_publish": false}
+  ignored = {"bogus_key": "未知设置项", "gen_concurrency": "超出范围 2-10"}
+  runtime = {"budget_cap": null, "created_at": "2026-09-30T15:40:03", "daily_target": 3, "dry_mode": false, "force": false, "gen_concurrency": 6, "goal": "", "max_attempts": 3, "max_repairs": 3, "publish_platforms": ["douyin"], "real_engage": false, "real_publish": false, "source": "webui", "stages": ["plan", "preflight", "generate", "qa", "compose", "package"]}
+  runtime_applies_to = 下一次「启动生产」/POST /api/jobs 的任务快照
+
+====================================================================================================
+⑮ GET /api/materials —— 成片区：视频 / QA / 标题封面 / 发布 / 表现 / 阻断原因
+====================================================================================================
+  HTTP 200 count=5
+  目标物料卡的原始投影（人话标题/封面上屏，指标数由后端投影，不靠前端数 key）：
+{
+  "uid": "job_p12_material",
+  "goal": "成片物料用例",
+  "status": "READY",
+  "stage": "ready",
+  "updated_at": "2026-09-30T15:40:03",
+  "cost_spent": 2.5,
+  "video": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\p12ev_p8979to6\\out\\material_case.mp4",
+  "video_url": "/media/material_case.mp4",
+  "creative": {
+    "structure": "S_duo_conflict",
+    "structure_name": "双人对撞",
+    "day": "2026-09-30",
+    "dna": {
+      "genre": "G1",
+      "hook_type": "冲突开场",
+      "shot_pattern": "4镜对撞",
+      "angle": "日常场景",
+      "sales_point": "单手提起",
+      "audience": "子女代购决策者",
+      "risk_flags": []
+    },
+    "rationale": {},
+    "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\p12ev_p8979to6\\state\\creative\\dna_job_p12_material.json"
+  },
+  "qa": {
+    "count": 1,
+    "latest_kind": "qa_critic",
+    "latest_score": 0.91,
+    "latest_passed": true,
+    "min_score": 0.91,
+    "detail": {
+      "checks": [
+        "ok"
+      ]
+    }
+  },
+  "publish": [
+    {
+      "platform": "douyin",
+      "status": "DRAFT",
+      "post_id": null,
+      "url": null,
+      "external_id": null,
+      "at": "2026-09-30T15:40:03"
+    }
+  ],
+  "performance": {
+    "platform": "douyin",
+    "post_id": null,
+    "snapshot_time": "2026-09-30T15:40:03",
+    "metric_count": 3,
+    "metrics": {
+      "impressions": null,
+      "views": 1200,
+      "skip_2s": null,
+      "retention_5s": null,
+      "avg_watch_time": null,
+      "avg_watch_pct": null,
+      "completion": 0.42,
+      "rewatches": null,
+      "likes": 31,
+      "comments": null,
+      "shares": null,
+      "saves": null,
+      "follows": null,
+      "profile_visits": null,
+      "dms": null,
+      "conversion_proxy": null
+    },
+    "raw": null
+  },
+  "title": "标题：单手拎起",
+  "cover": "封面：真轻",
+  "hashtags": [
+    "#轻便",
+    "#出行"
+  ],
+  "blocked"
+  ...(截断)
+  其它卡片摘要（含被阻断的任务）：
+    job_20260930_Phase12证据演练任务_20260930_154003_01 status=READY     blocked=None video=False
+    job_p12_paused   status=READY     blocked=None video=False
+    job_p12_blocked  status=BLOCKED   blocked=AI_DISCLOSURE_UNCONFIRMED video=True
+    job_p12_failed   status=READY     blocked=None video=False
+
+====================================================================================================
+⑯ 前端护栏：状态判断只认 canonical 字段，禁止字符串包含推断业务状态
+====================================================================================================
+  扫描前端文件 : ['api.js', 'health.js', 'hermes.js', 'jobs.js', 'outputs.js', 'settings.js', 'store.js', 'ui.js', 'app.js', 'neural_v4.js']
+  message/日志解析违规 : 0 行（同一套正则见测试同名用例）
+  中文字面量状态推断违规 : 0 行（期望 0）
+  ui.js CANONICAL_STAGES == JobState.LINEAR : True
+  ui.js CANONICAL_SIDE   == JobState.SIDE   : True
+  app.js 体量 = 4411 字节（装配层，< 12000）
+  js/hermes.js 模块体量 = 26165 字节（业务逻辑已下沉到模块）
+
+====================================================================================================
+⑰ 数据落盘位置（证据可复查）
+====================================================================================================
+  state 目录文件: ['backups', 'console.json', 'creative', 'logs', 'packaging_job_p12_material.json', 'pipeline.db', 'thumbs']
+  creative DNA  : ['dna_job_p12_material.json', 'dna_job_p12_ready.json']
+  out 目录文件  : ['blocked_case.mp4', 'material_case.mp4', 'ready_case.mp4']
