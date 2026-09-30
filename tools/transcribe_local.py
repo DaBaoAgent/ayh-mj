@@ -1,73 +1,70 @@
-"""本地转写（faster-whisper 直用，跳过 whisperx 的 alignment 环节）
+"""本地转写（faster-whisper 直用）—— 全链**唯一**的 ASR 入口（Phase 9 任务 1/2）。
 
-背景：whisperx 的中文对齐模型（jonatasgrosman/wav2vec2-large-xlsr-53-chinese-zh-cn）
-在 hf-mirror 上拉不到 feature extractor 配置 → 对齐必失败。
-本脚本直接用 whisperx 底层的 faster-whisper（small 模型已缓存）拿 segments 级时间戳，
-足够 check-take.mjs 做逐字比对与语速估算。
+Phase 9 之前这里跑 `small` 出 segments 级转写，`lines_to_srt.py` 又用 `medium`
+重跑一遍拿字级时间 —— 同一条视频两次推理、两份时间轴。现在只跑一次：
+
+  · 模型/语言走 settings.asr（默认 medium，字级时间戳 word_timestamps=True）；
+  · 结果落 `<视频目录>/transcripts/canonical.json`（segments + 每字 start/end + 源指纹）；
+  · 命中缓存（源视频没变）直接复用，**不重推**；
+  · 兼容产物 `transcripts/<stem>.json`（segments 级）由 canonical **派生**，供
+    tools/check-take.mjs 等老消费者继续用，不是第二份事实源。
+
+为什么不用 whisperx 的 alignment：中文对齐模型（wav2vec2-large-xlsr-53-chinese-zh-cn）
+在 hf-mirror 拉不到 feature extractor → 对齐必失败。faster-whisper 自带的字级时间戳够用。
 
 用法：
-    python tools/transcribe_local.py <视频路径>
-    → 产出 <视频目录>/transcripts/<stem>.json（segments[] 结构）
+    python tools/transcribe_local.py <视频路径> [--force] [--model medium]
+    → 产出 <视频目录>/transcripts/canonical.json（+ <stem>.json 兼容副本）
 """
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from lib.tools import ffmpeg
+from lib.post import transcript as T  # noqa: E402
 
 
-def extract_audio(video: str, out_wav: str):
-    """ffmpeg 抽音频（16k 单声道）"""
-    cmd = [ffmpeg(), "-y", "-i", video, "-vn", "-ac", "1", "-ar", "16000",
-           "-c:a", "pcm_s16le", out_wav]
-    subprocess.run(cmd, capture_output=True, timeout=300)
+def _settings_model() -> str:
+    try:
+        from lib.settings import get_settings
+
+        return get_settings().asr.model or T.DEFAULT_MODEL
+    except Exception:      # noqa: BLE001 - 设置不可用就退回默认模型
+        return T.DEFAULT_MODEL
 
 
-def transcribe(video_path: str) -> str:
-    from faster_whisper import WhisperModel
-
+def transcribe(video_path: str, *, force: bool = False, model: str | None = None) -> str:
+    """跑（或复用）canonical 转写 → 返回 canonical.json 路径。"""
     video = Path(video_path).resolve()
-    out_dir = video.parent / "transcripts"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    json_path = out_dir / f"{video.stem}.json"
+    workspace = video.parent
+    model = model or _settings_model()
 
-    if json_path.exists():
-        print(f"↻ 转录已存在: {json_path}", flush=True)
-        return str(json_path)
+    tr, reused = T.ensure(video, workspace=workspace, model=model, force=force)
+    if reused:
+        print(f"↻ 复用 canonical 转写（未重推）: {T.canonical_path(workspace)}", flush=True)
+    else:
+        print(f"🎧 faster-whisper 转写（{tr.model}/{tr.language}，字级时间戳）...", flush=True)
+    for seg in tr.segments:
+        print(f"  [{seg.start:5.1f}-{seg.end:5.1f}] {seg.text}", flush=True)
 
-    # 抽音频
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        wav = tmp.name
-    print("🎧 抽取音频...", flush=True)
-    extract_audio(str(video), wav)
-
-    # 转写（small 模型，CPU int8）
-    print("🎧 faster-whisper 转写中（small/int8）...", flush=True)
-    model = WhisperModel("small", device="cpu", compute_type="int8")
-    segments, info = model.transcribe(wav, language="zh", beam_size=5)
-
-    rows = []
-    for seg in segments:
-        rows.append({
-            "start": round(seg.start, 2),
-            "end": round(seg.end, 2),
-            "text": seg.text.strip(),
-        })
-        print(f"  [{seg.start:5.1f}-{seg.end:5.1f}] {seg.text.strip()}", flush=True)
-
-    json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
-    Path(wav).unlink(missing_ok=True)
-    print(f"✓ 转录: {json_path}", flush=True)
-    return str(json_path)
+    # 兼容副本：segments 级（老消费者 check-take.mjs 用），由 canonical 派生而非重推
+    legacy = workspace / "transcripts" / f"{video.stem}.json"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps(
+        [{"start": s.start, "end": s.end, "text": s.text} for s in tr.segments],
+        ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"✓ canonical: {T.canonical_path(workspace)}（{len(tr.segments)} 段 / "
+          f"{tr.char_count} 字 / 指纹 {tr.fingerprint()}）", flush=True)
+    return str(T.canonical_path(workspace))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
         print(__doc__)
-        sys.exit(2)
-    transcribe(sys.argv[1])
+        raise SystemExit(2)
+    force = "--force" in sys.argv
+    model = sys.argv[sys.argv.index("--model") + 1] if "--model" in sys.argv else None
+    transcribe(args[0], force=force, model=model)

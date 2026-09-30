@@ -1,0 +1,11 @@
+[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。
+build rc 0
+total=4.20s silences=[(1.02, 3.02)] cuts=1 keep=[(0.0, 1.12), (2.92, 4.2)]
+TRIM ok= True parts 2 / 2 dur 2.464 vs 2.403 streams 1 1 errors= []
+LOUDNESS(裁剪后干人声): -38.5 LUFS / 0.0 LU / -29.0 dBTP ✗ | issues: ['整体响度 -38.5 LUFS 不在 (-17.0, -9.0) 目标区间']
+
+反例 1 —— 保留段为空：
+  {"ok": false, "parts_expected": 0, "parts_produced": 0, "expected_duration": 0, "duration": 0.0, "video_streams": 0, "audio_streams": 0, "errors": ["保留段为空，无可裁剪"]}
+反例 2 —— 输出时长与保留段时长不符（容差 0）：
+  ok= False dur 0.223 vs 0.2 errors= ["输出时长 0.22s 与保留时长 0.20s 偏差超过 0.00s"]
+  → 部分失败必须显式报错，不得静默跳过（ok=False 是预期结果）

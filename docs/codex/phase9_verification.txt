@@ -1,0 +1,44 @@
+Phase 9 证据 —— 验证记录（ruff + pytest，全部实测）
+
+$ python -m ruff check lib tests tools webui
+All checks passed!
+
+$ python -m pytest tests/unit/test_post_transcript.py tests/unit/test_audio_director.py \
+        tests/unit/test_sfx_placement.py tests/unit/test_trim_validation.py \
+        tests/unit/test_loudness_master.py tests/integration/test_post_pipeline.py -q
+............................................                             [100%]
+44 passed in 0.77s
+
+$ python -m pytest -q        # 全量（含 tests/frontend；Phase 8 结束为 401 passed / 1 skipped）
+........................................................................ [ 48%]
+........................................................................ [ 64%]
+........................................................................ [ 80%]
+........................................................................ [ 96%]
+..............                                                           [100%]
+============================== warnings summary ===============================
+tests/unit/test_orchestrator.py::test_webui_cli_hermes_create_identical_jobs
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+445 passed, 1 skipped, 1 warning in 297.87s (0:04:57)
+
+$ python -m pytest tests/frontend -q
+...                                                                      [100%]
+3 passed in 2.74s
+
+——————————————————————————————————————————————————————————————
+Phase 9 新增测试（+44 条，全部通过）
+  tests/unit/test_post_transcript.py      7   一次 ASR / 复用不重推 / 源变更失效 / 字幕时间同一来源
+  tests/unit/test_audio_director.py       9   BGM 9 字段 metadata / 片型先验 / mood_curve 主导 / recent 非唯一
+  tests/unit/test_sfx_placement.py        9   动态放置（动作/反转/punchline/品牌）+ 片型 policy + 时间不叠加
+  tests/unit/test_trim_validation.py      7   段数/时长/音视频流校验，失败必须显式报错
+  tests/unit/test_loudness_master.py      9   统一阈值单一来源 / 母线增益 / 限幅同源 / 量不到不增益
+  tests/integration/test_post_pipeline.py 3   一条 canonical / 重跑后期不重生视频 / 字幕与 SFX 同源
+
+数值对照（Phase 8 → Phase 9）：
+  pytest 全量   401 passed + 1 skipped  →  445 passed + 1 skipped（+44）
+  前端 smoke     3 passed              →  3 passed
+  ruff          All checks passed!      →  All checks passed!
+
+说明：本轮修复了 tests/unit/test_orchestrator.py::test_cancel_is_cooperative_and_leaves_no_orphan
+的既有竞态（captured 在 run_subprocess 之前入列 → spawned 可能还空着），改为等到两者都就绪。
+修复前全量跑该用例偶发 IndexError，修复后连续两轮全量 442/445 全绿（未改任何生产逻辑）。

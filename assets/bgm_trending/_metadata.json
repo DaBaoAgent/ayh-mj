@@ -1,0 +1,255 @@
+{
+ "_note": "Phase 9 任务 6：按曲名判定的气质（mood/energy/comedic/emotional）。bpm/intro_strength/drop_time 未在此提供，由 lib.post.audio_director 确定性推断，非真实声学分析值。",
+ "爆笑欢乐包.mp3": {
+  "mood": "comedic",
+  "energy": 0.92,
+  "comedic": 0.95,
+  "emotional": 0.05,
+  "genre": "comedy"
+ },
+ "搞笑滑稽搞怪.mp3": {
+  "mood": "comedic",
+  "energy": 0.85,
+  "comedic": 0.9,
+  "emotional": 0.08,
+  "genre": "comedy"
+ },
+ "搞笑滑稽沙雕.mp3": {
+  "mood": "comedic",
+  "energy": 0.9,
+  "comedic": 0.95,
+  "emotional": 0.05,
+  "genre": "comedy"
+ },
+ "搞笑有趣可爱虫.mp3": {
+  "mood": "comedic",
+  "energy": 0.8,
+  "comedic": 0.85,
+  "emotional": 0.1,
+  "genre": "comedy"
+ },
+ "滑稽搞笑.mp3": {
+  "mood": "comedic",
+  "energy": 0.85,
+  "comedic": 0.9,
+  "emotional": 0.08,
+  "genre": "comedy"
+ },
+ "喜剧幽默搞笑古风.mp3": {
+  "mood": "comedic",
+  "energy": 0.82,
+  "comedic": 0.88,
+  "emotional": 0.1,
+  "genre": "comedy"
+ },
+ "三只小猪.mp3": {
+  "mood": "comedic",
+  "energy": 0.78,
+  "comedic": 0.8,
+  "emotional": 0.1,
+  "genre": "comedy"
+ },
+ "调皮哨.mp3": {
+  "mood": "comedic",
+  "energy": 0.75,
+  "comedic": 0.7,
+  "emotional": 0.1,
+  "genre": "comedy"
+ },
+ "万恶之源.mp3": {
+  "mood": "comedic",
+  "energy": 0.72,
+  "comedic": 0.7,
+  "emotional": 0.1,
+  "genre": "comedy"
+ },
+ "真拿你没办法.mp3": {
+  "mood": "comedic",
+  "energy": 0.62,
+  "comedic": 0.55,
+  "emotional": 0.15,
+  "genre": "comedy"
+ },
+ "归家步履踏歌来.mp3": {
+  "mood": "emotional",
+  "energy": 0.3,
+  "comedic": 0.04,
+  "emotional": 0.9,
+  "genre": "emotional"
+ },
+ "第一缕阳光.mp3": {
+  "mood": "emotional",
+  "energy": 0.45,
+  "comedic": 0.05,
+  "emotional": 0.78,
+  "genre": "emotional"
+ },
+ "一路都是风景.mp3": {
+  "mood": "emotional",
+  "energy": 0.32,
+  "comedic": 0.05,
+  "emotional": 0.55,
+  "genre": "emotional"
+ },
+ "黄昏海岸线.mp3": {
+  "mood": "calm",
+  "energy": 0.24,
+  "comedic": 0.04,
+  "emotional": 0.55,
+  "genre": "calm"
+ },
+ "惬意的黄昏海风.mp3": {
+  "mood": "calm",
+  "energy": 0.2,
+  "comedic": 0.04,
+  "emotional": 0.5,
+  "genre": "calm"
+ },
+ "山那边的风.mp3": {
+  "mood": "calm",
+  "energy": 0.21,
+  "comedic": 0.04,
+  "emotional": 0.5,
+  "genre": "calm"
+ },
+ "悠闲海边下午茶.mp3": {
+  "mood": "calm",
+  "energy": 0.2,
+  "comedic": 0.05,
+  "emotional": 0.4,
+  "genre": "calm"
+ },
+ "夏日慢时光.mp3": {
+  "mood": "calm",
+  "energy": 0.3,
+  "comedic": 0.08,
+  "emotional": 0.45,
+  "genre": "calm"
+ },
+ "偷偷.mp3": {
+  "mood": "calm",
+  "energy": 0.28,
+  "comedic": 0.1,
+  "emotional": 0.4,
+  "genre": "calm"
+ },
+ "mist.mp3": {
+  "mood": "calm",
+  "energy": 0.18,
+  "comedic": 0.03,
+  "emotional": 0.45,
+  "genre": "calm"
+ },
+ "轻快悠闲.mp3": {
+  "mood": "calm",
+  "energy": 0.34,
+  "comedic": 0.12,
+  "emotional": 0.35,
+  "genre": "calm"
+ },
+ "无人扶我青云志.mp3": {
+  "mood": "epic",
+  "energy": 0.78,
+  "comedic": 0.08,
+  "emotional": 0.55,
+  "genre": "epic"
+ },
+ "古风游戏.mp3": {
+  "mood": "epic",
+  "energy": 0.62,
+  "comedic": 0.1,
+  "emotional": 0.45,
+  "genre": "epic"
+ },
+ "西游记-天府月.mp3": {
+  "mood": "epic",
+  "energy": 0.66,
+  "comedic": 0.25,
+  "emotional": 0.4,
+  "genre": "epic"
+ },
+ "冬至新年.mp3": {
+  "mood": "upbeat",
+  "energy": 0.82,
+  "comedic": 0.35,
+  "emotional": 0.25,
+  "genre": "pop"
+ },
+ "欢喜欢快喜庆.mp3": {
+  "mood": "upbeat",
+  "energy": 0.85,
+  "comedic": 0.4,
+  "emotional": 0.25,
+  "genre": "pop"
+ },
+ "活泼快乐高兴.mp3": {
+  "mood": "upbeat",
+  "energy": 0.8,
+  "comedic": 0.42,
+  "emotional": 0.22,
+  "genre": "pop"
+ },
+ "喜出望外.mp3": {
+  "mood": "upbeat",
+  "energy": 0.8,
+  "comedic": 0.35,
+  "emotional": 0.28,
+  "genre": "pop"
+ },
+ "轻快活泼愉快口哨.mp3": {
+  "mood": "upbeat",
+  "energy": 0.78,
+  "comedic": 0.45,
+  "emotional": 0.2,
+  "genre": "pop"
+ },
+ "夏日气泡水.mp3": {
+  "mood": "upbeat",
+  "energy": 0.72,
+  "comedic": 0.3,
+  "emotional": 0.25,
+  "genre": "pop"
+ },
+ "这么快乐.mp3": {
+  "mood": "upbeat",
+  "energy": 0.78,
+  "comedic": 0.4,
+  "emotional": 0.2,
+  "genre": "pop"
+ },
+ "舞会吉他阳光.mp3": {
+  "mood": "upbeat",
+  "energy": 0.74,
+  "comedic": 0.25,
+  "emotional": 0.3,
+  "genre": "pop"
+ },
+ "愉悦清新休闲日常.mp3": {
+  "mood": "upbeat",
+  "energy": 0.62,
+  "comedic": 0.22,
+  "emotional": 0.32,
+  "genre": "pop"
+ },
+ "忙碌的小快乐.mp3": {
+  "mood": "upbeat",
+  "energy": 0.7,
+  "comedic": 0.28,
+  "emotional": 0.28,
+  "genre": "pop"
+ },
+ "groovy.mp3": {
+  "mood": "upbeat",
+  "energy": 0.68,
+  "comedic": 0.35,
+  "emotional": 0.22,
+  "genre": "pop"
+ },
+ "天真的橡皮.mp3": {
+  "mood": "upbeat",
+  "energy": 0.6,
+  "comedic": 0.45,
+  "emotional": 0.2,
+  "genre": "pop"
+ }
+}

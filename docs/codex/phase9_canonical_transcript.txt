@@ -1,0 +1,12 @@
+[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。
+[1] 首次转写：ASR 调用 1 次 | 产物 ['canonical.json'] | fingerprint 972e552717fd0ea6
+    words=23 chars=23 duration=5.3s model=fake-medium source_size=8192
+[2] 再次 ensure：ASR 调用 1 次（不重推） | reuse=True | 产物 ['canonical.json']
+    fingerprint 不变：True
+[3] 全链复用同一份：canonical 路径 = transcripts\canonical.json
+    字幕时间来自同一 transcript：align_spans[0][0]=0.5 build_rows[0][0]=0.5 （同一事实源：True）
+[4] 源视频变化后：ASR 调用 2 次（失效重推） | reuse=False | 产物 ['canonical.json']
+    source_size 已更新 9000 | 仍然只有一份 canonical：True
+[5] matches_source 对旧 transcript 判定：False（False = 失效逻辑生效）
+
+canonical.json 结构：

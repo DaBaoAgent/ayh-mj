@@ -33,8 +33,11 @@ SYS_PYTHON = Path(_settings.paths.python) if _settings.paths.python else Path(sy
 #   · MarginV = 288 × 比例 → 实测字幕底边距画面底部 = 画面高度 × 比例（1/3 时实测 33.9%）
 #   · 2026-09-24 宝哥验收「再低一点」→ 1/3 → 0.28（实测底边距底部 28.4%）
 #   · 想微调只改 SUBTITLE_BOTTOM_RATIO（更大=更高，更小=更低；0.25 更低、0.33 回到三分之一）
+# Phase 9（任务 3）：字号/安全区/每行字数全部走 settings.compose.subtitle，不再写死。
 ASS_PLAY_RES_Y = 288
-SUBTITLE_BOTTOM_RATIO = 0.25
+SUBTITLE_BOTTOM_RATIO = float(_settings.compose.subtitle.bottom_ratio)
+SUBTITLE_FONT_SIZE = int(_settings.compose.subtitle.font_size)
+SUBTITLE_MAX_CHARS = int(_settings.compose.subtitle.max_chars_per_line)
 SUBTITLE_MARGIN_V = round(ASS_PLAY_RES_Y * SUBTITLE_BOTTOM_RATIO)
 
 # 字幕字体（2026-09-25 宝哥令：统一改为「新青年体」= 文悦新青年体，抖音/剪映同款）
@@ -54,7 +57,7 @@ def _ffmpeg_path_arg(path: str) -> str:
 FONTS_DIR = _fonts_dir()
 FONTS_DIR_ARG = _ffmpeg_path_arg(FONTS_DIR)
 
-SUB_STYLE = (f"FontName={FONT_NAME},FontSize=13,PrimaryColour=&HFFFFFF,"
+SUB_STYLE = (f"FontName={FONT_NAME},FontSize={SUBTITLE_FONT_SIZE},PrimaryColour=&HFFFFFF,"
              "OutlineColour=&H000000,BorderStyle=1,Outline=1.0,Shadow=0,"
              f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=0")
 
@@ -90,7 +93,7 @@ def write_ass_with_effects(rows: list[tuple[float, float, str]], ass_path: Path)
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{FONT_NAME},13,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+        f"Style: Default,{FONT_NAME},{SUBTITLE_FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
         f"0,0,0,0,100,100,0,0,1,1.0,0,2,10,10,{SUBTITLE_MARGIN_V},134\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -255,7 +258,7 @@ def _cn_to_arabic(text: str) -> str:
     return text
 
 
-def _split_natural(text: str, max_chars: int = 10) -> list[str]:
+def _split_natural(text: str, max_chars: int = SUBTITLE_MAX_CHARS) -> list[str]:
     """把一个句子拆成 ≤max_chars 的自然句行（去标点输出 + 参数数字化）
 
     规则（宝哥定 2026-09-23）：一次只显示一行、每行≤10字、尽量自然句、
@@ -265,7 +268,7 @@ def _split_natural(text: str, max_chars: int = 10) -> list[str]:
     return [_cn_to_arabic(s) for s in out]
 
 
-def _split_raw(text: str, max_chars: int = 10) -> list[str]:
+def _split_raw(text: str, max_chars: int = SUBTITLE_MAX_CHARS) -> list[str]:
     """断句核心（保留标点用于判断，去标点在 _split_natural 统一处理）"""
     import re
     text = text.strip()
@@ -314,7 +317,7 @@ def _no_overlap(rows: list[tuple[float, float, str]], gap: float = 0.05) -> list
 
 
 def _explode_rows(segments: list[dict], texts: list[str] | None,
-                  max_chars: int = 10) -> list[tuple[float, float, str]]:
+                  max_chars: int = SUBTITLE_MAX_CHARS) -> list[tuple[float, float, str]]:
     """把每条字幕拆成 ≤max_chars 的行，时间按字数比例分配
 
     返回 [(start, end, text), ...]，直接写 SRT。
@@ -339,7 +342,8 @@ def _explode_rows(segments: list[dict], texts: list[str] | None,
 
 
 def segments_to_srt(segments: list[dict], srt_path: Path,
-                    expected_lines: list[str] = None, max_chars: int = 10) -> Path:
+                    expected_lines: list[str] = None,
+                    max_chars: int = SUBTITLE_MAX_CHARS) -> Path:
     """转写段落 → SRT；expected_lines 提供时做同音字校正（含连读/分段的合并对齐）
 
     字幕规则：一行≤max_chars 字、自然句成行、按字数比例分配时间轴。

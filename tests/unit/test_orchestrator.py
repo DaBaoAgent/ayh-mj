@@ -175,9 +175,10 @@ def test_cancel_is_cooperative_and_leaves_no_orphan(tmp_state):
     uid = result["jobs"][0]
 
     deadline = time.time() + 20
-    while not captured and time.time() < deadline:
+    while time.time() < deadline and not (captured and captured[0].spawned):
         time.sleep(0.1)
     assert captured, "generate 阶段未进入"
+    assert captured[0].spawned, "generate 的子进程未登记（captured/spawned 竞态）"
     proc = captured[0].spawned[0]
     assert proc.poll() is None, "子进程应仍在运行"
 

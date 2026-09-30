@@ -33,7 +33,9 @@ PHASE_DIMENSIONS: dict[str, tuple[str, ...]] = {
 PHASES: tuple[str, ...] = ("gen", "final")
 EVIDENCE_FILENAME = {"gen": "qa_evidence_{uid}.json", "final": "qa_final_evidence_{uid}.json"}
 VIDEO_FILENAME = {"gen": "onetake.mp4", "final": "onetake_final.mp4"}
-TRANSCRIPT_FILENAME = {"gen": "transcript_{uid}.json", "final": "transcript_{uid}.json"}
+# Phase 9：字幕/转写只有一个 canonical artifact，QA 直接读它（不再各阶段自己产时间轴）
+TRANSCRIPT_FILENAME = {"gen": "transcripts/canonical.json",
+                       "final": "transcripts/canonical.json"}
 
 
 def evidence_path(workspace: Path, uid: str, phase: str = "gen") -> Path:
@@ -57,8 +59,12 @@ def load_evidence(workspace: Path, uid: str, phase: str = "gen") -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _probe_video(path: Path) -> dict:
-    """探测成片：只报**事实**，探测不到就留空（让 checks 记 WARN/FAIL，不猜）。"""
+def _probe_video(path: Path, *, measure_audio: bool = False) -> dict:
+    """探测成片：只报**事实**，探测不到就留空（让 checks 记 WARN/FAIL，不猜）。
+
+    `measure_audio=True`（final 阶段）时跑一次统一响度检测（lib.post.loudness），
+    把真实 LUFS/dBTP 填进证据 —— 响度判定不再依赖 fixture 回填。
+    """
     out: dict = {"path": str(path), "exists": Path(path).is_file()}
     if not out["exists"]:
         return out
@@ -77,6 +83,19 @@ def _probe_video(path: Path) -> dict:
         out["duration"] = round(float(fmt.get("duration") or 0.0), 2)
     except (TypeError, ValueError):
         out["duration"] = None
+    if measure_audio and out["audio_streams"] >= 1:
+        try:
+            from ..post.loudness import measure
+
+            m = measure(path)
+            out["loudness_lufs"] = m.get("loudness_lufs")
+            out["true_peak_db"] = m.get("true_peak_db")
+            out["lra"] = m.get("lra")
+            out["loudness_ok"] = m.get("ok")
+            if m.get("error"):
+                out["loudness_error"] = m["error"]
+        except Exception as exc:      # noqa: BLE001 - 响度探测失败不该炸验片
+            out["loudness_error"] = f"{type(exc).__name__}: {exc}"
     return out
 
 
@@ -130,7 +149,8 @@ def gather_evidence(workspace: Path, uid: str, doc: dict, *, phase: str = "gen")
     ev = load_evidence(workspace, uid, phase)
     ev.setdefault("uid", uid)
     ev.setdefault("phase", phase)
-    ev["video"] = {**_probe_video(video_path(workspace, uid, phase)), **(ev.get("video") or {})}
+    ev["video"] = {**_probe_video(video_path(workspace, uid, phase),
+                                  measure_audio=(phase == "final")), **(ev.get("video") or {})}
     ev["spec"] = {**_spec_expectations(doc), **(ev.get("spec") or {})}
     ev.setdefault("copy", _spec_copy(doc))
     if not ev.get("transcript"):

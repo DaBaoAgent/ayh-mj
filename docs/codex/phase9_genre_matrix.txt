@@ -1,0 +1,14 @@
+曲库 37 首
+
+genre  mood_curve(moods)                  BGM 选曲                       SFX policy   SFX
+--------------------------------------------------------------------------------------------------------------
+G1     upbeat,upbeat,neutral,neutral      舞会吉他阳光.mp3                   low(max1)    ['品牌 beat']
+G2     epic,epic,upbeat,upbeat            欢喜欢快喜庆.mp3                   high(max4)   ['动作', '反转/转折', '品牌 beat', '品牌 beat']
+G3     upbeat,upbeat,comedic,comedic      搞笑滑稽搞怪.mp3                   high(max5)   ['动作', '反转/转折', '品牌 beat', '品牌 beat']
+G4     upbeat,upbeat,comedic,comedic      三只小猪.mp3                     medium(max3) ['反转/转折', '品牌 beat', '品牌 beat']
+G5     emotional,emotional,emotional,emotional 第一缕阳光.mp3                    none(max0)   []
+G6     neutral,neutral,neutral,neutral    Try - Andre Juss.mp3         low(max1)    ['品牌 beat']
+G7     calm,calm,calm,calm                轻快悠闲.mp3                     low(max1)    ['品牌 beat']
+G8     comedic,comedic,comedic,comedic    搞笑滑稽沙雕.mp3                   high(max4)   ['动作', '反转/转折', '品牌 beat', '品牌 beat']
+G9     epic,epic,epic,epic                无人扶我青云志.mp3                  medium(max2) ['品牌 beat', '品牌 beat']
+G10    epic,epic,upbeat,upbeat            舞会吉他阳光.mp3                   medium(max2) ['品牌 beat', '品牌 beat']

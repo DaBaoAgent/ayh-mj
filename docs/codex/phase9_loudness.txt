@@ -1,0 +1,23 @@
+canonical saved: True fingerprint 2408588a2c4feffc
+reuse: True True
+SRT rc 0
+✓ canonical 对齐 SRT：3 行 → D:\@kaifa\ayh-mj\logs\p9smoke\out.srt
+   [ 0.20- 1.80] 老王说走就走真快
+   [ 1.83- 3.60] 其实我没想到这么快
+   [ 3.63- 4.80] 爱优护真省心
+  SFX G3: 3 -> ['动作', '反转/转折', '品牌 beat']
+  SFX G5: 0 -> []
+  SFX G7: 1 -> ['品牌 beat']
+library size: 37 | sample meta: {"path": "D:\\@kaifa\\ayh-mj\\assets\\bgm_trending\\groovy.mp3", "name": "groovy.mp3", "source": "sidecar", "bpm": 74, "energy": 0.68, "mood": "upbeat", "intro_strength": 0.667, "drop_time": 13.44, "genre": "pop", "vocal": false, "comedic": 0.35, "emotional": 0.22}
+  BGM G3: 喜剧幽默搞笑古风.mp3 score=6.325 mood=comedic
+  BGM G5: 第一缕阳光.mp3 score=5.18 mood=emotional
+  BGM G7: 愉悦清新休闲日常.mp3 score=5.45 mood=upbeat
+  BGM G8: 喜剧幽默搞笑古风.mp3 score=6.2 mood=comedic
+  BGM G10: 愉悦清新休闲日常.mp3 score=6.555 mood=upbeat
+audio_polish rc 0
+🎵 AudioDirector 选曲：喜剧幽默搞笑古风.mp3（mood=comedic energy=0.82 genre=G3 score=7.825）
+  bgm: 喜剧幽默搞笑古风.mp3 | sfx: ['whoosh.mp3', 'whoosh.mp3', 'pop.mp3']
+  母线实测：-26.1 LUFS / 20.0 LU / -8.8 dBTP ✗ → volume=10.1dB,alimiter=limit=0.8414:level=0
+✓ 输出: D:\@kaifa\ayh-mj\logs\p9smoke\voice_polished.mp4
+  统一响度检测：-16.4 LUFS / 20.0 LU / -1.3 dBTP ✓
+stderr tail: [deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。

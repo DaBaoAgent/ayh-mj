@@ -33,8 +33,9 @@ STATIC_MAX_SECONDS = 2.0           # 无意义静止/长停顿上限
 PAYOFF_MAX_RATIO = 0.85            # payoff 不得晚于总时长的 85%
 SUB_OVERLAP_TOLERANCE = 0.12       # 字幕允许的相邻重叠（秒）
 SUB_MAX_CHARS_PER_LINE = 16        # 单行字幕上限（安全区/断句）
-LOUDNESS_BAND = (-17.0, -9.0)      # 对白片整体响度目标区间（LUFS）
-TRUE_PEAK_MAX = -1.0               # 真峰值上限（dBTP）
+# 响度/真峰值阈值与检测实现统一在 lib/post/loudness.py（Phase 9 任务 11），此处只引用，
+# 避免「混音口径」与「验片口径」两套数字漂移。
+from ..post.loudness import LOUDNESS_BAND, TRUE_PEAK_MAX  # noqa: E402
 
 _SPEECH_MODES = ("dialogue", "duo", "interview", "vlog", "comment", "pov", "voiceover")
 

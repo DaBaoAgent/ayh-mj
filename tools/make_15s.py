@@ -21,8 +21,9 @@
   · 字数口径：门禁不查字数 → 自己按纯汉字 65-72 校验（口径 68-75/15s）
   · 阿拉伯数字：门禁 R18 拦截，字幕层再转回数字
   · 字幕孤行：时长<0.35s 或 ≤2 字且夹在两句之间 → 并进下一行
-  · 音效：audio_polish 的 SFX_RULES 对无标点转写失效 → 本工具按 SRT 节拍自混（素材先归一化电平）
+  · 音效：Phase 9 起由 lib.post.sfx 依剧情/片型动态放置（不再固定第 4/5/7/8 句）
   · 音效电平：ding/whoosh/pop 素材仅 -25dB → 混音前必须 +19~26dB，混后 alimiter
+  · 后期链事实源：ASR 只做一次 → transcripts/canonical.json；字幕/BGM/SFX 全读它
   · 归档：rename_approved 统一「序号 主体.mp4」+ 桌面同步
 """
 from __future__ import annotations
@@ -45,13 +46,8 @@ REFS_TAIL = [PROD / "折叠-无阴影.png", PROD / "正侧-3-无阴影.png", PRO
 MIN_CJK, MAX_CJK = 65, 72
 PROMPT_MAX, PROMPT_SAFE = 10000, 9800   # H3 prompt 硬上限 / 安全线（2026-09-26 实测）
 
-# ── 音效：按 SRT 节拍自动选点（三类各一 + 品牌前一拍）──
-SFX_PLAN = [
-    ("赌约", 4, "ding.mp3", 20),    # 第 4 句起点（赌注钉死）
-    ("崩溃", 5, "whoosh.mp3", 26),  # 第 5 句起点（力竭求饶）
-    ("兑现", 7, "pop.mp3", 24),     # 第 7 句起点（打脸动作/兑现赌注）
-    ("品牌", 8, "pop.mp3", 17),     # 第 8 句起点（品牌句）
-]
+# ── 音效：Phase 9 起不再固定第 4/5/7/8 句模板 ──
+# 改由 lib.post.sfx.plan_sfx 依「动作 / 反转 / punchline / 品牌 beat」+ 片型 policy 动态放置。
 
 
 def run(cmd, **kw):
@@ -172,6 +168,23 @@ def cmd_new(a) -> int:
     return 0 if (not miss and ok_lines and ok_gate) else 1
 
 
+def _story_brief(spec: dict) -> dict:
+    """spec → 后期音频 brief（genre / mood_curve / beat_map / lines）。"""
+    from lib.post import story_audio_brief
+    return story_audio_brief(spec)
+
+
+def _recent_bgm() -> set[str]:
+    """历史分配里已用过的 BGM 名（AudioDirector 的「最近未使用」惩罚项，非唯一逻辑）。"""
+    used: set[str] = set()
+    for f in ROOT.glob("docs/bgm分配*.json"):
+        with contextlib.suppress(Exception):
+            data = json.loads(f.read_text(encoding="utf-8"))
+            used |= {v["bgm"] for v in (data.get("assignments") or {}).values()
+                     if isinstance(v, dict) and v.get("bgm")}
+    return used
+
+
 # ── 模式②：出片 ────────────────────────────────────────────
 def cmd_run(a) -> int:
     spec_path = Path(a.spec).resolve()
@@ -181,7 +194,6 @@ def cmd_run(a) -> int:
     raw, trim = g / "onetake.mp4", g / "onetake_trim.mp4"
     sub, clip, final = g / "onetake_trim_sub.mp4", g / "onetake_sub_polished.mp4", g / "onetake_final.mp4"
     lines_f, srt = ROOT / f"docs/onetake_lines_{uid}.txt", g / "onetake_trim.srt"
-    trj = g / "transcripts" / "onetake_trim.json"
     g.mkdir(parents=True, exist_ok=True)
 
     steps = []
@@ -235,18 +247,19 @@ def cmd_run(a) -> int:
     else:
         print("  ↻ 已有 onetake_trim.mp4，跳过裁剪")
 
-    # 3 转写
-    if not trj.exists():
-        do("转写（faster-whisper small）",
+    # 3 转写（Phase 9：唯一 ASR，落 canonical.json，字级时间戳）
+    canon = g / "transcripts" / "canonical.json"
+    if not canon.exists():
+        do("转写（faster-whisper medium · 字级时间戳 · canonical）",
            lambda: run([PY, str(ROOT / "tools/transcribe_local.py"), str(trim)]).returncode == 0)
     else:
-        print("  ↻ 已有转写 json，跳过")
+        print("  ↻ 已有 canonical 转写，跳过（不重推）")
 
-    # 4 一致性自检
-    if trj.exists() and not a.dry:
+    # 4 一致性自检（读 canonical；legacy json 只是它的派生副本）
+    if canon.exists() and not a.dry:
         import difflib
-        d = json.loads(trj.read_text(encoding="utf-8"))
-        segs = d if isinstance(d, list) else d.get("segments", [])
+        d = json.loads(canon.read_text(encoding="utf-8"))
+        segs = d.get("segments", [])
         exp = "".join(re.sub(r"[^\u4e00-\u9fff]", "", ln) for ln in load_lines(uid))
         hyp = "".join(re.sub(r"[^\u4e00-\u9fff]", "", s.get("text", "")) for s in segs)
         ratio = difflib.SequenceMatcher(None, exp, hyp).ratio()
@@ -301,24 +314,29 @@ def cmd_run(a) -> int:
     else:
         print("  ↻ 已有带字幕版，跳过")
 
-    # 7 BGM
+    # 7 BGM（Phase 9：AudioDirector 依 StorySpec mood_curve/beat_map + 片型选曲，确定性）
+    brief = _story_brief(spec)
     bgm = a.bgm
     if bgm == "auto":
-        pool = [p for p in (ROOT / "assets/bgm_trending").glob("*.mp3") if p.stat().st_size > 200_000]
-        used = set()
-        for f in ROOT.glob("docs/bgm分配*.json"):
-            with contextlib.suppress(Exception):
-                used |= {v["bgm"] for v in json.loads(f.read_text(encoding="utf-8")).get("assignments", {}).values()}
-        cand = [p for p in pool if p.name not in used] or pool
-        bgm = str(sorted(cand, key=lambda p: p.stat().st_size)[0])
-    if not clip.exists():
+        from lib.post.audio_director import select_bgm
+        track, rationale = select_bgm(brief.get("mood_curve"), brief.get("beat_map"),
+                                      genre=str(brief.get("genre") or ""), recent=_recent_bgm())
+        bgm = track.path if track else ""
+        print(f"  🎵 选曲：{track.name if track else '(曲库为空)'}"
+              f"（mood={track.mood if track else '-'}｜genre={brief.get('genre')}｜"
+              f"score={rationale.get('score')}）")
+    if bgm and not clip.exists():
         do(f"BGM 铺底（{Path(bgm).name}）",
-           lambda: run([PY, str(ROOT / "tools/audio_polish.py"), str(sub), "--bgm", bgm]).returncode == 0)
-    else:
+           lambda: run([PY, str(ROOT / "tools/audio_polish.py"), str(sub), "--bgm", bgm,
+                        "--spec", str(spec_path)]).returncode == 0)
+    elif clip.exists():
         print("  ↻ 已有 BGM 版，跳过")
+    else:
+        print("  ⚠ 未选到 BGM（不阻断出片）")
 
-    # 8 音效（按台词句时间轴自动混，素材先归一化电平）
-    do("音效 4 点（ding/whoosh/pop 电平归一化 + 限幅）", lambda: _mix_sfx(clip, srt, load_lines(uid), final))
+    # 8 音效（Phase 9：动作/反转/punchline/品牌 beat 动态放置 + 片型 policy）
+    do(f"音效（动态放置 · {brief.get('genre') or '默认片型'} policy）",
+       lambda: _mix_sfx(clip, srt, load_lines(uid), final, brief, srt_ok=srt.exists()))
 
     if a.dry:
         print("\n(dry) 未执行后续归档步骤")
@@ -384,33 +402,68 @@ def _sentence_spans(rows, lines: list[str]) -> list[tuple[float, float]]:
     return spans
 
 
-def _mix_sfx(clip: Path, srt: Path, lines: list[str], final: Path) -> bool:
-    """按台词句的时间轴自动插 4 个音效（素材 -25dB → 先归一化，混后限幅）"""
+def _sfx_spans(clip: Path, srt: Path, lines: list[str]) -> list[tuple[float, float]]:
+    """每句台词的真实起止：优先 canonical transcript；没有就退回 SRT 行归并。"""
+    from lib.post import transcript as T
+
+    tr = T.load(clip.parent)
+    if tr is not None:
+        spans = T.align_spans(tr, lines)
+        if len(spans) == len(lines):
+            return spans
+    if srt.exists():
+        return _sentence_spans(_read_srt(srt), lines)
+    return [(0.0, 0.0)] * len(lines)
+
+
+def _mix_sfx(clip: Path, srt: Path, lines: list[str], final: Path, brief: dict | None = None,
+             *, srt_ok: bool = True) -> bool:
+    """动态放置音效（素材先归一化电平，混后限幅）。
+
+    触发点来自 `lib.post.sfx.plan_sfx`：动作/反转/punchline/品牌 beat + 片型 policy。
+    情感片（G5）policy 为「零音效」→ 这里合法地一个都不插，且**不算失败**。
+    """
     from lib import tools as T
+    from lib.post.sfx import plan_sfx, resolve_files
+
+    brief = brief or {}
+    spans = _sfx_spans(clip, srt, lines) if srt_ok or clip.exists() else [(0.0, 0.0)] * len(lines)
+    hits = plan_sfx(spans, lines, genre=str(brief.get("genre") or ""), story=brief)
+    points = [(at, path, hit) for at, path, hit in resolve_files(hits, ROOT / "assets/sfx")]
+    if not points:
+        print(f"    音效：本片型（{brief.get('genre') or '默认'}）policy 下无触发点，跳过")
+        return clip.exists()
+
+    from lib.post import loudness as L
+
     ff = T.ffmpeg()
-    spans = _sentence_spans(_read_srt(srt), lines)
     inputs, fc, labels, names = [], [], [], []
-    for i, (label, k, fname, gain) in enumerate(SFX_PLAN, start=1):
-        if k > len(spans):
-            continue
-        at = max(0.0, spans[k - 1][0] - 0.05)
-        inputs += ["-i", str(ROOT / "assets/sfx" / fname)]
-        pre = "highpass=f=700," if fname.startswith("ding") else ""
+    for i, (at, path, hit) in enumerate(points, start=1):
+        inputs += ["-i", str(path)]
+        pre = "highpass=f=700," if path.name.startswith("ding") else ""
         ms = int(at * 1000)
-        fc.append(f"[{i}:a]{pre}volume={gain}dB,adelay={ms}|{ms}[s{i}]")
+        fc.append(f"[{i}:a]{pre}volume={hit.gain_db}dB,adelay={ms}|{ms}[s{i}]")
         labels.append(f"[s{i}]")
-        names.append(f"{label}@{at:.2f}s")
-    if not labels:
-        print("    ⚠ 未定位到音效点，跳过")
-        return False
+        names.append(f"{hit.reason}@{at:.2f}s")
     fc.insert(0, "[0:a]volume=-1dB[base]")
-    fc.append(f"[base]{''.join(labels)}amix=inputs={len(labels)+1}:duration=first:normalize=0,alimiter=limit=0.95[aout]")
-    cmd = [ff, "-y", "-i", str(clip)] + inputs + ["-filter_complex", ";".join(fc),
-           "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(final)]
+    mix = f"[base]{''.join(labels)}amix=inputs={len(labels)+1}:duration=first:normalize=0"
+    head = [ff, "-y", "-i", str(clip)] + inputs
+
+    # 母线（任务 11）：实测整条混音图 → 静态增益拉到响度目标 + 同源限幅兜峰值。
+    # 与 tools/audio_polish.py 共用 lib.post.loudness，一套阈值一份实现。
+    wav = final.with_name(final.stem + "_premaster.wav")
+    master, _measured = L.master_for_mix(head, ";".join(fc + [mix]), wav)
+    if wav.exists():
+        wav.unlink()
+    cmd = head + ["-filter_complex", ";".join(fc + [f"{mix},{master}[aout]"]),
+                  "-map", "0:v", "-map", "[aout]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", str(final)]
     r = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
-    if r.returncode == 0:
-        print("    音效点：" + ", ".join(names))
-    return r.returncode == 0
+    if r.returncode != 0:
+        print("    ✗ 音效混音失败：" + (r.stderr or "")[-200:])
+        return False
+    print("    音效点：" + ", ".join(names))
+    print("    响度：" + L.summarize(L.measure(final)))
+    return True
 
 
 def _today() -> str:

@@ -16,6 +16,71 @@ from .dna import CreativeDNA
 
 # 通用叙事节拍（按骨架镜数裁剪）
 BEAT_LADDER = ("钩子", "冲突/悬念", "演示/转折", "收口卖点", "回味")
+
+# Phase 9（任务 7）：每个叙事节拍的默认情绪/能量/标签 —— StorySpec 据此输出 mood_curve / beat_map，
+# 由 Phase 9 的 AudioDirector 消费（不再靠文件大小或 random 选曲）。
+BEAT_BASE: dict[str, dict] = {
+    "钩子": {"mood": "upbeat", "energy": 0.85, "role": "hook", "tags": ["hook"]},
+    "冲突/悬念": {"mood": "epic", "energy": 0.80, "role": "conflict", "tags": ["tension"]},
+    "演示/转折": {"mood": "upbeat", "energy": 0.70, "role": "turn", "tags": ["turn", "demo"]},
+    "收口卖点": {"mood": "upbeat", "energy": 0.60, "role": "brand", "tags": ["brand", "payoff"]},
+    "回味": {"mood": "emotional", "energy": 0.35, "role": "close", "tags": ["warm"]},
+}
+
+
+def _genre_profile(genre: str) -> dict:
+    """取片型的音频气质（与 AudioDirector 共用同一张表，避免两处各写一份）。"""
+    try:
+        from ..post.audio_director import GENRE_BGM_PROFILE
+
+        return GENRE_BGM_PROFILE.get(genre) or {}
+    except Exception:      # noqa: BLE001 - 音频层不可用时退回中性气质，不影响创意编译
+        return {}
+
+
+def _tone(beat: str, profile: dict) -> tuple[str, float]:
+    """节拍情绪 × 片型气质 → (mood, energy)。
+
+    片型 profile 的第一种气质是**主色**；钩子/悬念若片型有更"带劲"的第二气质就取它
+    （开场要抓人）。能量按片型整体基调加减。这样同一套骨架在不同片型下得到明显不同的
+    mood_curve，AudioDirector 才有得选（任务 7/10）。
+    """
+    base = BEAT_BASE.get(beat, BEAT_BASE["钩子"])
+    moods = list(profile.get("mood") or [base["mood"]])
+    mood = moods[0]
+    if beat in ("钩子", "冲突/悬念") and len(moods) > 1 and moods[1] in ("epic", "upbeat", "comedic"):
+        mood = moods[1]
+    energy = base["energy"]
+    tier = float(profile.get("energy", 0.5))
+    if tier <= 0.35:
+        energy = max(0.15, energy - 0.3)
+    elif tier >= 0.8:
+        energy = min(1.0, energy + 0.1)
+    return mood, round(energy, 3)
+
+
+def build_beat_map(structure: dict, dna: CreativeDNA) -> tuple[list[dict], list[dict]]:
+    """按骨架镜数铺出叙事节拍表 → (beat_map, mood_curve)。
+
+    beat_map 每镜带 role/tags/mood/energy（SFX 触发与留存分析用）；
+    mood_curve 是同一张表的紧凑版（AudioDirector 选曲用）。
+    """
+    n = max(3, int(structure.get("shots") or 4))
+    cast = [c for c in (dna.cast_pattern or "").split("+") if c.strip()] or ["@elder_male"]
+    profile = _genre_profile(dna.genre)
+    beat_map: list[dict] = []
+    mood_curve: list[dict] = []
+    for i in range(n):
+        beat = BEAT_LADDER[i] if i < len(BEAT_LADDER) else BEAT_LADDER[-1]
+        base = BEAT_BASE.get(beat, BEAT_BASE["钩子"])
+        mood, energy = _tone(beat, profile)
+        beat_map.append({
+            "index": i + 1, "beat": beat, "role": base["role"], "mood": mood,
+            "energy": energy, "tags": list(base["tags"]),
+            "cast_ref": cast[i % len(cast)],
+        })
+        mood_curve.append({"index": i + 1, "beat": beat, "mood": mood, "energy": energy})
+    return beat_map, mood_curve
 DEFAULT_DURATION = 15
 DEFAULT_RESOLUTION = "768p竖"
 DEFAULT_WORKFLOW = "multi_image_15s"
@@ -42,6 +107,8 @@ class StorySpec:
     ref_images: list = field(default_factory=list)
     ref_audios: list = field(default_factory=list)
     shots: list = field(default_factory=list)
+    mood_curve: list = field(default_factory=list)   # Phase 9：[{index,beat,mood,energy}]
+    beat_map: list = field(default_factory=list)     # Phase 9：[{index,beat,role,mood,energy,tags}]
     lines: list = field(default_factory=list)   # Phase 7：[{shot, speaker, text}]，句数随骨架变
     prompt: str = ""
     prompt_ready: bool = False
@@ -64,7 +131,10 @@ class StorySpec:
             "resolution": self.resolution, "workflow": self.workflow,
             "fallback_workflows": list(self.fallback_workflows),
             "ref_images": list(self.ref_images), "ref_audios": list(self.ref_audios),
-            "shots": [dict(s) for s in self.shots], "prompt": self.prompt,
+            "shots": [dict(s) for s in self.shots],
+            "mood_curve": [dict(x) for x in self.mood_curve],
+            "beat_map": [dict(x) for x in self.beat_map],
+            "prompt": self.prompt,
             "prompt_ready": self.prompt_ready,
             "lines": [dict(x) if isinstance(x, dict) else x for x in self.lines],
             "prompt_meta": dict(self.prompt_meta), "spec_version": self.spec_version,
@@ -139,12 +209,14 @@ def build_story_spec(*, uid: str, structure: dict, dna: CreativeDNA, hotspot: di
                      first_last: bool = False,
                      text_only: bool = False) -> StorySpec:
     """装配 StorySpec（唯一定稿入口，Planner 与 CLI 共用）。"""
+    beat_map, mood_curve = build_beat_map(structure, dna)
     return StorySpec(
         uid=uid, structure_id=structure["id"], structure_name=structure["name"],
         dna=dna, hotspot=dict(hotspot or {}), research_refs=dict(research_refs or {}),
         title=title, duration=duration, resolution=resolution, workflow=workflow,
         fallback_workflows=[w for w in FALLBACK_WORKFLOWS if w != workflow],
         shots=build_shots(structure, dna),
+        mood_curve=mood_curve, beat_map=beat_map,
         lines=[dict(x) if isinstance(x, dict) else x for x in (lines or [])],
         rationale=dict(rationale or {}), first_last=bool(first_last),
         text_only=bool(text_only),

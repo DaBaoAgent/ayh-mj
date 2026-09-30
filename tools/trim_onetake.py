@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -22,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib.tools import ffmpeg
+from lib.tools import ffmpeg, ffprobe
 
 HEAD_KEEP = 0.15
 TAIL_KEEP = 0.15
@@ -30,6 +31,28 @@ MID_TRIGGER = 0.35
 MID_KEEP = 0.20
 SIL_DB = -35
 SIL_D = 0.10
+# Phase 9（任务 5）：裁剪后必须校验，局部失败不得静默跳过
+MIN_PART_BYTES = 1024      # 一段 0.2s 纯色也可能只有几 KB —— 用「流完整」而不是字节数判断成功
+MIN_OUT_BYTES = 1024     # 字节数只是最低底线；真成片由「流完整 + 时长吻合」判定
+
+
+def _probe(path):
+    """ffprobe 事实：时长 + 视频/音频流数量（探测失败留 0，不猜）。"""
+    try:
+        r = subprocess.run([ffprobe(), "-v", "error", "-show_entries",
+                            "format=duration:stream=codec_type", "-of", "json", str(path)],
+                           capture_output=True, text=True, errors="replace")
+        data = json.loads((r.stdout or "").strip() or "{}")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {"duration": 0.0, "video": 0, "audio": 0}
+    streams = data.get("streams") or []
+    try:
+        duration = float((data.get("format") or {}).get("duration") or 0.0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    return {"duration": round(duration, 3),
+            "video": sum(1 for x in streams if x.get("codec_type") == "video"),
+            "audio": sum(1 for x in streams if x.get("codec_type") == "audio")}
 
 
 def _arg_val(name: str, default: float) -> float:
@@ -92,24 +115,64 @@ def complement(total: float, cuts):
     return keep
 
 
-def apply_keep(video: Path, keep, out: Path) -> bool:
+def apply_keep(video: Path, keep, out: Path, *, tolerance: float | None = None) -> dict:
+    """裁剪 → 拼回 → **校验**（任务 5）。返回 report（含 errors）；ok=False 即必须上抛。
+
+    校验项：① 每段都真的产出（不允许静默丢段）② 输出存在且够大
+            ③ 输出时长 ≈ 保留段总时长 ④ 视频/音频流完整（源有音频则输出也要有）。
+    """
+    report: dict = {"ok": False, "parts_expected": len(keep), "parts_produced": 0,
+                    "expected_duration": round(sum(b - a for a, b in keep), 3),
+                    "duration": 0.0, "video_streams": 0, "audio_streams": 0, "errors": []}
+    if not keep:
+        report["errors"].append("保留段为空，无可裁剪")
+        return report
+    src = _probe(video)
     tmp = Path(tempfile.mkdtemp(prefix="trim_onetake_"))
-    parts = []
+    parts, failed = [], []
     for i, (a, b) in enumerate(keep):
         p = tmp / f"seg_{i:02d}.mp4"
-        subprocess.run([ffmpeg(), "-y", "-i", str(video), "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
-                        "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
-                        "-c:a", "aac", "-b:a", "128k", str(p)],
-                       capture_output=True, text=True, errors="replace")
-        if p.exists() and p.stat().st_size > 10 * 1024:
+        r = subprocess.run([ffmpeg(), "-y", "-i", str(video), "-ss", f"{a:.3f}", "-to", f"{b:.3f}",
+                            "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
+                            "-c:a", "aac", "-b:a", "128k", str(p)],
+                           capture_output=True, text=True, errors="replace")
+        ok_part = r.returncode == 0 and p.exists() and p.stat().st_size > MIN_PART_BYTES
+        if ok_part:
+            pr = _probe(p)
+            ok_part = pr["video"] >= 1 and (src["audio"] < 1 or pr["audio"] >= 1)
+        if ok_part:
             parts.append(p)
-    if not parts:
-        return False
+        else:
+            failed.append(i)
+    report["parts_produced"] = len(parts)
+    if failed:
+        report["errors"].append(f"局部 ffmpeg 失败，丢弃了 {len(failed)} 段：{failed}")
+    if len(parts) != len(keep):
+        report["errors"].append(f"产出段数 {len(parts)} ≠ 保留段数 {len(keep)}")
+        return report
+
     lst = tmp / "list.txt"
     lst.write_text("\n".join(f"file '{p.as_posix()}'" for p in parts), encoding="utf-8")
     r = subprocess.run([ffmpeg(), "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
                         "-c", "copy", str(out)], capture_output=True, text=True, errors="replace")
-    return r.returncode == 0 and out.exists() and out.stat().st_size > 50 * 1024
+    if r.returncode != 0 or not out.exists() or out.stat().st_size <= MIN_OUT_BYTES:
+        report["errors"].append(f"拼接失败或输出过小：returncode={r.returncode}")
+        return report
+
+    probe = _probe(out)
+    report.update({"duration": probe["duration"], "video_streams": probe["video"],
+                   "audio_streams": probe["audio"]})
+    if probe["video"] < 1:
+        report["errors"].append("输出无视频流")
+    if src["audio"] >= 1 and probe["audio"] < 1:
+        report["errors"].append("源有音频流但输出无音频流")
+    tol = tolerance if tolerance is not None else max(0.5, 0.05 * len(keep))
+    if abs(probe["duration"] - report["expected_duration"]) > tol:
+        report["errors"].append(
+            f"输出时长 {probe['duration']:.2f}s 与保留时长 {report['expected_duration']:.2f}s "
+            f"偏差超过 {tol:.2f}s")
+    report["ok"] = not report["errors"]
+    return report
 
 
 def main():
@@ -135,8 +198,16 @@ def main():
         return
     keep = complement(total, cuts)
     out = video.with_name(video.stem + "_trim.mp4")
-    ok = apply_keep(video, keep, out)
-    print(f"{'✓ 输出: ' + str(out) if ok else '✗ 裁剪失败'}")
+    report = apply_keep(video, keep, out)
+    if report["ok"]:
+        print(f"✓ 输出: {out}（{report['parts_produced']}/{report['parts_expected']} 段 / "
+              f"{report['duration']:.2f}s / v{report['video_streams']}·a{report['audio_streams']}）")
+        return
+    print("✗ 裁剪校验未通过（不静默出片）：")
+    for err in report["errors"]:
+        print("   -", err)
+    out.unlink(missing_ok=True)
+    raise SystemExit(1)
 
 
 if __name__ == "__main__":

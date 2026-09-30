@@ -1,0 +1,6 @@
+[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。
+build rc 0
+total=4.20s silences=[(1.02, 2.21)] cuts=1 keep=2
+TRIM ok= True parts 2 / 2 dur 3.277 vs 3.216 streams 1 1
+errors: []
+LOUDNESS(未过母线的人声): -38.4 LUFS / 20.0 LU / -29.0 dBTP ✗ | issues: ['整体响度 -38.4 LUFS 不在 (-17.0, -9.0) 目标区间']
