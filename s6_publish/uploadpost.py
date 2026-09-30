@@ -28,6 +28,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from lib.contracts import assert_contract
+
 try:
     import httpx
 except ImportError:  # pragma: no cover
@@ -112,7 +114,9 @@ def _check(r: httpx.Response) -> dict:
 
 def whoami() -> dict:
     """GET /api/uploadposts/me —— 验通 + 看套餐用量。"""
-    return _check(httpx.get(f"{API}/uploadposts/me", headers=_headers(), timeout=30))
+    return assert_contract(
+        "uploadpost_me",
+        _check(httpx.get(f"{API}/uploadposts/me", headers=_headers(), timeout=30)))
 
 
 # ---------------------------------------------------------------- 发布
@@ -167,13 +171,15 @@ def upload_video(
     with p.open("rb") as fh:
         files = {"video": (p.name, fh, "video/mp4")}
         r = httpx.post(f"{API}/upload", headers=_headers(), data=data, files=files, timeout=900)
-    return _check(r)
+    return assert_contract("uploadpost_upload", _check(r))
 
 
 def upload_status(request_id: str) -> dict:
     """GET /api/uploadposts/status?request_id= —— 轮询上传结果。"""
-    return _check(httpx.get(f"{API}/uploadposts/status",
-                            params={"request_id": request_id}, headers=_headers(), timeout=60))
+    return assert_contract(
+        "uploadpost_status",
+        _check(httpx.get(f"{API}/uploadposts/status",
+                         params={"request_id": request_id}, headers=_headers(), timeout=60)))
 
 
 def wait_upload(request_id: str, timeout_s: int = 900, interval: int = 10) -> dict:

@@ -1,0 +1,95 @@
+Phase 13 证据补充 —— 验证记录（ruff + pytest + CI 门禁，全部实测）
+
+$ python -m ruff check lib tests tools webui s6_publish s7_learn
+All checks passed!
+
+$ python -m pytest -q tests/unit/test_contracts.py tests/unit/test_golden_artifacts.py \
+        tests/contract
+........................................................................ [ 72%]
+............................                                             [100%]
+100 passed in 0.46s
+
+$ python -m pytest -q        # 全量（Phase 12 结束为 632 passed / 1 skipped）
+........................................................................ [  9%]
+.........................................s.............................. [ 19%]
+........................................................................ [ 29%]
+........................................................................ [ 39%]
+........................................................................ [ 48%]
+........................................................................ [ 58%]
+........................................................................ [ 68%]
+........................................................................ [ 78%]
+........................................................................ [ 88%]
+........................................................................ [ 97%]
+...............                                                          [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+734 passed, 1 skipped, 1 warning in 319.75s (0:05:19)
+
+$ python -m pytest --collect-only -q
+735 tests collected in 0.40s          # 734 passed + 1 skipped（该 paid 用例同时带 live）
+
+$ python -m pytest tests -m "live or paid" -q -rs     # 不带任何 AYHMJ_RUN_* 变量
+1 skipped, 734 deselected, 1 warning in 0.38s
+SKIPPED [1] tests\paid\test_paid_placeholder.py: paid test: set AYHMJ_RUN_PAID=1 to enable
+
+$ python logs/_p13_evidence.py
+wrote docs/codex/phase13_ci_guardrails.txt   # 12 段实测（契约表 / 正反例 / PostFlow / 生产接线 /
+                                             # 改坏 fixture / 一条命令 / marker / live-paid / 主链 / golden）
+
+$ python tools/ci.py                          # 一条命令跑全部非 live 测试（验收标准 ①）
+>>> lint          All checks passed!
+>>> typecheck
+>>> unit          621 passed, 1 warning
+>>> contract      50 passed
+>>> integration   54 passed
+>>> frontend      9 passed
+>>> migration     5 passed
+  汇总
+  PASS  lint            0.1s
+  PASS  typecheck       0.1s
+  PASS  unit           16.1s
+  PASS  contract        1.2s
+  PASS  integration   289.8s
+  PASS  frontend       10.6s
+  PASS  migration       0.7s
+
+全部门禁通过（总耗时 318.5s）
+returncode = 0
+
+——————————————————————————————————————————————————————————————
+Phase 13 新增测试（+102 条，全部通过。全仓 633 -> 735 collected）
+
+  tests/unit/test_contracts.py                 23  契约校验器纯逻辑：路径下钻 a.b 与 a[]、
+                                                  条件规则 when、enum / nonempty / types、
+                                                  bool 不当 int、is_valid 不抛异常、
+                                                  ContractError 文本点名到字段、
+                                                  PostFlow 凭据失效判定
+
+  tests/contract/test_providers.py             35  ok/ 7 份逐份合规、broken/ 10 份逐份被拒
+                                                  且拒绝理由点名到字段、
+                                                  PostFlow 4 份 CLI 文本判定
+
+  tests/contract/test_production_wiring.py     15  坏响应注入 6 个真实客户端函数
+                                                  （lib.llm.chat、autodl create_task / query_task、
+                                                  uploadpost whoami / upload_video / upload_status），
+                                                  全部当场抛 ContractError、
+                                                  publish._AUTH_MARKERS is POSTFLOW_AUTH_MARKERS
+
+  tests/unit/test_golden_artifacts.py          27  3 份 golden 的 shot_count / line_count /
+                                                  cinedance、prompt 不超上限、
+                                                  Hard constraints 与尾部完整、
+                                                  SINGLE UNIT、两次编译输出完全一致
+
+  tests/integration/test_main_chain_e2e.py      2  Planner -> READY 全链（fake provider +
+                                                  fixture media），含一次真实修复回退
+                                                  PRODUCT_DEFORMED -> REGENERATE_SHOT，
+                                                  只提交一次付费任务、无孤儿状态、可重复跑
+
+  新增 fixture 21 份：tests/fixtures/contracts/ok/ 7 份正例、
+  tests/fixtures/contracts/broken/ 10 份反例、tests/fixtures/contracts/postflow/ 4 份 CLI 文本样本。
+  新增 golden 3 份：tests/golden/creative/duo_conflict.json、silent_slapstick.json、solo_vlog.json。
+
+  修改 1 个既有文件：tests/unit/test_jobview.py 补 pytestmark = pytest.mark.unit
+  （Phase 12 的 23 条用例漏了 marker，会被 -m unit 静默漏跑）。

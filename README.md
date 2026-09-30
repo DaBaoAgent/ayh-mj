@@ -105,6 +105,53 @@ ayh-mj/
 | 角色图/音色（建库期） | Seedream ≈¥0.3/张（已完成，95图/42音色入库） |
 | **单条成片合计** | **约 ¥1.0** |
 
+## 测试与 CI 门禁（Phase 13）
+
+一条命令跑完所有**非 live / 非 paid** 测试（不需要网络、不花钱）：
+
+```bash
+.venv/Scripts/python.exe tools/ci.py          # Windows
+python tools/ci.py                            # 任意平台
+```
+
+按固定顺序执行，任一步失败立即停手：
+
+| 顺序 | 步骤 | 内容 |
+|---|---|---|
+| 1 | `lint` | `ruff check lib tests tools webui s6_publish s7_learn` |
+| 2 | `typecheck` | `compileall`（本仓没有 mypy，用"能不能编译"当语法闸门） |
+| 3 | `unit` | 纯逻辑单测（状态机 / settings / claims / router / 创意评分 / 修复策略 / 发布配额）。跑完顺带做 marker 分类纪律检查：`tests/unit` 每条用例必须带 `unit` marker，忘打即红灯 |
+| 4 | `contract` | 第三方响应契约 fixture（DeepSeek / AutoDL / Upload-Post / PostFlow） |
+| 5 | `integration` | fake provider 驱动的多模块流程（含 Planner 到 READY 的完整主链） |
+| 6 | `frontend` | Playwright WebUI 冒烟（无浏览器环境可加 `--skip-frontend`） |
+| 7 | `migration` | 数据库迁移测试 |
+
+测试层级：
+
+- `unit` / `contract` / `integration` / `frontend` 默认全部执行
+- `live`（要真实网络或账号）与 `paid`（真花钱）**默认永不执行**，必须显式
+  `AYHMJ_RUN_LIVE=1` / `AYHMJ_RUN_PAID=1` 才放行。CI 与 `tools/ci.py` 里这两个变量被强制清空
+- 自动测试对 AutoDL 的付费提交有硬约束：任何一次真实提交都会直接 AssertionError
+
+单独跑某一层：
+
+```bash
+.venv/Scripts/python.exe -m pytest tests/unit -q
+.venv/Scripts/python.exe -m pytest tests/contract -q
+.venv/Scripts/python.exe -m pytest tests/integration -q
+.venv/Scripts/python.exe -m pytest tests/frontend -q
+```
+
+契约 fixture 在 `tests/fixtures/contracts/`：`ok/` 是真实形状样本，`broken/` 是反例。
+任意一份被改坏（字段缺失、类型漂移、取值越界），`tests/contract` 会**点名到字段**地失败，
+这就是"第三方字段变化时尽早报警"的机制。生产解析路径上装了同一道闸
+（`lib/contracts.assert_contract`），见 `tests/contract/test_production_wiring.py`。
+
+Golden 样本在 `tests/golden/creative/`：只冻结**输入**（稳定 StorySpec / CreativeDNA），
+断言编译后仍满足关键结构与 hard constraints，不比较自然语言全文。
+
+CI 配置见 `.github/workflows/ci.yml`，PR 未全绿禁止合并。
+
 ## 历史
 
 - 2026-09-23：四池体系定型（角色100/卖点20/角度50/片型10），模板链路停用

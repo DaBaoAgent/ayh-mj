@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 
+from lib.contracts import assert_contract
 from lib.secrets import get_secret
 from lib.settings import get_settings
 
@@ -107,6 +108,7 @@ def create_task(workflow_id: str, payload: dict, retries: int = 3) -> str:
             body = resp.json()
             if body.get("code") != "Success":
                 raise RuntimeError(f"提交失败: {body.get('msg') or body}")
+            assert_contract("autodl_submit", body)
             return body["data"]["task_id"]
         except httpx.ConnectError as e:
             last_err = e
@@ -125,6 +127,7 @@ def query_task(task_id: str, retries: int = 5) -> dict:
             body = resp.json()
             if body.get("code") != "Success":
                 raise RuntimeError(f"查询失败: {body.get('msg') or body}")
+            assert_contract("autodl_result", body)
             return body.get("data", {})
         except (httpx.TransportError, httpx.ConnectError, httpx.TimeoutException) as e:
             last_err = e

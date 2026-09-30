@@ -1,0 +1,61 @@
+name: ci
+
+# Phase 13 门禁：lint、typecheck、unit、contract、integration、frontend、migration 全绿才允许合并。
+# 硬约束：CI 永不设置 AYHMJ_RUN_LIVE / AYHMJ_RUN_PAID，因此永不跑 live，
+# 也永不提交付费任务或真实发布（tools/ci.py 还会主动清除这两个变量）。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: gate (non-live)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AYHMJ_RUN_LIVE: ""
+      AYHMJ_RUN_PAID: ""
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Show gate plan
+        run: python tools/ci.py --list
+
+      - name: Run gate
+        run: python tools/ci.py
+
+      - name: Upload pytest failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            .pytest_cache/**
+            logs/*.log
+          if-no-files-found: ignore

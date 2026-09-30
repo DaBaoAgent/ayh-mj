@@ -7,6 +7,7 @@ import json
 
 import httpx
 
+from .contracts import assert_contract
 from .settings import get_settings
 
 _settings = get_settings()
@@ -55,7 +56,8 @@ def chat(
         resp = client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
                            headers=headers, json=payload)
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = assert_contract("deepseek_chat", resp.json())
+        return body["choices"][0]["message"]["content"]
 
 
 def _extract_json(text: str) -> dict:

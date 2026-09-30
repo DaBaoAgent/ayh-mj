@@ -1,0 +1,39 @@
+{
+ "version": 1,
+ "note": "Phase 13 golden 输入样本（只冻结输入，不冻结自然语言输出）",
+ "entries": [
+  {
+   "file": "duo_conflict.json",
+   "structure_id": "S_duo_conflict",
+   "structure_name": "双人对撞短剧",
+   "genre": "G1",
+   "dialogue_mode": "双人对白",
+   "duration": 15,
+   "resolution": "768p竖",
+   "shots": 4,
+   "lines": 4
+  },
+  {
+   "file": "silent_slapstick.json",
+   "structure_id": "S_silent_slapstick",
+   "structure_name": "无对白肢体喜剧",
+   "genre": "G8",
+   "dialogue_mode": "无对白",
+   "duration": 15,
+   "resolution": "768p竖",
+   "shots": 3,
+   "lines": 0
+  },
+  {
+   "file": "solo_vlog.json",
+   "structure_id": "S_solo_vlog",
+   "structure_name": "单人Vlog/生活流",
+   "genre": "G7",
+   "dialogue_mode": "画外音旁白",
+   "duration": 15,
+   "resolution": "768p竖",
+   "shots": 5,
+   "lines": 3
+  }
+ ]
+}

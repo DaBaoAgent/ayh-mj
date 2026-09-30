@@ -1,0 +1,18 @@
+{
+  "code": "Success",
+  "msg": "ok",
+  "data": {
+    "task_id": "task_9f3c1a",
+    "status": "SUCCESS",
+    "results": [
+      {
+        "type": "video",
+        "url": "https://autodl.example.com/out/task_9f3c1a.mp4"
+      },
+      {
+        "type": "cover",
+        "url": "https://autodl.example.com/out/task_9f3c1a.jpg"
+      }
+    ]
+  }
+}

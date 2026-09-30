@@ -10,6 +10,8 @@ from lib.orchestrator.errors import human_action_hint, is_retryable, repair_acti
 from tests import p12_support as S
 from webui import jobview
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture()
 def out_dir(tmp_state):

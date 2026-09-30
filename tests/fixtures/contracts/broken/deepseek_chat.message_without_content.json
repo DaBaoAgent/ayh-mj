@@ -1,0 +1,11 @@
+{
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "reasoning_content": "只有思考没有正文"
+      }
+    }
+  ]
+}

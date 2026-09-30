@@ -1,0 +1,162 @@
+{
+ "job_uid": "GOLDEN_S_solo_vlog",
+ "title": "骨架演示 单人Vlog/生活流",
+ "duration": 15,
+ "resolution": "768p竖",
+ "workflow": "",
+ "prompt": "",
+ "prompt_ready": false,
+ "plan_only": true,
+ "prompt_meta": {},
+ "spec_version": "storyspec/1.0",
+ "workflow_source": "static",
+ "ref_images": [
+  "assets/products/主图1.jpg",
+  "assets/products/主图2.jpg"
+ ],
+ "claim_ids": [],
+ "creative": {
+  "structure": "S_solo_vlog",
+  "structure_name": "单人Vlog/生活流",
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "单人Vlog/生活流",
+   "genre": "G7",
+   "angle": "日常纪实",
+   "sales_point": "单手提起",
+   "hook_type": "身份代入",
+   "narrative_arc": "日常纪实",
+   "shot_pattern": "五镜生活流",
+   "cast_pattern": "@elder_male",
+   "product_role": "配角道具",
+   "conflict_type": "无冲突氛围向",
+   "visual_motif": "折叠收放",
+   "camera_language": "手持跟拍",
+   "dialogue_mode": "画外音旁白",
+   "audio_mode": "旁白+BGM",
+   "payoff": "把卖点收在一个干净利落的动作上",
+   "ending": "画面停在产品与人物同框的瞬间",
+   "CTA": "点开头像看看同款",
+   "risk_flags": []
+  },
+  "claim_ids": []
+ },
+ "story_spec": {
+  "uid": "GOLDEN_S_solo_vlog",
+  "structure_id": "S_solo_vlog",
+  "structure_name": "单人Vlog/生活流",
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "单人Vlog/生活流",
+   "genre": "G7",
+   "angle": "日常纪实",
+   "sales_point": "单手提起",
+   "hook_type": "身份代入",
+   "narrative_arc": "日常纪实",
+   "shot_pattern": "五镜生活流",
+   "cast_pattern": "@elder_male",
+   "product_role": "配角道具",
+   "conflict_type": "无冲突氛围向",
+   "visual_motif": "折叠收放",
+   "camera_language": "手持跟拍",
+   "dialogue_mode": "画外音旁白",
+   "audio_mode": "旁白+BGM",
+   "payoff": "把卖点收在一个干净利落的动作上",
+   "ending": "画面停在产品与人物同框的瞬间",
+   "CTA": "点开头像看看同款",
+   "risk_flags": []
+  },
+  "hotspot": {
+   "title": "单人Vlog/生活流"
+  },
+  "title": "骨架演示 单人Vlog/生活流",
+  "duration": 15,
+  "resolution": "768p竖",
+  "workflow": "",
+  "fallback_workflows": [],
+  "ref_images": [
+   "assets/products/主图1.jpg",
+   "assets/products/主图2.jpg"
+  ],
+  "ref_audios": [],
+  "shots": [
+   {
+    "index": 1,
+    "beat": "钩子",
+    "camera_language": "手持跟拍",
+    "cast_ref": "@elder_male",
+    "visual_motif": "折叠收放",
+    "product_role": "配角道具",
+    "dialogue_mode": "画外音旁白",
+    "note": ""
+   },
+   {
+    "index": 2,
+    "beat": "冲突/悬念",
+    "camera_language": "手持跟拍",
+    "cast_ref": "@elder_male",
+    "visual_motif": "折叠收放",
+    "product_role": "配角道具",
+    "dialogue_mode": "画外音旁白",
+    "note": ""
+   },
+   {
+    "index": 3,
+    "beat": "演示/转折",
+    "camera_language": "手持跟拍",
+    "cast_ref": "@elder_male",
+    "visual_motif": "折叠收放",
+    "product_role": "配角道具",
+    "dialogue_mode": "画外音旁白",
+    "note": ""
+   },
+   {
+    "index": 4,
+    "beat": "收口卖点",
+    "camera_language": "手持跟拍",
+    "cast_ref": "@elder_male",
+    "visual_motif": "折叠收放",
+    "product_role": "配角道具",
+    "dialogue_mode": "画外音旁白",
+    "note": ""
+   },
+   {
+    "index": 5,
+    "beat": "回味",
+    "camera_language": "手持跟拍",
+    "cast_ref": "@elder_male",
+    "visual_motif": "折叠收放",
+    "product_role": "配角道具",
+    "dialogue_mode": "画外音旁白",
+    "note": ""
+   }
+  ],
+  "lines": [
+   {
+    "shot": 1,
+    "speaker": "@elder_male",
+    "text": "早上出门，它就在门口等着"
+   },
+   {
+    "shot": 2,
+    "speaker": "@elder_male",
+    "text": "路上遇到台阶，推着就过去了"
+   },
+   {
+    "shot": 3,
+    "speaker": "@elder_male",
+    "text": "晚上回家，收起来不占地方"
+   }
+  ],
+  "prompt": "",
+  "prompt_ready": false,
+  "prompt_meta": {},
+  "spec_version": "storyspec/1.0",
+  "workflow_source": "static",
+  "first_last": false,
+  "text_only": false,
+  "claim_ids": []
+ }
+}

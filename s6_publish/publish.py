@@ -31,6 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import STATE_DIR, packaging
+from lib.contracts import POSTFLOW_AUTH_MARKERS, postflow_is_auth_error
 from lib.orchestrator.errors import AUTH_EXPIRED
 from lib.orchestrator.publishing import (
     DRAFT,
@@ -56,9 +57,8 @@ PACING_FILE = STATE_DIR / "publish_pacing.json"
 
 ROOT = get_settings().root
 
-# AUTH_EXPIRED 判定：CLI/REST 的错误文本里出现这些就认为凭据失效（不猜别的）
-_AUTH_MARKERS = ("登录", "扫码", "未登录", "认证失效", "token expired", "unauthorized",
-                 "401", "auth", "credential", "cookie")
+# AUTH_EXPIRED 判定：凭据失效信号由 lib.contracts 单点声明（Phase 13 起不再各处复制）
+_AUTH_MARKERS = POSTFLOW_AUTH_MARKERS
 
 
 def load_config() -> dict:
@@ -148,8 +148,7 @@ def mark_published(platform: str):
 
 
 def _is_auth_error(text: str) -> bool:
-    low = (text or "").lower()
-    return any(marker in low for marker in _AUTH_MARKERS)
+    return postflow_is_auth_error(text)
 
 
 def _run_cli(cmd: list[str], timeout: float = 900.0) -> subprocess.CompletedProcess:

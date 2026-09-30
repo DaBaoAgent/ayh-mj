@@ -1,0 +1,10 @@
+{
+  "success": true,
+  "profile": "ayh-main",
+  "username": "ayh-main",
+  "plan": "creator",
+  "usage": {
+    "uploads_today": 3,
+    "uploads_limit": 10
+  }
+}

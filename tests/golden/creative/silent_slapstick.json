@@ -1,0 +1,126 @@
+{
+ "job_uid": "GOLDEN_S_silent_slapstick",
+ "title": "骨架演示 无对白肢体喜剧",
+ "duration": 15,
+ "resolution": "768p竖",
+ "workflow": "",
+ "prompt": "",
+ "prompt_ready": false,
+ "plan_only": true,
+ "prompt_meta": {},
+ "spec_version": "storyspec/1.0",
+ "workflow_source": "static",
+ "ref_images": [
+  "assets/products/主图1.jpg",
+  "assets/products/主图2.jpg"
+ ],
+ "claim_ids": [],
+ "creative": {
+  "structure": "S_silent_slapstick",
+  "structure_name": "无对白肢体喜剧",
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "无对白肢体喜剧",
+   "genre": "G8",
+   "angle": "误会解除",
+   "sales_point": "单手提起",
+   "hook_type": "视觉奇观",
+   "narrative_arc": "误会解除",
+   "shot_pattern": "无对白肢体三段",
+   "cast_pattern": "@elder_male+@young_male",
+   "product_role": "惊喜礼物",
+   "conflict_type": "质疑能力",
+   "visual_motif": "单手提起",
+   "camera_language": "俯拍全景",
+   "dialogue_mode": "无对白",
+   "audio_mode": "纯音效",
+   "payoff": "把卖点收在一个干净利落的动作上",
+   "ending": "画面停在产品与人物同框的瞬间",
+   "CTA": "点开头像看看同款",
+   "risk_flags": []
+  },
+  "claim_ids": []
+ },
+ "story_spec": {
+  "uid": "GOLDEN_S_silent_slapstick",
+  "structure_id": "S_silent_slapstick",
+  "structure_name": "无对白肢体喜剧",
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "无对白肢体喜剧",
+   "genre": "G8",
+   "angle": "误会解除",
+   "sales_point": "单手提起",
+   "hook_type": "视觉奇观",
+   "narrative_arc": "误会解除",
+   "shot_pattern": "无对白肢体三段",
+   "cast_pattern": "@elder_male+@young_male",
+   "product_role": "惊喜礼物",
+   "conflict_type": "质疑能力",
+   "visual_motif": "单手提起",
+   "camera_language": "俯拍全景",
+   "dialogue_mode": "无对白",
+   "audio_mode": "纯音效",
+   "payoff": "把卖点收在一个干净利落的动作上",
+   "ending": "画面停在产品与人物同框的瞬间",
+   "CTA": "点开头像看看同款",
+   "risk_flags": []
+  },
+  "hotspot": {
+   "title": "无对白肢体喜剧"
+  },
+  "title": "骨架演示 无对白肢体喜剧",
+  "duration": 15,
+  "resolution": "768p竖",
+  "workflow": "",
+  "fallback_workflows": [],
+  "ref_images": [
+   "assets/products/主图1.jpg",
+   "assets/products/主图2.jpg"
+  ],
+  "ref_audios": [],
+  "shots": [
+   {
+    "index": 1,
+    "beat": "钩子",
+    "camera_language": "俯拍全景",
+    "cast_ref": "@elder_male",
+    "visual_motif": "单手提起",
+    "product_role": "惊喜礼物",
+    "dialogue_mode": "无对白",
+    "note": ""
+   },
+   {
+    "index": 2,
+    "beat": "冲突/悬念",
+    "camera_language": "俯拍全景",
+    "cast_ref": "@young_male",
+    "visual_motif": "单手提起",
+    "product_role": "惊喜礼物",
+    "dialogue_mode": "无对白",
+    "note": ""
+   },
+   {
+    "index": 3,
+    "beat": "演示/转折",
+    "camera_language": "俯拍全景",
+    "cast_ref": "@elder_male",
+    "visual_motif": "单手提起",
+    "product_role": "惊喜礼物",
+    "dialogue_mode": "无对白",
+    "note": ""
+   }
+  ],
+  "lines": [],
+  "prompt": "",
+  "prompt_ready": false,
+  "prompt_meta": {},
+  "spec_version": "storyspec/1.0",
+  "workflow_source": "static",
+  "first_last": false,
+  "text_only": false,
+  "claim_ids": []
+ }
+}

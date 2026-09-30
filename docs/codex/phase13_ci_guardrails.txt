@@ -1,0 +1,277 @@
+ayh-mj Phase 13 证据 —— 测试体系、CI 与自动开发护栏
+本文件由 logs/_p13_evidence.py 真实执行产出（可重复运行）
+
+==============================================================================
+§1 环境快照
+==============================================================================
+时间：2026-09-30 16:11:31
+仓库：D:\@kaifa\ayh-mj
+Python：3.12.9  (D:\@kaifa\ayh-mj\.venv\Scripts\python.exe)
+git rev-parse --abbrev-ref HEAD -> codex/ayh-mj-vNext
+git log --oneline -1 -> c10b500 phase-12: rebuild web console around canonical jobs and events
+live 开关 AYHMJ_RUN_LIVE = None
+paid 开关 AYHMJ_RUN_PAID = None
+（两者都为空 => 本证据全程 live/paid 用例被跳过，未提交任何付费任务）
+
+==============================================================================
+§2 契约表清单（lib/contracts.py）
+==============================================================================
+已登记契约 6 个：
+  · autodl_result
+      endpoint : GET /api/v1/comfyui/comfyui_workflow/result/{task_id}
+      consumer : s4_generate.autodl_client.query_task / poll_task
+      rules    : 6 条规则
+  · autodl_submit
+      endpoint : POST /api/v1/comfyui/comfyui_workflow/{workflow_id}
+      consumer : s4_generate.autodl_client.create_task
+      rules    : 2 条规则
+  · deepseek_chat
+      endpoint : POST {llm.base_url}/chat/completions
+      consumer : lib/llm.chat
+      rules    : 2 条规则
+  · uploadpost_me
+      endpoint : GET /api/uploadposts/me
+      consumer : s6_publish.uploadpost.whoami
+      rules    : 0 条规则 + 自定义校验
+  · uploadpost_status
+      endpoint : GET /api/uploadposts/status?request_id=
+      consumer : s6_publish.uploadpost.upload_status / wait_upload
+      rules    : 0 条规则 + 自定义校验
+  · uploadpost_upload
+      endpoint : POST /api/upload
+      consumer : s6_publish.uploadpost.upload_video
+      rules    : 1 条规则
+
+PostFlow CLI 契约：
+  子命令    : upload-video
+  必需 flag : --account, --video, --title, --desc, --tags
+  凭据失效信号 10 个：登录 / 扫码 / 未登录 / 认证失效 / token expired / unauthorized / 401 / auth / credential / cookie
+
+==============================================================================
+§3 正例 fixture 全量校验（tests/fixtures/contracts/ok/）
+==============================================================================
+  [合规] autodl_result.running.json                 契约=autodl_result
+  [合规] autodl_result.success.json                 契约=autodl_result
+  [合规] autodl_submit.queued.json                  契约=autodl_submit
+  [合规] deepseek_chat.chat_completion.json         契约=deepseek_chat
+  [合规] uploadpost_me.profile.json                 契约=uploadpost_me
+  [合规] uploadpost_status.completed.json           契约=uploadpost_status
+  [合规] uploadpost_upload.queued.json              契约=uploadpost_upload
+  小计：7 份正例，其中不合规 0 份
+
+==============================================================================
+§4 反例 fixture 全量校验（tests/fixtures/contracts/broken/）
+==============================================================================
+  [已拒绝] autodl_result.results_not_list.json            首条理由：data.results 类型应为 list，实际 dict
+  [已拒绝] autodl_result.success_without_url.json         首条理由：缺少字段 data.results[].url
+  [已拒绝] autodl_submit.empty_task_id.json               首条理由：data.task_id（付费任务 id） 不能是空字符串
+  [已拒绝] autodl_submit.error_code.json                  首条理由：code 取值 'Failed' 不在 ('Success',)
+  [已拒绝] deepseek_chat.choices_not_list.json            首条理由：choices（OpenAI 兼容候选列表） 类型应为 list，实际 dict
+  [已拒绝] deepseek_chat.message_without_content.json     首条理由：缺少字段 choices[].message.content（正文，思考模型可能返回空串，由上层翻倍重试而不是当契约破坏）
+  [已拒绝] uploadpost_me.bad_field_type.json              首条理由：profile 应为字符串，实际 int
+  [已拒绝] uploadpost_status.item_not_object.json         首条理由：results[tiktok] 应为对象，实际 str
+  [已拒绝] uploadpost_status.not_object.json              首条理由：响应不是 JSON 对象
+  [已拒绝] uploadpost_upload.no_request_id.json           首条理由：缺少字段 request_id（轮询状态用的上传请求 id）
+  小计：10 份反例，其中被错误接受 0 份
+
+==============================================================================
+§5 PostFlow CLI 文本样本判定（凭据失效 vs 普通结果）
+==============================================================================
+  [AUTH_EXPIRED] upload_auth_expired.txt      错误：未登录或登录状态已过期，请重新扫码登录后再试
+  [普通结果        ] upload_draft_ok.txt          [postflow] 抖音 · 草稿箱 / 已保存草稿：https://creator.douyin.com/creat
+  [普通结果        ] upload_failed.txt            错误：视频编码不受支持（h264 high 10），请转码后重试
+  [普通结果        ] upload_published_ok.txt      [postflow] 抖音 · 直接发布 / 发布成功：https://www.douyin.com/video/741
+
+==============================================================================
+§6 生产接线：坏响应注入真实客户端，必须当场抛 ContractError
+==============================================================================
+  [已拦截] lib.llm.chat                 -> 响应不符合契约 deepseek_chat：choices（OpenAI 兼容候选列表） 类型应为 list，实际 dict，缺少字段 choices[].message.content（正文，思考模型可能返回空串，由上层翻倍重试而不是当契约破坏）
+  [已拦截] autodl_client.create_task   -> 响应不符合契约 autodl_submit：data.task_id（付费任务 id） 不能是空字符串
+  [已拦截] autodl_client.query_task    -> 响应不符合契约 autodl_result：data.results 类型应为 list，实际 dict，缺少字段 data.results[].type，缺少字段 data.results[].url
+  [已拦截] uploadpost.upload_status    -> 响应不符合契约 uploadpost_status：既没有 results / platforms，也没有顶层 status
+  [已拦截] uploadpost.whoami           -> 响应不符合契约 uploadpost_me：profile 应为字符串，实际 int
+
+  publish._AUTH_MARKERS is lib.contracts.POSTFLOW_AUTH_MARKERS -> True
+  publish._is_auth_error('未登录') -> True
+
+==============================================================================
+§7 故意改坏一份 fixture —— 契约测试必须明确失败（验收标准 ③）
+==============================================================================
+目标：tests\fixtures\contracts\ok\autodl_submit.queued.json
+改动：把 data.task_id 改成空字符串（真实支付任务 id 为空 = 绝对不能接受）
+
+改坏后 pytest 输出：
+F                                                                        [100%]
+================================== FAILURES ===================================
+E   AssertionError: autodl_submit.queued.json 应当合规，却报出：['data.task_id（付费任务 id） 不能是空字符串']
+    assert ['data.task_i... id） 不能是空字符串'] == []
+      Left contains one more item: 'data.task_id（付费任务 id） 不能是空字符串'
+      Use -v to get more diff
+D:\@kaifa\ayh-mj\tests\contract\test_providers.py:58: AssertionError: autodl_submit.queued.json 应当合规，却报出：['data.task_id（付费任务 id） 不能是空字符串']
+=========================== short test summary info ===========================
+FAILED tests/contract/test_providers.py::test_positive_fixture_satisfies_its_contract[ok/autodl_submit.queued.json]
+1 failed, 34 deselected in 0.01s
+returncode = 1  => 明确失败（符合预期）
+同时契约校验器直接点名：
+  validate('autodl_submit', ...) -> ['data.task_id（付费任务 id） 不能是空字符串']
+
+还原后同一命令：
+  1 passed, 34 deselected in 0.01s
+  returncode = 0  => 复绿
+
+==============================================================================
+§8 一条命令跑全部非 live 测试：tools/ci.py
+==============================================================================
+命令： .venv/Scripts/python.exe tools/ci.py
+
+>>> lint
+All checks passed!
+    (0.1s, exit=0)
+>>> typecheck
+    (0.1s, exit=0)
+>>> unit
+621 passed, 1 warning in 18.76s
+    (19.1s, exit=0)
+    ok tests/unit: 全部用例都带 unit marker
+    ok tests/contract: 全部用例都带 contract marker
+    ok tests/integration: 全部用例都带 integration marker
+    ok tests/frontend: 全部用例都带 frontend marker
+>>> contract
+50 passed in 0.23s
+    (0.5s, exit=0)
+>>> integration
+54 passed in 291.41s (0:04:51)
+    (291.7s, exit=0)
+>>> frontend
+9 passed in 11.26s
+    (11.5s, exit=0)
+>>> migration
+5 passed in 0.23s
+    (0.5s, exit=0)
+  PASS  lint            0.1s
+  PASS  typecheck       0.1s
+  PASS  unit           20.8s
+  PASS  contract        0.5s
+  PASS  integration   291.7s
+  PASS  frontend       11.5s
+  PASS  migration       0.5s
+
+门禁 returncode = 0  => 全绿
+
+==============================================================================
+§9 marker 分类纪律（tests/<layer> 下每条用例都必须带对应 marker）
+==============================================================================
+  tests/unit           not unit         -> no tests collected (621 deselected) in 0.34s
+  tests/contract       not contract     -> no tests collected (50 deselected) in 0.01s
+  tests/integration    not integration  -> no tests collected (54 deselected) in 0.14s
+  tests/frontend       not frontend     -> no tests collected (9 deselected) in 0.04s
+  全仓收集：735 tests collected in 0.38s
+
+==============================================================================
+§10 live / paid 默认永不执行
+==============================================================================
+命令： pytest tests -m 'live or paid' -q   （不带任何 AYHMJ_RUN_* 环境变量）
+
+s                                                                        [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+SKIPPED [1] tests\paid\test_paid_placeholder.py: paid test: set AYHMJ_RUN_PAID=1 to enable
+1 skipped, 734 deselected, 1 warning in 0.38s
+
+returncode = 0
+（被 SKIPPED 即证明：默认 CI 不会联网、不会提交付费任务、不会真实发布）
+
+==============================================================================
+§11 fake 端到端主链全阶段轨迹（Planner 到 READY，含一次真实修复回退）
+==============================================================================
+
+编排结果：{"ok": true, "jobs": ["P13_E2E"], "count": 1}
+终态：READY（期望 READY）
+
+阶段尝试轨迹（stage / 第几次 / status / cost / error_code）：
+  plan       #1  SUCCESS        cost=0.0    
+  preflight  #1  SUCCESS        cost=0.0    
+  generate   #1  SUCCESS        cost=0.9    
+  qa         #1  PRODUCT_DEFORMED cost=0.0    PRODUCT_DEFORMED
+  generate   #1  SUCCESS        cost=0.0    
+  qa         #1  SUCCESS        cost=0.0    
+  compose    #1  SUCCESS        cost=0.0    
+  package    #1  SUCCESS        cost=0.0    
+
+修复记录：
+  action=REGENERATE_SHOT rewind_to=generate error_code=PRODUCT_DEFORMED status=EXECUTED
+  repair_summary = {"count": 1, "cost": 0.0, "by_code": {"PRODUCT_DEFORMED": 1}, "by_action": "REGENERATE_SHOT", "last": {"id": 1, "job_id": 1, "stage": "qa", "error_code": "PRODUCT_DEFORMED", "action": "REGENERATE_SHOT", "rewind_to": "generate", "target_shot": null, "attempt": 1, "budget": 1, "cost": 0.0, "status": "EXECUTED", "detail": {"repair_id": 1, "repair_error": "PRODUCT_DEFORMED", "status": "EXECUTED", "error_code": null, "cost": 0.0}, "created_at": "2026-09-30T16:17:01"}}
+
+验片结论（按发生顺序）：
+  qa_report_gen      passed=False
+  qa_report_gen      passed=True
+  qa_report_final    passed=True
+
+产物：
+  spec           queue_15s\P13_E2E.json
+  video          out\gen_P13_E2E\onetake.mp4
+  qa_report      out\gen_P13_E2E\qa\qa_report_gen.json
+  qa_report_md   out\gen_P13_E2E\qa\qa_report_gen.md
+  final          out\gen_P13_E2E\onetake_final.mp4
+  qa_report      out\gen_P13_E2E\qa\qa_report_final.json
+  qa_report_md   out\gen_P13_E2E\qa\qa_report_final.md
+  packaging      out\gen_P13_E2E\packaging.json
+
+付费提交计数（FakeEnv）：create_task=1 download=1 llm=0 upload=0
+成本记账：cost_spent=0.9（768p x 15s = 0.06 x 15，修复回退不重复计费）
+
+事件轨迹（最近 24 条）：
+  stage_end    preflight  ✓ 预检门禁：门禁通过：{'claims_gate': 'pass', 'claim_ids': ['anti_flip'], 'unmap
+  status_change generating 视频生成开始
+  stage_start  generate   ▶ 视频生成
+  provider_submitted generate   已提交 minimax_h3_lightx2v_v5_15s：task_id=fake_task_1（prompt 8569 字符）
+  stage_end    generate   ✓ 视频生成：H3 生成完成 minimax_h3_lightx2v_v5_15s（¥0.90）
+  status_change qa         验片开始
+  stage_start  qa         ▶ 验片
+  stage_failed qa         ✗ 验片：验片不通过（FAIL（1 FAIL / 0 WARN）｜主错误码 PRODUCT_DEFORMED｜覆盖 100%）：[FAIL]
+  repair       qa         ↺ 定点修复 1/1
+  repair_begin repairing  进入定点修复
+  status_change generating 视频生成开始
+  stage_start  generate   ▶ 视频生成
+  stage_end    generate   ✓ 视频生成：已有 onetake.mp4，跳过生成
+  status_change qa         验片开始
+  stage_start  qa         ▶ 验片
+  stage_end    qa         ✓ 验片：验片通过：PASS（0 FAIL / 0 WARN）｜覆盖 100%
+  status_change composing  后期合成开始
+  stage_start  compose    ▶ 后期合成
+  stage_end    compose    ✓ 后期合成：fixture 后期合成完成
+  status_change packaging  归档打包开始
+  stage_start  package    ▶ 归档打包
+  stage_end    package    ✓ 归档打包：已归档（未找到归档件，需人工确认）
+  status_change ready      PACKAGING → READY（system）
+  repair_done  qa         ↺ 定点修复 PRODUCT_DEFORMED → EXECUTED（¥0.00）
+
+修复阶段之间的 QA 调用次数：qa=2 generate=2 compose=1
+=> 全阶段贯通且只提交一次付费任务，符合验收标准 ②（无网络、无付费完成主链）
+
+==============================================================================
+§12 golden：稳定输入 -> 关键结构 + hard constraints（不比较自然语言全文）
+==============================================================================
+样本 3 份，来自 tests\golden\creative
+
+  duo_conflict.json  (S_duo_conflict / G1 / 双人对白)
+      shot_count=4（期望 4）  line_count=4（期望 4）  cinedance=True（期望 True）
+      prompt 8569 字符（上限 10000，压缩=False）
+      hard constraints：Hard constraints=True  尾部完整=True  SINGLE UNIT=True  Hard cut x4
+      编译纯函数：两次输出完全一致=True
+  silent_slapstick.json  (S_silent_slapstick / G8 / 无对白)
+      shot_count=3（期望 3）  line_count=0（期望 0）  cinedance=True（期望 True）
+      prompt 5020 字符（上限 10000，压缩=False）
+      hard constraints：Hard constraints=True  尾部完整=True  SINGLE UNIT=True  Hard cut x3
+      编译纯函数：两次输出完全一致=True
+  solo_vlog.json  (S_solo_vlog / G7 / 画外音旁白)
+      shot_count=5（期望 5）  line_count=3（期望 3）  cinedance=False（期望 False）
+      prompt 7009 字符（上限 10000，压缩=False）
+      hard constraints：Hard constraints=True  尾部完整=True  SINGLE UNIT=True  Hard cut x5
+      编译纯函数：两次输出完全一致=True
+
+采集完成，用时 329.8s

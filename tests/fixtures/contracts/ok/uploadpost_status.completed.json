@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "request_id": "req_7c1f2b",
+  "results": {
+    "tiktok": {
+      "status": "completed",
+      "post_id": "tt_123",
+      "post_url": "https://tiktok.com/@a/video/123"
+    },
+    "youtube": {
+      "status": "completed",
+      "post_id": "yt_456"
+    }
+  }
+}
