@@ -20,8 +20,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from lib.console import enable_utf8_console
 from lib.llm import chat
 from lib.state import connect
+
+enable_utf8_console()
 
 # 红线关键词（中文+英文）
 RED_LINES = {

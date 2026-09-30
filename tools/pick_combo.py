@@ -22,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lib import angles as angles_mod, genres, products
+from lib import angles as angles_mod
+from lib import genres, products
 
 LIB = ROOT / "assets/cast/library"
 GROUPS_USED = ROOT / "state" / "groups_used.json"
@@ -98,10 +99,8 @@ def main() -> None:
 
     ag = pick_angle(args.angle)
 
-    if args.genre:
-        gr = next(x for x in genres.GENRES if x["id"] == args.genre)
-    else:
-        gr = genres.next_genre()
+    gr = (next(x for x in genres.GENRES if x["id"] == args.genre)
+          if args.genre else genres.next_genre())
 
     combo = {
         "picked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

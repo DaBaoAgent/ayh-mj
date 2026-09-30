@@ -27,6 +27,7 @@ hermes serve 跑的是 tui_gateway 的 JSON-RPC 协议 —— 与 Hermes 桌面�
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import secrets
@@ -215,17 +216,13 @@ class HermesBridge:
         await client.accept()
         ok, detail = await self.ensure_ready()
         if not ok:
-            try:
+            with contextlib.suppress(Exception):
                 await client.send_text(json.dumps({
                     "jsonrpc": "2.0", "method": "event",
                     "params": {"type": "bridge.error", "payload": {"message": detail}},
                 }, ensure_ascii=False))
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 await client.close(code=4503)
-            except Exception:
-                pass
             return
 
         try:
@@ -235,10 +232,8 @@ class HermesBridge:
                 close_timeout=3)
         except Exception as e:
             blog(f"连 serve 失败: {e}")
-            try:
+            with contextlib.suppress(Exception):
                 await client.close(code=4503)
-            except Exception:
-                pass
             self._ready = False
             return
 
@@ -259,10 +254,8 @@ class HermesBridge:
             for t in (t1, t2):
                 t.cancel()
             await asyncio.gather(t1, t2, return_exceptions=True)
-            try:
+            with contextlib.suppress(Exception):
                 await upstream.close()
-            except Exception:
-                pass
 
     # ── 状态 ────────────────────────────────────────────────────
 
@@ -275,11 +268,10 @@ class HermesBridge:
         }
 
 
-_bridge: HermesBridge | None = None
+_BRIDGE: list = []  # 懒加载单例缓存（list 容器避免 global 语句）
 
 
 def get_bridge() -> HermesBridge:
-    global _bridge
-    if _bridge is None:
-        _bridge = HermesBridge()
-    return _bridge
+    if not _BRIDGE:
+        _BRIDGE.append(HermesBridge())
+    return _BRIDGE[0]

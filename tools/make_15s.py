@@ -28,8 +28,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -65,7 +65,7 @@ def cjk_count(s: str) -> int:
 
 def load_lines(uid: str) -> list[str]:
     p = ROOT / f"docs/onetake_lines_{uid}.txt"
-    return [l.strip() for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
 
 def check_dialogue(spec_path: Path) -> tuple[bool, str]:
@@ -80,7 +80,7 @@ def check_dialogue(spec_path: Path) -> tuple[bool, str]:
 def assert_lines(uid: str) -> tuple[bool, str]:
     """字数 + 阿拉伯数字 + 单句长度自检（门禁不查这些）"""
     lines = load_lines(uid)
-    counts = [cjk_count(l) for l in lines]
+    counts = [cjk_count(ln) for ln in lines]
     total = sum(counts)
     msgs = [f"台词 {len(lines)} 句 / 纯汉字 {total} / 单句 {counts}"]
     ok = True
@@ -94,7 +94,7 @@ def assert_lines(uid: str) -> tuple[bool, str]:
     if long:
         msgs.append(f"✗ 单句超 13 字：{long}（H3 易念断/丢句）")
         ok = False
-    if any(re.search(r"[0-9]", l) for l in lines):
+    if any(re.search(r"[0-9]", ln) for ln in lines):
         msgs.append("✗ 台词含阿拉伯数字（门禁 R18）→ 改中文读法")
         ok = False
     return ok, " ｜ ".join(msgs)
@@ -103,8 +103,8 @@ def assert_lines(uid: str) -> tuple[bool, str]:
 # ── 模式①：造脚本 ───────────────────────────────────────────
 def cmd_new(a) -> int:
     uid = a.uid
-    lines = [l.strip() for l in Path(a.lines).read_text(encoding="utf-8").splitlines() if l.strip()]
-    shots = [l.strip() for l in Path(a.shots).read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [ln.strip() for ln in Path(a.lines).read_text(encoding="utf-8").splitlines() if ln.strip()]
+    shots = [ln.strip() for ln in Path(a.shots).read_text(encoding="utf-8").splitlines() if ln.strip()]
 
     def cast_block(img: str, voice: str, desc: str, short: str, vnote: str):
         return {"short": short, "img": f"{LIB}/{img}.png", "audio": f"{VOICE_DIR}/{voice}",
@@ -247,7 +247,7 @@ def cmd_run(a) -> int:
         import difflib
         d = json.loads(trj.read_text(encoding="utf-8"))
         segs = d if isinstance(d, list) else d.get("segments", [])
-        exp = "".join(re.sub(r"[^\u4e00-\u9fff]", "", l) for l in load_lines(uid))
+        exp = "".join(re.sub(r"[^\u4e00-\u9fff]", "", ln) for ln in load_lines(uid))
         hyp = "".join(re.sub(r"[^\u4e00-\u9fff]", "", s.get("text", "")) for s in segs)
         ratio = difflib.SequenceMatcher(None, exp, hyp).ratio()
         print(f"【验收】转写 {len(segs)} 段 vs 台词 8 句 ｜ 逐字一致率 {ratio*100:.1f}%（基线 75.4%）")
@@ -267,10 +267,13 @@ def cmd_run(a) -> int:
                     t0, t1 = L[1].split(" --> ")
                     rows.append([t0, t1, " ".join(L[2:])])
             def sec(t):
-                h, m, rest = t.split(":"); s, ms = rest.split(",")
+                h, m, rest = t.split(":")
+                s, ms = rest.split(",")
                 return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
             def fmt(x):
-                h = int(x // 3600); m = int(x % 3600 // 60); s = x % 60
+                h = int(x // 3600)
+                m = int(x % 3600 // 60)
+                s = x % 60
                 return f"{h:02d}:{m:02d}:{s:06.3f}".replace(".", ",")
             i = 0
             while i < len(rows):
@@ -281,7 +284,8 @@ def cmd_run(a) -> int:
                     rows[i + 1][2] = txt + rows[i + 1][2]
                     i += 1
                 else:
-                    out.append((a0, a1, txt)); i += 1
+                    out.append((a0, a1, txt))
+                    i += 1
             srt.write_text("\n\n".join(f"{k+1}\n{a0} --> {a1}\n{t}" for k, (a0, a1, t) in enumerate(out)) + "\n",
                            encoding="utf-8")
             print(f"    字幕 {len(out)} 行（孤行已合并）")
@@ -303,10 +307,8 @@ def cmd_run(a) -> int:
         pool = [p for p in (ROOT / "assets/bgm_trending").glob("*.mp3") if p.stat().st_size > 200_000]
         used = set()
         for f in ROOT.glob("docs/bgm分配*.json"):
-            try:
+            with contextlib.suppress(Exception):
                 used |= {v["bgm"] for v in json.loads(f.read_text(encoding="utf-8")).get("assignments", {}).values()}
-            except Exception:
-                pass
         cand = [p for p in pool if p.name not in used] or pool
         bgm = str(sorted(cand, key=lambda p: p.stat().st_size)[0])
     if not clip.exists():
@@ -344,7 +346,8 @@ def cmd_run(a) -> int:
 
 def _read_srt(srt: Path) -> list[tuple[float, float, str]]:
     def sec(t: str) -> float:
-        h, m, rest = t.split(":"); s, ms = rest.split(",")
+        h, m, rest = t.split(":")
+        s, ms = rest.split(",")
         return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
     rows = []
     for blk in srt.read_text(encoding="utf-8").strip().split("\n\n"):
@@ -363,7 +366,7 @@ def _merge_len(s: str) -> int:
 def _sentence_spans(rows, lines: list[str]) -> list[tuple[float, float]]:
     """字幕行（可能被拆成 >8 行）按字数归并回 N 句 → 每句 (start, end)
     坑：① 不要用行号索引（8 句常被拆成 10-12 行）② 数字串要折算（否则「100」那行少 2 字、整条错位）"""
-    need = [_merge_len(l) for l in lines]
+    need = [_merge_len(ln) for ln in lines]
     spans, gi, acc, start = [], 0, 0, None
     for t0, t1, txt in rows:
         if start is None:
@@ -371,7 +374,9 @@ def _sentence_spans(rows, lines: list[str]) -> list[tuple[float, float]]:
         acc += _merge_len(txt)
         if gi < len(need) and acc >= max(1, need[gi] - 1):   # 留 1 字容差
             spans.append((start, t1))
-            gi += 1; acc = 0; start = None
+            gi += 1
+            acc = 0
+            start = None
             if gi >= len(need):
                 break
     while len(spans) < len(need):

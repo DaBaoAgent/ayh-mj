@@ -195,7 +195,7 @@ def main() -> None:
     for s in SCRIPTS:
         if args.uid and args.uid != s["uid"]:
             continue
-        prompt = f'<!-- duration="15" -->\n' + build_prompt(s)
+        prompt = '<!-- duration="15" -->\n' + build_prompt(s)
         cast = [CAST_LIB[k] for k in s["cast"]]
         refs = [str(ROOT / c["img"]) for c in cast] + [str(p) for p in REFS_TAIL]
         audios = [str(ROOT / c["audio"]) for c in cast]

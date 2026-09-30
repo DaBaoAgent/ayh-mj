@@ -1,0 +1,4 @@
+docs\onetake_check_W2_carvoice.txt  0 ERROR / 1 WARN
+  • R26  提示词体量约 1976（中文按字、英文按 1/3 计），超过本项目经验上限 400（AutoDL 实测长提示词容易出片失败）
+
+合计 0 ERROR / 1 WARN（规则见 docs/rules-dialogue.md）

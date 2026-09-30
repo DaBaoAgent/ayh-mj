@@ -31,8 +31,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from lib import prompt_parts as pp  # noqa: E402
 from lib import hellgrind as hg  # noqa: E402
+from lib import prompt_parts as pp  # noqa: E402
 
 UID = "H1_hero"
 TITLE = "英雄对决"

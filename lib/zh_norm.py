@@ -10,24 +10,24 @@
 """
 from __future__ import annotations
 
-_CC = None
+_CC: list = []  # 懒加载缓存：空 = 未初始化；[<OpenCC>] 或 [False]
 
 
 def to_simplified(text: str) -> str:
     """繁体 → 简体（依赖 opencc-python-reimplemented；缺包时原样返回，只影响分数不影响流程）"""
-    global _CC
     if not text:
         return text
-    if _CC is None:
+    if not _CC:
         try:
             from opencc import OpenCC
-            _CC = OpenCC("t2s")
+            _CC.append(OpenCC("t2s"))
         except Exception:
-            _CC = False
-    if _CC is False:
+            _CC.append(False)
+    cc = _CC[0]
+    if cc is False:
         return text
     try:
-        return _CC.convert(text)
+        return cc.convert(text)
     except Exception:
         return text
 

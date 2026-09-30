@@ -47,9 +47,10 @@ def title_of(path: Path) -> str:
 
 def main() -> None:
     dry = "--dry" in sys.argv
-    files = sorted([p for p in SRC.glob("*.mp4")], key=lambda p: p.stat().st_mtime)
+    files = sorted(SRC.glob("*.mp4"), key=lambda p: p.stat().st_mtime)
     if not files:
-        print("没有成片"); return
+        print("没有成片")
+        return
 
     # 序号固定映射：标题 → 序号（重烧/重归档沿用原序号，避免序号漂移）
     order: dict[str, int] = {}
@@ -122,7 +123,7 @@ def main() -> None:
         print(f"  {'(dry) ' if dry else ''}[桌面] {old}  →  {new}")
         desk_changed += 1
     # 桌面缺失的新名文件补齐（dry 模式跳过在改名后自然就位的）
-    for p, new in plan:
+    for _p, new in plan:
         if new in desk_will_have:
             continue
         if DST.exists() and not (DST / new).exists():

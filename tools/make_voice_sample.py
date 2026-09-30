@@ -42,11 +42,11 @@ def main() -> None:
         while j + 1 < len(segs) and (segs[j + 1].start - segs[j].end) < 0.6:
             j += 1
         span = segs[j].end - segs[i].start
-        if span >= args.min and segs[i].start >= args.skip:
-            if best is None or span < 14.5:  # 优先接近 13s
-                best = (segs[i].start, segs[j].end, span, " ".join(s.text.strip() for s in segs[i:j+1]))
-                if span <= 14.5:
-                    break
+        if (span >= args.min and segs[i].start >= args.skip
+                and (best is None or span < 14.5)):  # 优先接近 13s
+            best = (segs[i].start, segs[j].end, span, " ".join(s.text.strip() for s in segs[i:j+1]))
+            if span <= 14.5:
+                break
         i = j + 1
 
     if not best:
@@ -60,7 +60,7 @@ def main() -> None:
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([
+    subprocess.run([
         ffmpeg(), "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", args.audio,
         "-af", "loudnorm=I=-18:TP=-2:LRA=9", "-ar", "32000", "-ac", "1", "-b:a", "96k", str(out),
     ], capture_output=True, text=True)

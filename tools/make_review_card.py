@@ -3,7 +3,6 @@
 用法: python tools/make_review_card.py
 输出: docs/review_card_T06_20260924.png
 """
-import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont

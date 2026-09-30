@@ -17,6 +17,7 @@ STATE = ROOT / "state/podcast_harvest.json"
 
 def dur_of(path: Path) -> float:
     import subprocess
+
     from lib.tools import ffprobe
     r = subprocess.run([ffprobe(), "-v", "error", "-show_entries", "format=duration",
                         "-of", "default=nw=1:nk=1", str(path)], capture_output=True, text=True)
@@ -27,7 +28,6 @@ def dur_of(path: Path) -> float:
 
 
 def main() -> None:
-    import subprocess
     state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
     p_files = sorted(REAL.glob("p_*.mp3"))
     if not p_files:
@@ -57,7 +57,7 @@ def main() -> None:
     add += ["", "> 全部为真人自然口语（播客讲述）；适配角色以聆听为准"]
     idx.write_text(t + "\n".join(add) + "\n", encoding="utf-8")
     print(f"✓ INDEX.md 已更新：{len(rows)} 个播客样本")
-    for name, src, text, d in rows:
+    for name, src, text, _d in rows:
         print(f"  {name} | {src} | {text[:30]}")
 
 

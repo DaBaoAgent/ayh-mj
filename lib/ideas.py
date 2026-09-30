@@ -67,9 +67,9 @@ def novelty_issue(lines: dict, standard_lines: dict | None = None) -> str:
         if old_script and SequenceMatcher(None, candidate, old_script).ratio() >= .78:
             return f"整体台词与历史作品 {idea.get('template', '')} 过于相似"
         # Brand sign-offs are naturally similar; compare the opening hook only.
-        if ordered and previous and min(len(ordered[0]), len(previous[0])) >= 5:
-            if SequenceMatcher(None, ordered[0], previous[0]).ratio() >= .85:
-                return f"开场钩子与历史作品 {idea.get('template', '')} 重复"
+        if (ordered and previous and min(len(ordered[0]), len(previous[0])) >= 5
+                and SequenceMatcher(None, ordered[0], previous[0]).ratio() >= .85):
+            return f"开场钩子与历史作品 {idea.get('template', '')} 重复"
     return ""
 
 

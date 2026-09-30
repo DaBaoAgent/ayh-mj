@@ -63,10 +63,7 @@ def sfx_points(tjson: Path) -> list[tuple[float, str]]:
     if not tjson.exists():
         return []
     data = json.loads(tjson.read_text(encoding="utf-8"))
-    if isinstance(data, list):
-        segs = data
-    else:
-        segs = data.get("segments", [])
+    segs = data if isinstance(data, list) else data.get("segments", [])
     pts: list[tuple[float, str]] = []
     used = set()
     for s in segs:
@@ -119,7 +116,7 @@ def main() -> None:
         inputs += ["-stream_loop", "-1", "-i", str(bgm)]
         # 侧链闪避：BGM 被语音压低
         fc.append(f"[{n}:a]volume=0.20[bg]")
-        fc.append(f"[bg][v0]sidechaincompress=threshold=0.03:ratio=6:attack=80:release=350[bgd]")
+        fc.append("[bg][v0]sidechaincompress=threshold=0.03:ratio=6:attack=80:release=350[bgd]")
         mix_in.append("[bgd]")
 
     fc.append(f"{''.join(mix_in)}amix=inputs={len(mix_in)}:duration=first:normalize=0[aout]")

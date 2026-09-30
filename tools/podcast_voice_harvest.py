@@ -67,9 +67,7 @@ def bad_text(t: str) -> bool:
     if cn / len(t2) < 0.55:
         return True  # 英文段/外语段
     grams = [t2[i:i + 2] for i in range(len(t2) - 1)]
-    if grams and Counter(grams).most_common(1)[0][1] >= 4:
-        return True  # 复读/乱码
-    return False
+    return bool(grams and Counter(grams).most_common(1)[0][1] >= 4)  # 复读/乱码
 
 
 def load_state() -> dict:
@@ -97,7 +95,6 @@ def find_windows(segs, scan_end: float):
 
 def density_windows(segs, scan_end: float):
     """fallback：滑窗找语音密度最高、且时长≥11s 的 13s 窗口（适配访谈/对话间隙大的节目）"""
-    import math
     best = None
     t_end = min(scan_end, max((s.end for s in segs), default=0) - 13)
     t0 = 0.0
@@ -130,7 +127,7 @@ def main(dry: bool = False) -> None:
             print(f"⬇ 下载 {tag} ...", flush=True)
             if dry:
                 continue
-            r = subprocess.run(["curl", "-sL", "-m", "280", "-o", str(src), url], capture_output=True)
+            subprocess.run(["curl", "-sL", "-m", "280", "-o", str(src), url], capture_output=True)
             if not src.exists() or src.stat().st_size < 50000:
                 print(f"  ✗ 下载失败 {tag}", flush=True)
                 continue

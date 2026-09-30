@@ -39,7 +39,7 @@ def build(video: Path, lines: list[str], max_chars: int = 10) -> list[tuple[floa
 
     # 字符级对齐：exp 位置 → got 位置
     mapping: dict[int, int] = {}
-    for tag, i1, i2, j1, j2 in SequenceMatcher(None, exp, got, autojunk=False).get_opcodes():
+    for tag, i1, i2, j1, _j2 in SequenceMatcher(None, exp, got, autojunk=False).get_opcodes():
         if tag == "equal":
             for k in range(i2 - i1):
                 mapping[i1 + k] = j1 + k
@@ -81,17 +81,19 @@ def build(video: Path, lines: list[str], max_chars: int = 10) -> list[tuple[floa
     # 防重叠
     out = []
     for i, (a, b, txt) in enumerate(rows):
-        if i and a < out[-1][1] + 0.03:
-            a = out[-1][1] + 0.03
-        if b <= a:
-            b = a + 0.3
-        out.append((a, b, txt))
+        a2, b2 = a, b
+        if i and a2 < out[-1][1] + 0.03:
+            a2 = out[-1][1] + 0.03
+        if b2 <= a2:
+            b2 = a2 + 0.3
+        out.append((a2, b2, txt))
     return out
 
 
 def write_srt(rows, path: Path) -> None:
     def ts(t: float) -> str:
-        h, r = divmod(t, 3600); m, s = divmod(r, 60)
+        h, r = divmod(t, 3600)
+        m, s = divmod(r, 60)
         return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int((t % 1) * 1000):03d}"
     path.write_text("\n".join(f"{i+1}\n{ts(a)} --> {ts(b)}\n{t}\n"
                               for i, (a, b, t) in enumerate(rows)), encoding="utf-8")

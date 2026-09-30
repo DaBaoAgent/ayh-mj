@@ -56,7 +56,7 @@ def compose(shots: str, cast: str, soundscape: str = "", extra_tail: str = "", c
     acting   : 表演层文本（lib/hellgrind.acting_block 的产出，ACTING 技能）——留空则不带，向后兼容
     cinedance: True 则拼入 CINEDANCE 电影语言总纲（镜头/首帧/光锁/物理锁）
     """
-    parts = [f"integrated_multimodal_description: Live-action fun commercial in vertical framing. "]
+    parts = ["integrated_multimodal_description: Live-action fun commercial in vertical framing. "]
     if cinedance:
         from lib.hellgrind import CINEDANCE_CONSTANTS
         parts.append(CINEDANCE_CONSTANTS + " ")

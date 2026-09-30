@@ -74,7 +74,7 @@ def plan_cuts(total: float, silences, mid_trigger: float = MID_TRIGGER,
             if L > TAIL_KEEP:
                 cuts.append((s + TAIL_KEEP, total, f"结尾 {L:.2f}s → {TAIL_KEEP}s"))
         else:
-            if L >= mid_trigger:
+            if mid_trigger <= L:
                 c0, c1 = s + mid_keep / 2, e - mid_keep / 2
                 if c1 > c0:
                     cuts.append((c0, c1, f"停顿 {s:.2f}-{e:.2f}（{L:.2f}s → {mid_keep}s）"))

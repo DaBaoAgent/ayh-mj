@@ -24,7 +24,7 @@ def best_hit(line: str, hyp: str) -> float:
     n = len(line)
     best = 0.0
     for w in range(max(1, n - 3), n + 4):
-        for i in range(0, max(1, len(hyp) - w + 1)):
+        for i in range(max(1, len(hyp) - w + 1)):
             best = max(best, difflib.SequenceMatcher(None, line, hyp[i:i + w]).ratio())
             if best >= 0.999:
                 return best
@@ -49,7 +49,7 @@ def main() -> None:
         d = json.loads(tr.read_text(encoding="utf-8"))
         segs = d if isinstance(d, list) else d.get("segments", [])
         hyp = norm("".join(s.get("text", "") for s in segs))
-        exp = [l for l in it["lines"]]
+        exp = list(it["lines"])
         print(f"\n{'=' * 56}\n▶ {uid}《{it['title']}》｜转写 {len(segs)} 段 / 台词 {len(exp)} 句")
         variants = [exp[1], exp[3], exp[5]]
         hit_all = True

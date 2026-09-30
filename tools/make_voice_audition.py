@@ -54,7 +54,7 @@ def norm_clip(src: Path, out: Path, secs: float) -> None:
 
 def silence(out: Path, secs: float) -> None:
     run([FF, "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi",
-         "-i", f"anullsrc=r=44100:cl=stereo", "-t", str(secs),
+         "-i", "anullsrc=r=44100:cl=stereo", "-t", str(secs),
          "-c:a", "libmp3lame", "-b:a", "128k", str(out)])
 
 

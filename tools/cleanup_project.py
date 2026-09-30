@@ -56,19 +56,18 @@ STATE_KEEP = {
 }
 
 MB = 1024 * 1024
-size = 0
+STATS = {"size": 0}
 actions: list[str] = []
 
 
 def rm(p: Path, dry: bool) -> None:
-    global size
     try:
         s = p.stat().st_size if p.is_file() else 0
         if p.is_dir():
             s = sum(f.stat().st_size for f in p.rglob("*") if f.is_file())
         if not dry:
             shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
-        size += s
+        STATS["size"] += s
         try:
             label = p.relative_to(ROOT)
         except ValueError:          # 项目外（如 %TEMP%）路径
@@ -80,7 +79,7 @@ def rm(p: Path, dry: bool) -> None:
 
 def main(dry: bool = False) -> None:
     print("=" * 64)
-    print(("清理预览（不改动）" if dry else "开始清理（白名单保护式）"))
+    print("清理预览（不改动）" if dry else "开始清理（白名单保护式）")
     print("=" * 64)
 
     # ① out/gen_*/ 只删派生中间件
@@ -125,8 +124,9 @@ def main(dry: bool = False) -> None:
         rm(p, dry)
 
     # ⑤ 回执
-    print("\n".join(actions[:60]) + ("\n  ... 另 %d 项" % (len(actions) - 60) if len(actions) > 60 else ""))
-    print(f"\n{'（dry）' if dry else ''}共 {len(actions)} 项 / {size / MB:.1f}MB")
+    more = f"\n  ... 另 {len(actions) - 60} 项" if len(actions) > 60 else ""
+    print("\n".join(actions[:60]) + more)
+    print(f"\n{'（dry）' if dry else ''}共 {len(actions)} 项 / {STATS['size'] / MB:.1f}MB")
     print("\n=== 保护清单（一律不删）===")
     n_app = len(list(APPROVED.glob("*.mp4"))) if APPROVED.exists() else 0
     n_arch = len(list(ARCHIVE.glob("*.mp4"))) if ARCHIVE.exists() else 0

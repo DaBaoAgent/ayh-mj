@@ -33,6 +33,7 @@ print("=" * 74)
 # ── 1. 官方原文（本地副本 + MD5）──
 print("\n【1】官方原文（D:\\@kaifa\\higgsfield-hell-grind-skills）")
 import hashlib
+
 EXPECT = {
     "LIRA SKILL.md": "dbda9c9aaac7f12dfa7c11db797d27b1",
     "CINEDANCE HIGGSFIELD SKILL.md": "1ad963e23e869929b562e5a8609c1bd6",
@@ -60,9 +61,10 @@ for name in ("lira-image-prompts", "cinedance-seedance", "acting-performance"):
 # ── 3. 代码接入层 ──
 print("\n【3】代码接入层")
 try:
+    import inspect
+
     from lib import hellgrind as hg
     from lib import prompt_parts as pp
-    import inspect
     chk(True, "lib/hellgrind.py 可导入")
     for fn in ("cast_prompt", "shot_block", "acting_block", "load_master", "master_profile_template",
                "tail_constants", "ensure_dirs"):

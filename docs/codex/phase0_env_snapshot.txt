@@ -1,0 +1,13 @@
+ayh-mj Phase 0 基线环境快照（2026-09-30 11:52:50)
+========================================================================
+OS            : Microsoft Windows NT 10.0.26200.0
+Python(venv)  : Python 3.12.9
+uv            : uv 0.11.12 (63c5f57d3 2026-05-08 x86_64-pc-windows-msvc)
+node          : v24.15.0
+ruff          : ruff 0.16.9
+pytest        : pytest 9.1.1
+ffmpeg        : C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffmpeg.exe
+ffprobe       : C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffprobe.exe
+PYTHONPATH    : D:\@佳康顺矩阵\hermes
+branch        : codex/ayh-mj-vNext
+baseline SHA  : 61349e88204081978c452dcb6c830ad1972a5453

@@ -26,6 +26,7 @@ def main() -> None:
         out = ROOT / out
 
     import httpx
+
     from s4_generate.autodl_client import query_task
 
     r = query_task(tid)

@@ -1,0 +1,9 @@
+  ✓ [escalate_price] 这个轮椅多少钱？
+  ✓ [escalate_medical] 能治腿脚不便吗
+  ✓ [escalate_complaint] 我要退款！
+  ✓ [spam] 加微信了解更多
+  ✓ [normal] 奶奶用这个好方便啊
+  ✓ [escalate_price] how much does it cost?
+  ✓ [normal] My grandma loves it!
+
+demo: 7/7 通过
