@@ -1,0 +1,10 @@
+Phase 8 证据 —— repairs 表（次数 / 成本 / 结果 落库，可审计）
+
+{"id": 1, "stage": "qa", "error_code": "PRODUCT_DEFORMED", "action": "REGENERATE_SHOT", "rewind_to": "generate", "target_shot": null, "attempt": 1, "budget": 2, "cost": 0.0, "status": "EXECUTED", "created_at": "2026-09-30T13:50:14"}
+{"id": 2, "stage": "qa", "error_code": "PRODUCT_DEFORMED", "action": "REGENERATE_SHOT", "rewind_to": "generate", "target_shot": null, "attempt": 2, "budget": 2, "cost": 0.0, "status": "FAILED", "created_at": "2026-09-30T13:50:15"}
+{"id": 3, "stage": "qa", "error_code": "SUBTITLE_ALIGN_FAIL", "action": "REBUILD_SUBTITLE", "rewind_to": "compose", "target_shot": null, "attempt": 1, "budget": 3, "cost": 0.0, "status": "EXECUTED", "created_at": "2026-09-30T13:50:15"}
+
+P8EV_A repair_summary: {"count": 2, "cost": 0.0, "by_code": {"PRODUCT_DEFORMED": 2}, "by_action": "REGENERATE_SHOT", "last": {"id": 2, "job_id": 1, "stage": "qa", "error_code": "PRODUCT_DEFORMED", "action": "REGENERATE_SHOT", "rewind_to": "generate", "target_shot": null, "attempt": 2, "budget": 2, "cost": 0.0, "status": "FAILED", "detail": {"repair_id": 2, "repair_error": "PRODUCT_DEFORMED", "status": "FAILED", "error_code": "PRODUCT_DEFORMED", "cost": 0.0}, "created_at": "2026-09-30T13:50:15"}}
+P8EV_B repair_summary: {"count": 1, "cost": 0.0, "by_code": {"SUBTITLE_ALIGN_FAIL": 1}, "by_action": "REBUILD_SUBTITLE", "last": {"id": 3, "job_id": 2, "stage": "qa", "error_code": "SUBTITLE_ALIGN_FAIL", "action": "REBUILD_SUBTITLE", "rewind_to": "compose", "target_shot": null, "attempt": 1, "budget": 3, "cost": 0.0, "status": "EXECUTED", "detail": {"repair_id": 3, "repair_error": "SUBTITLE_ALIGN_FAIL", "status": "EXECUTED", "error_code": null, "cost": 0.0}, "created_at": "2026-09-30T13:50:15"}}
+
+schema: 4

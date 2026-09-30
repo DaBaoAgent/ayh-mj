@@ -79,6 +79,14 @@ def _build_transitions() -> dict[str, set[str]]:
         # QA 通过时可直接进入 COMPOSING（跳过 REPAIRING），仍在"向前"语义内
         if name == JobState.QA:
             nxt.add(JobState.COMPOSING)
+        # REPAIRING（Phase 8）是定点修复中枢：
+        #   ① 任何"还没出片"的阶段都能把任务交给它（发现不合格 → 去修）；
+        #   ② 它自己允许**回退**到更早阶段重做（重生成 / 重建字幕）。
+        # 回退因此仍是合法转换，不需要 force 绕过状态机。
+        if name != JobState.REPAIRING and idx < _LINEAR_INDEX[JobState.READY]:
+            nxt.add(JobState.REPAIRING)
+        if name == JobState.REPAIRING:
+            nxt |= set(JobState.LINEAR[:idx])
         t[name] = nxt
     # 旁路状态可以恢复到任意"未终结"主线状态，也可以继续取消（人工终止意图永远有效）
     resume = set(JobState.LINEAR) - {JobState.DONE}
@@ -360,6 +368,66 @@ class JobStore:
             rows = conn.execute(
                 "SELECT * FROM attempts WHERE job_id = ? ORDER BY id ASC", (job_id,)).fetchall()
             return [dict(r) for r in rows]
+
+    # ── repairs（Phase 8：定点修复的次数/成本/结果，审计"为什么又跑了一遍"）──
+    def add_repair(self, uid: str, *, error_code: str, action: str, stage: str = "",
+                   rewind_to: str = "", target_shot: int | None = None, attempt: int = 1,
+                   budget: int = 0, cost: float = 0.0, status: str = "PLANNED",
+                   detail: dict | str | None = None) -> int:
+        payload = detail if isinstance(detail, str) or detail is None else json.dumps(
+            detail, ensure_ascii=False)
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            cur = conn.execute(
+                """INSERT INTO repairs
+                   (job_id, stage, error_code, action, rewind_to, target_shot, attempt,
+                    budget, cost, status, detail, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (job_id, stage, error_code, action, rewind_to, target_shot, int(attempt),
+                 int(budget), float(cost), status, payload, utc_now()))
+            conn.commit()
+            return int(cur.lastrowid)
+
+    def update_repair(self, repair_id: int, *, cost: float | None = None,
+                      status: str | None = None, detail: dict | str | None = None) -> bool:
+        """回填一次修复的**真实成本/结果**（次数在 add 时落库，成本要等重跑完才知道）。"""
+        sets: list[str] = []
+        params: list = []
+        if cost is not None:
+            sets.append("cost = ?")
+            params.append(float(cost))
+        if status is not None:
+            sets.append("status = ?")
+            params.append(str(status))
+        if detail is not None:
+            payload = detail if isinstance(detail, str) else json.dumps(detail, ensure_ascii=False)
+            sets.append("detail = ?")
+            params.append(payload)
+        if not sets:
+            return False
+        params.append(int(repair_id))
+        with self._connect() as conn:
+            cur = conn.execute(f"UPDATE repairs SET {', '.join(sets)} WHERE id = ?", params)
+            conn.commit()
+            return cur.rowcount > 0
+
+    def list_repairs(self, uid: str) -> list[dict]:
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            rows = conn.execute(
+                "SELECT * FROM repairs WHERE job_id = ? ORDER BY id ASC", (job_id,)).fetchall()
+            return [_decode(r, "detail") for r in rows]
+
+    def repair_summary(self, uid: str) -> dict:
+        """修复次数 / 成本 / 最后一次结果 —— plan 阶段与最终验收都要用。"""
+        rows = self.list_repairs(uid)
+        by_code: dict[str, int] = {}
+        for row in rows:
+            code = str(row.get("error_code") or "")
+            by_code[code] = by_code.get(code, 0) + 1
+        return {"count": len(rows), "cost": round(sum(float(r.get("cost") or 0) for r in rows), 4),
+                "by_code": by_code, "by_action": (rows[-1]["action"] if rows else None),
+                "last": dict(rows[-1]) if rows else None}
 
     # ── provider tasks（幂等：先落 task_id 再轮询，Phase 4）────────
     def upsert_provider_task(self, uid: str, fingerprint: str, *, stage: str = "generate",

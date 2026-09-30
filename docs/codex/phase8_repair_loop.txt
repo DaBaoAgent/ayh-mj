@@ -1,0 +1,25 @@
+Phase 8 证据 —— 自动 QA → RepairEngine → 定点回退 闭环轨迹
+
+### P8EV_A 画面不合格（products_seen=2）→ 回退 generate，到上限转人工
+
+generate 调用 3 次 / compose 调用 0 次；终态 BLOCKED（PRODUCT_DEFORMED）；修复次数 2
+
+--- 编排日志 ---
+↺ P8EV_A 定点修复 1/2：PRODUCT_DEFORMED → REGENERATE_SHOT（回退到 generate）
+  ↺ P8EV_A 定点修复 2/2：PRODUCT_DEFORMED → REGENERATE_SHOT（回退到 generate）
+  ✗ P8EV_A BLOCKED（PRODUCT_DEFORMED）：定点修复已达上限 2 次（PRODUCT_DEFORMED）：验片不通过（FAIL（1 FAIL / 1 WARN）｜主错误码 PRODUCT_DEFORMED｜覆盖 83%）：[FAIL] product/PRODUCT_DEFORMED: 画面产品数 2 ≠ StorySpec 要求 1；[WARN] retention/VISUAL_QA_FAIL: 没有提供 0–2s 钩子出现时间（留存首帧无法判定）
+
+### P8EV_B 字幕越界 → 只回退 compose 重建字幕（不重生视频）
+
+generate 调用 1 次 / compose 调用 1 次；终态 COMPOSING（None）；修复次数 1
+
+--- 编排日志 ---
+↺ P8EV_B 定点修复 1/3：SUBTITLE_ALIGN_FAIL → REBUILD_SUBTITLE（回退到 compose）
+
+### P8EV_C 未登记承诺 → 直接人工，不烧重生
+
+generate 调用 1 次 / compose 调用 0 次；终态 BLOCKED（COMPLIANCE_BLOCK）；修复次数 0
+
+--- 编排日志 ---
+✗ P8EV_C BLOCKED（COMPLIANCE_BLOCK）：验片不通过（FAIL（2 FAIL / 0 WARN）｜主错误码 COMPLIANCE_BLOCK｜覆盖 33%）：[FAIL] compliance/COMPLIANCE_BLOCK: 未登记的产品承诺「1000公里」；[FAIL] compliance/COMPLIANCE_BLOCK: claim「sales_rank_1」当前不可用：禁用改写，等同伪造参数 —— 是 sales_rank_1（高端轮椅销量第一 · 累计销量 86280 台）的禁用改写
+

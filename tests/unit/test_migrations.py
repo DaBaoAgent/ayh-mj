@@ -46,7 +46,7 @@ def test_empty_db_migrates_to_current_version(tmp_path):
     db = tmp_path / "empty.db"
     conn = _conn(db)
     result = migrations.apply_migrations(conn, db_path=db)
-    assert result["applied"] == [1, 2, 3]
+    assert result["applied"] == [1, 2, 3, 4]
     assert migrations.current_version(conn) == migrations.SCHEMA_VERSION
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     for t in ("jobs", "attempts", "artifacts", "events", "evaluations",
@@ -75,7 +75,7 @@ def test_legacy_db_is_backed_up_and_compat_migrated(tmp_path):
 
     conn = _conn(db)
     result = migrations.apply_migrations(conn, db_path=db)
-    assert result["applied"] == [2, 3]              # v1 基线只补记，不重跑
+    assert result["applied"] == [2, 3, 4]              # v1 基线只补记，不重跑
     assert result["from_version"] == 0
     assert result["backup"], "迁移前必须为老库生成备份"
 

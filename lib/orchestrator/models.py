@@ -121,6 +121,7 @@ class RunConfig:
     publish_platforms: list[str] = field(default_factory=lambda: ["douyin"])
     stages: list[str] = field(default_factory=lambda: list(STAGE_ORDER))
     max_attempts: int = 3
+    max_repairs: int = 3
     budget_cap: float | None = None
     force: bool = False
     created_at: str = ""
@@ -129,6 +130,7 @@ class RunConfig:
         self.daily_target = max(1, min(20, int(self.daily_target or 1)))
         self.gen_concurrency = max(1, min(10, int(self.gen_concurrency or 6)))
         self.max_attempts = max(1, min(5, int(self.max_attempts or 3)))
+        self.max_repairs = max(0, min(10, int(self.max_repairs if self.max_repairs is not None else 3)))
         chosen = [s for s in STAGE_ORDER if s in set(self.stages or STAGE_ORDER)]
         self.stages = chosen or list(STAGE_ORDER)
         self.publish_platforms = [str(p) for p in (self.publish_platforms or [])]
@@ -142,6 +144,7 @@ class RunConfig:
             "dry_mode": self.dry_mode, "real_publish": self.real_publish,
             "real_engage": self.real_engage, "publish_platforms": list(self.publish_platforms),
             "stages": list(self.stages), "max_attempts": self.max_attempts,
+            "max_repairs": self.max_repairs,
             "budget_cap": self.budget_cap, "force": self.force,
             "created_at": self.created_at,
         }

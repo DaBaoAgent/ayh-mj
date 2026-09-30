@@ -1,0 +1,168 @@
+Phase 8 证据 —— QA 报告样例（同一份证据 → 结构化 JSON + 人类可读 MD）
+
+== to_json() ==
+
+{
+ "uid": "P8SAMPLE",
+ "stage": "qa",
+ "passed": false,
+ "score": 0.0,
+ "coverage": 1.0,
+ "dimensions": {
+  "product": "fail",
+  "cast": "fail",
+  "audio": "fail",
+  "retention": "fail",
+  "compliance": "fail",
+  "delivery": "pass"
+ },
+ "codes": [
+  "COMPLIANCE_BLOCK",
+  "PRODUCT_DEFORMED",
+  "WRONG_SPEAKER",
+  "HUMAN_ANATOMY_FAIL",
+  "ASR_MISMATCH",
+  "VISUAL_QA_FAIL"
+ ],
+ "primary_error": "COMPLIANCE_BLOCK",
+ "summary": "FAIL（9 FAIL / 0 WARN）｜主错误码 COMPLIANCE_BLOCK｜覆盖 100%",
+ "notes": [],
+ "generated_at": "2026-09-30T00:00:00",
+ "findings": [
+  {
+   "dimension": "product",
+   "severity": "FAIL",
+   "error_code": "PRODUCT_DEFORMED",
+   "message": "画面产品数 2 ≠ StorySpec 要求 1",
+   "shot": null,
+   "fix_hint": "锁死产品数量；多余产品必须清场后重生",
+   "evidence": {
+    "products_seen": 2.0,
+    "expected": 1.0
+   }
+  },
+  {
+   "dimension": "cast",
+   "severity": "FAIL",
+   "error_code": "VISUAL_QA_FAIL",
+   "message": "画面人数 2 ≠ StorySpec 要求 1",
+   "shot": null,
+   "fix_hint": "调整 occupancy/机位让人数稳定；重生",
+   "evidence": {
+    "people_seen": 2.0,
+    "expected": 1.0
+   }
+  },
+  {
+   "dimension": "cast",
+   "severity": "FAIL",
+   "error_code": "HUMAN_ANATOMY_FAIL",
+   "message": "人脸/手/脚/腿/身体结构畸形（右手多指）",
+   "shot": null,
+   "fix_hint": "调整 occupancy/镜头距离/动作复杂度后重生",
+   "evidence": {
+    "anatomy_issues": [
+     "右手多指"
+    ]
+   }
+  },
+  {
+   "dimension": "cast",
+   "severity": "FAIL",
+   "error_code": "WRONG_SPEAKER",
+   "message": "说话人与声音不匹配（镜 [2]）",
+   "shot": 2,
+   "fix_hint": "强化该镜 speaker lock；必要时减少同镜角色后重生",
+   "evidence": {
+    "wrong_speaker_shots": [
+     2
+    ]
+   }
+  },
+  {
+   "dimension": "audio",
+   "severity": "FAIL",
+   "error_code": "ASR_MISMATCH",
+   "message": "镜 1 台词未出现/漏词：期望「这台车后排能放平」",
+   "shot": 1,
+   "fix_hint": "真实漏词 → 缩句/调整节奏后重生；只错字 → 只重建字幕",
+   "evidence": {
+    "expected": "这台车后排能放平"
+   }
+  },
+  {
+   "dimension": "audio",
+   "severity": "FAIL",
+   "error_code": "ASR_MISMATCH",
+   "message": "片尾静默 2.4s（长尾静默，白占时长）",
+   "shot": null,
+   "fix_hint": "裁掉长尾或补足口播铺满时长",
+   "evidence": {}
+  },
+  {
+   "dimension": "retention",
+   "severity": "FAIL",
+   "error_code": "VISUAL_QA_FAIL",
+   "message": "0–2s 没有明确钩子（首个钩子在 3.2s）",
+   "shot": null,
+   "fix_hint": "把冲突/动作/声音钩子提到前 2 秒",
+   "evidence": {
+    "first_hook_seconds": 3.2
+   }
+  },
+  {
+   "dimension": "retention",
+   "severity": "FAIL",
+   "error_code": "VISUAL_QA_FAIL",
+   "message": "存在 2.6s 无意义静止/长停顿（上限 2s）",
+   "shot": null,
+   "fix_hint": "删静止段或补动作推进",
+   "evidence": {
+    "static_seconds": 2.6,
+    "tail_silence": 2.4
+   }
+  },
+  {
+   "dimension": "compliance",
+   "severity": "FAIL",
+   "error_code": "COMPLIANCE_BLOCK",
+   "message": "未登记的产品承诺「1000公里」",
+   "shot": null,
+   "fix_hint": "改文案或补 claim 后再出，不允许绕过 gate",
+   "evidence": {
+    "kind": "numeric",
+    "claim_id": null
+   }
+  }
+ ]
+}
+
+== to_markdown() ==
+
+# QA 报告 — P8SAMPLE
+
+- 结论：**FAIL（9 FAIL / 0 WARN）｜主错误码 COMPLIANCE_BLOCK｜覆盖 100%**
+- 生成时间：2026-09-30T00:00:00
+
+| 维度 | 结论 | 说明 |
+|---|---|---|
+| 视觉产品保真 | **不通过** | |
+| 人物与表演 | **不通过** | |
+| 音频/对白 | **不通过** | |
+| 镜头与留存代理指标 | **不通过** | |
+| 品牌/合规 | **不通过** | |
+| 成片完整性 | 通过 | |
+
+## 明细（FAIL / WARN 都带 error_code）
+
+| 严重度 | 维度 | error_code | 镜 | 结论 | 修复方向 |
+|---|---|---|---|---|---|
+| FAIL | 视觉产品保真 | `PRODUCT_DEFORMED` |  | 画面产品数 2 ≠ StorySpec 要求 1 | 锁死产品数量；多余产品必须清场后重生 |
+| FAIL | 人物与表演 | `VISUAL_QA_FAIL` |  | 画面人数 2 ≠ StorySpec 要求 1 | 调整 occupancy/机位让人数稳定；重生 |
+| FAIL | 人物与表演 | `HUMAN_ANATOMY_FAIL` |  | 人脸/手/脚/腿/身体结构畸形（右手多指） | 调整 occupancy/镜头距离/动作复杂度后重生 |
+| FAIL | 人物与表演 | `WRONG_SPEAKER` | 2 | 说话人与声音不匹配（镜 [2]） | 强化该镜 speaker lock；必要时减少同镜角色后重生 |
+| FAIL | 音频/对白 | `ASR_MISMATCH` | 1 | 镜 1 台词未出现/漏词：期望「这台车后排能放平」 | 真实漏词 → 缩句/调整节奏后重生；只错字 → 只重建字幕 |
+| FAIL | 音频/对白 | `ASR_MISMATCH` |  | 片尾静默 2.4s（长尾静默，白占时长） | 裁掉长尾或补足口播铺满时长 |
+| FAIL | 镜头与留存代理指标 | `VISUAL_QA_FAIL` |  | 0–2s 没有明确钩子（首个钩子在 3.2s） | 把冲突/动作/声音钩子提到前 2 秒 |
+| FAIL | 镜头与留存代理指标 | `VISUAL_QA_FAIL` |  | 存在 2.6s 无意义静止/长停顿（上限 2s） | 删静止段或补动作推进 |
+| FAIL | 品牌/合规 | `COMPLIANCE_BLOCK` |  | 未登记的产品承诺「1000公里」 | 改文案或补 claim 后再出，不允许绕过 gate |

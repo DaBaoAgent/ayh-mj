@@ -4,7 +4,7 @@
   · `orchestrator` / `start_production()` —— 启动生产的唯一入口；
   · `StageResult` / `RunConfig` —— 阶段契约与配置快照；
   · `PipelineOrchestrator` —— 需要独立实例（测试/多库）时用；
-  · `RepairEngine` —— 失败恢复决策。
+  · `RepairEngine` / `plan_repair()` —— 失败恢复决策与定点修复计划（Phase 8）。
 """
 from .errors import (
     ALL_CODES,
@@ -38,6 +38,7 @@ from .models import (
 from .policies import StagePolicy, policy_for
 from .providers import AutoDLProvider, ProviderTask, build_payload
 from .recovery import RepairDecision, RepairEngine
+from .repairs import PLAYBOOK, REPAIR_TARGET, RepairPlan, plan_repair, repair_target
 from .service import (
     PipelineOrchestrator,
     console_state,
@@ -50,9 +51,11 @@ __all__ = [
     "ALL_CODES", "AutoDLProvider", "BudgetExceeded", "Cancelled", "FRONTEND_STAGE",
     "GenerationOutcome", "IdempotentGenerator", "JobNotResumable", "OrchestratorError",
     "PROMPT_MAX", "PROMPT_SAFE", "PipelineOrchestrator", "ProviderTask",
-    "REPAIR_ACTIONS", "RepairDecision", "RepairEngine", "RunConfig", "STAGE_LABEL",
+    "REPAIR_ACTIONS", "REPAIR_TARGET", "PLAYBOOK", "RepairDecision", "RepairEngine",
+    "RepairPlan", "RunConfig", "STAGE_LABEL",
     "STAGE_ORDER", "STAGE_STATES", "StageContext", "StageFailure", "StagePolicy",
     "StageResult", "UnknownJob", "build_payload", "compress_prompt", "console_state",
     "ensure_prompt_budget", "fingerprint", "fingerprint_parts", "kill_process_tree",
-    "orchestrator", "policy_for", "repair_action_for", "start_production",
+    "orchestrator", "plan_repair", "policy_for", "repair_action_for", "repair_target",
+    "start_production",
 ]

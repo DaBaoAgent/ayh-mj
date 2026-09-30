@@ -31,6 +31,7 @@ from ..creative.planner import PlannerError
 from ..dispatch import sync_queue
 from ..jobstore import InvalidTransition, JobState, can_transition, sha256_of
 from ..jobstore import store as default_store
+from . import repairs as repairs_mod
 from . import stages as stages_mod
 from .errors import (
     REQUIRE_HUMAN,
@@ -336,15 +337,27 @@ class PipelineOrchestrator:
 
     def _run_stages(self, uid: str, cfg: RunConfig, handle: _RunHandle,
                     *, from_stage: str | None = None) -> StageResult:
+        """顺序跑阶段，并支持**定点修复回退**（Phase 8）。
+
+        某个阶段报 FAIL 且修复动作指向别的阶段（重生 / 只重建字幕）时，不原地空转，
+        而是走 REPAIRING 回退到目标阶段重做 —— 次数受 `cfg.max_repairs` 限制，
+        到顶即转人工（BLOCKED），绝不死循环。
+        """
         job = self.store.get_job(uid)
         if job is None:
             raise UnknownJob(f"任务不存在：{uid}")
-        stages = list(stages_mod.resolve_stages(cfg.stages))
+        all_stages = list(stages_mod.resolve_stages(cfg.stages))
+        stages = list(all_stages)
         if from_stage in stages:
             stages = stages[stages.index(from_stage):]
 
+        limit = max(0, int(getattr(cfg, "max_repairs", 0) or 0))
+        repairs = self._repairs_used(uid)
         last: StageResult | None = None
-        for name in stages:
+        pending: dict | None = None          # 最近一次"已计划但成本未知"的修复
+        idx = 0
+        while idx < len(stages):
+            name = stages[idx]
             if handle.cancelled:
                 raise Cancelled("收到取消请求，安全停止")
             if not cfg.dry_mode:
@@ -354,8 +367,87 @@ class PipelineOrchestrator:
                 raise StageFailure(f"未注册的 stage：{name}", error_code="STAGE_NOT_REGISTERED")
             self._walk_to(uid, STAGE_STATES[name][0], message=f"{STAGE_LABEL[name]}开始")
             self.store.add_event(uid, "stage_start", f"▶ {STAGE_LABEL[name]}", stage=name)
-            last = self._run_one_stage(uid, cfg, handle, name, fn)
+            try:
+                last = self._run_one_stage(uid, cfg, handle, name, fn)
+            except StageFailure as exc:
+                plans = (exc.data or {}).get("repair_plan") or {}
+                target = str(plans.get("rewind_to") or "")
+                # 断点续跑可能把更早的 stage 截掉了；回退目标只要在本配置里就补回来
+                if target and target in all_stages and target not in stages:
+                    stages = list(all_stages)
+                # 需要回退才算"定点修复"；就地重跑由 _run_one_stage 内部消化
+                if not target or target not in stages or target == name:
+                    self._finalize_repair(uid, pending, status="FAILED",
+                                          error_code=exc.error_code or "")
+                    raise
+                if repairs >= limit:
+                    self._finalize_repair(uid, pending, status="FAILED",
+                                          error_code=exc.error_code or "")
+                    raise StageFailure(
+                        f"定点修复已达上限 {limit} 次（{exc.error_code}）：{exc.message}",
+                        error_code=exc.error_code,
+                        data={**(exc.data or {}), "repairs_used": repairs,
+                              "repairs_limit": limit, "repair_exhausted": True},
+                        next_action=REQUIRE_HUMAN) from exc
+                # 上一次修复的口子在这次失败处结束 → 结算它的真实成本/结果
+                self._finalize_repair(uid, pending, status="EXECUTED")
+                repairs += 1
+                job = self.store.get_job(uid) or {}
+                repair_id = self._record_repair(uid, plans, repairs, limit)
+                pending = {"id": repair_id, "error_code": plans.get("error_code"),
+                           "stage": plans.get("stage") or name,
+                           "cost0": float(job.get("cost_spent") or 0.0)}
+                self._try_transition(uid, JobState.REPAIRING, message="进入定点修复",
+                                     event_type="repair_begin", data={"rewind_to": target})
+                idx = stages.index(target)
+                continue
+            idx += 1
+        self._finalize_repair(uid, pending, status="EXECUTED")
         return last or StageResult.ok("plan", message="无阶段可执行")
+
+    def _repairs_used(self, uid: str) -> int:
+        """已经用掉的修复次数（读 DB，因此 resume/retry 也接着算，不会靠内存绕过预算）。"""
+        with suppress(Exception):
+            return int(self.store.repair_summary(uid).get("count") or 0)
+        return 0
+
+    def _record_repair(self, uid: str, plan: dict, used: int, limit: int) -> int | None:
+        """落一条修复记录（次数此刻可知；真实成本等重跑完由 `_finalize_repair` 回填）。"""
+        detail = {**plan, "used": used, "limit": limit}
+        repair_id = None
+        with suppress(Exception):
+            repair_id = self.store.add_repair(
+                uid, error_code=str(plan.get("error_code") or "UNKNOWN"),
+                action=str(plan.get("action") or ""),
+                stage=str(plan.get("stage") or ""),
+                rewind_to=str(plan.get("rewind_to") or ""),
+                target_shot=plan.get("target_shot"), attempt=used,
+                budget=limit, cost=0.0, status="PLANNED", detail=detail)
+        with suppress(Exception):
+            self.store.add_event(uid, "repair", f"↺ 定点修复 {used}/{limit}",
+                                 stage=str(plan.get("stage") or ""),
+                                 data={"repair_plan": plan, "used": used, "limit": limit})
+        self._log(f"  ↺ {uid} 定点修复 {used}/{limit}：{plan.get('error_code')} → "
+                  f"{plan.get('action')}（回退到 {plan.get('rewind_to') or plan.get('stage')}）")
+        return repair_id
+
+    def _finalize_repair(self, uid: str, pending: dict | None, *, status: str,
+                         error_code: str = "") -> None:
+        """回填一次修复的**真实成本与结果**（PLANNED → EXECUTED / FAILED）。"""
+        if not pending:
+            return
+        job = self.store.get_job(uid) or {}
+        spent = float(job.get("cost_spent") or 0.0)
+        cost = round(max(0.0, spent - float(pending.get("cost0") or 0.0)), 4)
+        detail = {"repair_id": pending.get("id"), "repair_error": pending.get("error_code"),
+                  "status": status, "error_code": error_code or None, "cost": cost}
+        with suppress(Exception):
+            self.store.update_repair(pending.get("id"), cost=cost, status=status, detail=detail)
+        with suppress(Exception):
+            self.store.add_event(uid, "repair_done",
+                                 f"↺ 定点修复 {pending.get('error_code')} → {status}"
+                                 f"（¥{cost:.2f}）", stage=str(pending.get("stage") or ""),
+                                 data=detail)
 
     def _run_one_stage(self, uid: str, cfg: RunConfig, handle: _RunHandle,
                        name: str, fn) -> StageResult:
@@ -405,13 +497,21 @@ class PipelineOrchestrator:
             policy = policy_for(name)
             decision = self.repair.decide(result, attempts=attempt,
                                           max_attempts=cfg.max_attempts, stage=name)
+            target = repairs_mod.repair_target(decision.action, name)
+            rewind = bool(decision.in_stage and target and target != name)
+            plan = repairs_mod.plan_repair(
+                result.error_code or "UNKNOWN", stage=name, attempt=attempt,
+                budget=int(getattr(cfg, "max_repairs", 0) or 0),
+                findings=(result.data or {}).get("findings"),
+                detail={"message": result.message, "rewind_to": target}) if rewind else None
             self.store.add_event(
                 uid, "stage_failed", f"✗ {STAGE_LABEL[name]}：{result.message}", stage=name,
                 data={"error_code": result.error_code, "decision": decision.action,
                       "reason": decision.reason, "repair": decision.to_dict(),
+                      "repair_plan": plan.to_dict() if plan else None,
                       "metrics": result.metrics,
                       "seconds": seconds, "attempt": attempt, "detail": result.data})
-            if decision.in_stage and attempt < policy.max_attempts:
+            if decision.in_stage and not rewind and attempt < policy.max_attempts:
                 if decision.delay:
                     self._log(f"  ⏳ {uid} {name} 瞬时错误（{result.error_code}）"
                               f"→ 退避 {decision.delay:.0f}s 后重试")
@@ -421,7 +521,8 @@ class PipelineOrchestrator:
                 continue
             raise StageFailure(result.message, error_code=result.error_code or "STAGE_FAILED",
                                data={**result.data, "repair_action": decision.action,
-                                     "repair_reason": decision.reason},
+                                     "repair_reason": decision.reason,
+                                     "repair_plan": plan.to_dict() if plan else None},
                                next_action=decision.action)
 
     def _ensure_budget(self, uid: str, cfg: RunConfig, stage: str = "") -> None:

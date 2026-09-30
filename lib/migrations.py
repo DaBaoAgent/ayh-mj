@@ -218,6 +218,28 @@ CREATE INDEX IF NOT EXISTS idx_provider_tasks_task ON provider_tasks(task_id);
 CREATE INDEX IF NOT EXISTS idx_provider_tasks_job ON provider_tasks(job_id, stage);
 """
 
+
+# ── v4：定点修复记录（Phase 8）—— 修复次数 / 成本 / 最终结果都要可查 ──────
+V4_REPAIRS_DDL = """
+CREATE TABLE IF NOT EXISTS repairs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES jobs(id),
+    stage TEXT,
+    error_code TEXT NOT NULL,
+    action TEXT NOT NULL,
+    rewind_to TEXT,
+    target_shot INTEGER,
+    attempt INTEGER DEFAULT 1,
+    budget INTEGER DEFAULT 0,
+    cost REAL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'PLANNED',
+    detail TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_repairs_job ON repairs(job_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_repairs_code ON repairs(error_code);
+"""
+
 # 旧 status → canonical 状态（一次性兼容迁移；不删任何历史行）
 LEGACY_STATUS_MAP = {
     "pending": "PLANNING",
@@ -258,10 +280,15 @@ def _v3(conn: sqlite3.Connection) -> None:
     conn.executescript(V3_PROVIDER_TASKS_DDL)
 
 
+def _v4(conn: sqlite3.Connection) -> None:
+    conn.executescript(V4_REPAIRS_DDL)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "legacy_baseline", lambda conn: conn.executescript(V1_LEGACY_DDL)),
     Migration(2, "canonical_job_store", _v2),
     Migration(3, "provider_task_idempotency", _v3),
+    Migration(4, "qa_repair_records", _v4),
 )
 
 SCHEMA_VERSION = MIGRATIONS[-1].version

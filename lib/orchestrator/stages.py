@@ -44,7 +44,6 @@ PROMPT_SAFE = 9800
 
 GENERATE_TIMEOUT = 3600.0     # H3 一条 15s：实测 ~10 分钟，留足重试余量
 COMPOSE_TIMEOUT = 7200.0      # 裁剪+转写+字幕+混音+归档
-MIN_FINAL_BYTES = 100_000     # 低于此值视为坏文件（15s 成片实测 >1MB）
 
 
 def _make_15s():
@@ -503,28 +502,64 @@ def _generation_cost(ctx: StageContext) -> float:
 
 
 # ── 4. qa ──────────────────────────────────────────────────────
+def _qa_gate(ctx: StageContext, *, phase: str, stage: str) -> StageResult:
+    """自动验片（Phase 8）：Critic 判定 → 落 artifact → 写 evaluation → 带主错误码失败。
+
+    失败时把 `findings` 放进 `data`；`service` 的修复环据此生成 RepairPlan
+    （回退 generate 重生 / compose 重建字幕），次数受 `cfg.max_repairs` 限制。
+    没有证据的维度记 `skipped`（不算通过），并在报告里写明 —— 绝不假装验过。
+    """
+    from ..qa import critic as qa_critic
+
+    doc = _spec_doc(ctx.spec) if ctx.spec is not None else {}
+    report = qa_critic.critique(ctx.workspace, ctx.uid, doc, phase=phase, stage=stage)
+
+    out_dir = ctx.workspace / "qa"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / f"qa_report_{phase}.json"
+    md_path = out_dir / f"qa_report_{phase}.md"
+    json_path.write_text(report.to_json(), encoding="utf-8")
+    md_path.write_text(report.to_markdown(), encoding="utf-8")
+    artifacts = [{"type": "qa_report", "path": json_path},
+                 {"type": "qa_report_md", "path": md_path}]
+
+    if ctx.store is not None:
+        for dim, status in report.dimensions.items():
+            ctx.store.add_evaluation(
+                ctx.uid, f"qa_{dim}", stage=stage,
+                passed=None if status == "skipped" else status == "pass",
+                detail={"phase": phase, "status": status, "coverage": report.coverage,
+                        "codes": sorted({f.error_code for f in report.findings
+                                         if f.dimension == dim})})
+        ctx.store.add_evaluation(ctx.uid, f"qa_report_{phase}", stage=stage,
+                                 score=report.score(), passed=report.passed,
+                                 detail=report.to_dict())
+
+    metrics = {"qa_phase": phase, "qa_passed": report.passed, "qa_score": report.score(),
+               "qa_coverage": report.coverage, "qa_codes": report.codes(),
+               "qa_dimensions": report.dimensions}
+    if not report.failed:
+        return StageResult.ok(stage, artifacts=artifacts, metrics=metrics,
+                              message=f"验片通过：{report.summary()}")
+    top = "；".join(f"[{f.severity}] {f.dimension}/{f.error_code}: {f.message}"
+                    for f in report.findings[:4])
+    return StageResult.fail(stage, report.primary_error() or QA_FAILED,
+                            f"验片不通过（{report.summary()}）：{top}",
+                            metrics=metrics, artifacts=artifacts,
+                            data={"findings": [f.to_dict() for f in report.findings],
+                                  "qa_report": str(json_path), "phase": phase})
+
+
 def stage_qa(ctx: StageContext) -> StageResult:
     out = ctx.workspace / "onetake.mp4"
     if ctx.dry:
         return StageResult.ok("qa", metrics={"dry": True}, message="演练：跳过验片")
     if not out.is_file():
         return StageResult.fail("qa", QA_FAILED, f"成片不存在：{out}")
-    size = out.stat().st_size
-    if size < MIN_FINAL_BYTES:
-        return StageResult.fail("qa", QA_FAILED, f"成片疑似损坏（{size} 字节 < {MIN_FINAL_BYTES}）",
-                                metrics={"bytes": size})
-    metrics = {"bytes": size}
-    try:
-        from lib.tools import get_video_duration
-        metrics["duration"] = round(get_video_duration(str(out)), 2)
-    except Exception:  # ffprobe 不可用不应阻断出片，只少一个指标
-        metrics["duration"] = None
-    if ctx.store is not None:
-        ctx.store.add_evaluation(ctx.uid, "qa_basic", stage="qa",
-                                 passed=True, detail={"bytes": size,
-                                                      "duration": metrics["duration"]})
-    return StageResult.ok("qa", artifacts=[{"type": "video", "path": out}],
-                          metrics=metrics, message="验片通过")
+    res = _qa_gate(ctx, phase="gen", stage="qa")
+    if res.success:
+        res.artifacts.append({"type": "video", "path": out})
+    return res
 
 
 # ── 5. compose ─────────────────────────────────────────────────
@@ -532,7 +567,7 @@ def stage_compose(ctx: StageContext) -> StageResult:
     if ctx.dry:
         return StageResult.ok("compose", metrics={"dry": True}, message="演练：跳过后期")
     if ctx.spec is None:
-        return StageResult.fail("compose", NO_SPEC, "缺少 spec，无法后期合成")
+        return StageResult.fail("compose", NO_SPEC, "缺少 spec，无法进入后期合成")
 
     cmd = [ctx.python, ctx.root / "tools" / "make_15s.py", "run", str(ctx.spec), "--skip-gen"]
     if ctx.force:
@@ -543,15 +578,20 @@ def stage_compose(ctx: StageContext) -> StageResult:
     if res.returncode != 0 or not final.is_file():
         return StageResult.fail(
             "compose", COMPOSE_FAILED,
-            f"后期合成失败（returncode={res.returncode}）",
+            f"后期合成失败：returncode={res.returncode}",
             metrics={"returncode": res.returncode}, data={"tail": tail})
-    return StageResult.ok("compose", artifacts=[{"type": "final", "path": final}],
-                          metrics={"bytes": final.stat().st_size},
-                          message="后期合成完成（裁剪/字幕/BGM/音效/归档）",
+
+    gate = _qa_gate(ctx, phase="final", stage="compose")
+    artifacts = [{"type": "final", "path": final}, *gate.artifacts]
+    metrics = {"bytes": final.stat().st_size, **gate.metrics}
+    if not gate.success:
+        return StageResult.fail("compose", gate.error_code or QA_FAILED, gate.message,
+                                metrics=metrics, artifacts=artifacts, data=gate.data)
+    return StageResult.ok("compose", artifacts=artifacts, metrics=metrics,
+                          message="后期合成完成（剪切/字幕/BGM/音效/归档）",
                           data={"tail": tail})
 
 
-# ── 6. package ─────────────────────────────────────────────────
 def stage_package(ctx: StageContext) -> StageResult:
     final = ctx.workspace / "onetake_final.mp4"
     if ctx.dry:

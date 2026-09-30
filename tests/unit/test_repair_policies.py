@@ -18,6 +18,7 @@ from lib.orchestrator.errors import (
     PROMPT_TOO_LONG,
     PUBLISH_QUOTA,
     RATE_LIMIT,
+    REGENERATE_SHOT,
     REPAIR_ACTIONS,
     REPAIR_MAP,
     REQUIRE_HUMAN,
@@ -138,16 +139,18 @@ def test_workflow_rejection_switches_workflow():
     assert d.action == SWITCH_WORKFLOW and d.can_continue
 
 
-def test_stage_policy_whitelist_blocks_out_of_scope_codes():
-    """qa 阶段不做"重出成片"：VISUAL_QA_FAIL 虽可修，但不属于该阶段白名单 → ABORT。"""
+def test_stage_policy_whitelist_is_stage_scoped():
+    """Phase 8：qa 阶段已把 VISUAL_QA_FAIL 纳入白名单（→ 重出成片），
+    而 generate 阶段的白名单不含该码 —— 同一 error_code 在不同阶段行为不同。"""
     engine = RepairEngine()
-    d = engine.decide(StageResult.fail("qa", "VISUAL_QA_FAIL", "画面糊"),
+    d = engine.decide(StageResult.fail("qa", "VISUAL_QA_FAIL", "画面差"),
                       attempts=1, stage="qa")
-    assert d.action == ABORT
-    # 换成 generate 阶段（其白名单也不含 VISUAL_QA_FAIL）同样拒绝
-    d2 = engine.decide(StageResult.fail("generate", "VISUAL_QA_FAIL", "画面糊"),
+    assert d.action == REGENERATE_SHOT and d.can_continue
+    # generate 阶段白名单不含 VISUAL_QA_FAIL → 拒绝在本阶段重跑
+    d2 = engine.decide(StageResult.fail("generate", "VISUAL_QA_FAIL", "画面差"),
                        attempts=1, stage="generate")
     assert d2.action == ABORT
+
 
 
 # ── 3. 阶段策略（必做任务 6）──────────────────────────────────

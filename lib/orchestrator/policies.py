@@ -18,13 +18,18 @@ from .errors import (
     DOWNLOAD_FAILED,
     GENERATION_FAILED,
     GENERATION_TIMEOUT,
+    HUMAN_ANATOMY_FAIL,
     NETWORK_TRANSIENT,
+    PRODUCT_DEFORMED,
     PROMPT_TOO_LONG,
     PROVIDER_REJECTED,
+    QA_FAILED,
     RATE_LIMIT,
     STAGE_TIMEOUT,
     SUBTITLE_ALIGN_FAIL,
     UNEXPECTED_ERROR,
+    VISUAL_QA_FAIL,
+    WRONG_SPEAKER,
 )
 
 # 15s/768p 一条 ≈ ¥0.90；给 1.2 倍余量防止"估 0.9 实收 1.0"被判超支
@@ -41,7 +46,14 @@ _GENERATE_CODES = (
     UNEXPECTED_ERROR,
 )
 # 后期/质检：转写、字幕对齐错了可以只重跑本阶段
-_COMPOSE_CODES = (ASR_MISMATCH, SUBTITLE_ALIGN_FAIL, STAGE_TIMEOUT, UNEXPECTED_ERROR)
+_COMPOSE_CODES = (ASR_MISMATCH, SUBTITLE_ALIGN_FAIL, STAGE_TIMEOUT, UNEXPECTED_ERROR,
+                  QA_FAILED, DOWNLOAD_FAILED)
+# 验片（Phase 8）：画面/人物/产品/文案的 FAIL 都允许进修复环（回退到 generate 重做），
+# 字幕类回退到 compose；上限由 RunConfig.max_repairs 管，绝不死循环。
+_QA_CODES = (
+    VISUAL_QA_FAIL, PRODUCT_DEFORMED, WRONG_SPEAKER, HUMAN_ANATOMY_FAIL, QA_FAILED,
+    ASR_MISMATCH, SUBTITLE_ALIGN_FAIL, DOWNLOAD_FAILED, UNEXPECTED_ERROR,
+)
 
 
 @dataclass(frozen=True)
@@ -72,7 +84,7 @@ STAGE_POLICIES: dict[str, StagePolicy] = {
     "preflight": StagePolicy(max_attempts=2, max_cost=0.0, repairable=_FREE, timeout=300.0),
     "generate": StagePolicy(max_attempts=3, max_cost=_ONE_TAKE_COST_EST,
                             repairable=_GENERATE_CODES, timeout=3600.0),
-    "qa": StagePolicy(max_attempts=2, max_cost=0.0, repairable=_FREE, timeout=300.0),
+    "qa": StagePolicy(max_attempts=2, max_cost=0.0, repairable=_QA_CODES, timeout=300.0),
     "compose": StagePolicy(max_attempts=2, max_cost=0.0, repairable=_COMPOSE_CODES,
                            timeout=7200.0),
     "package": StagePolicy(max_attempts=1, max_cost=0.0, repairable=(), timeout=120.0),

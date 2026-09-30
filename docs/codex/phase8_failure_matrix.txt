@@ -1,0 +1,19 @@
+Phase 8 证据 —— 失败 fixture → error_code → 修复动作 → 回退目标
+
+说明：证据是机器可读 JSON dict（与 qa_evidence_<uid>.json 同 schema）；
+      维度结论 skipped = 没有证据，绝不算 pass。
+
+fixture                  命中维度                               FAIL error_code        动作                 回退到        判定
+-------------------------------------------------------------------------------------------------------------------
+product_count_drift      product=fail,cast=pass,retention=pass,delivery=pass PRODUCT_DEFORMED       REGENERATE_SHOT    generate   OK
+product_deformed         product=fail,cast=pass,retention=pass,delivery=pass PRODUCT_DEFORMED       REGENERATE_SHOT    generate   OK
+human_anatomy_fail       product=pass,cast=fail,retention=pass,delivery=pass HUMAN_ANATOMY_FAIL     REGENERATE_SHOT    generate   OK
+wrong_speaker            product=pass,cast=fail,retention=pass,delivery=pass WRONG_SPEAKER          REGENERATE_SHOT    generate   OK
+asr_real_missing_word    audio=fail,compliance=pass,delivery=pass ASR_MISMATCH           REBUILD_SUBTITLE   compose    OK
+subtitle_out_of_bounds   audio=fail,delivery=pass           SUBTITLE_ALIGN_FAIL    REBUILD_SUBTITLE   compose    OK
+hook_too_late            product=pass,cast=pass,retention=fail,delivery=pass VISUAL_QA_FAIL         REGENERATE_SHOT    generate   OK
+unregistered_claim       compliance=fail,delivery=pass      COMPLIANCE_BLOCK       REQUIRE_HUMAN      (当前阶段)     OK
+artifact_missing         delivery=fail                      DOWNLOAD_FAILED        RETRY_SAME         (当前阶段)     OK
+no_video_stream          delivery=fail                      QA_FAILED              REGENERATE_SHOT    generate   OK
+
+共 10 种失败 fixture；覆盖 9 个不同 error_code。

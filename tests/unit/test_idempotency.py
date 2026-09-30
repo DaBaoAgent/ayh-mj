@@ -240,6 +240,15 @@ def test_orchestrator_generate_stage_uses_idempotent_driver(tmp_state):
     provider.payload_bytes = b"v" * 150_000           # 过 qa 体量门限
     uid = "P4E2E"
     _queue_spec(tmp_state, _spec(uid=uid))
+    # Phase 8: real QA probes the artifact with ffprobe; the fake provider
+    # cannot emit a real video stream, so inject evidence asserting a
+    # complete deliverable so the gate passes.
+    ws = tmp_state / "out" / f"gen_{uid}"
+    ws.mkdir(parents=True, exist_ok=True)
+    (ws / f"qa_evidence_{uid}.json").write_text(
+        json.dumps({"video": {"exists": True, "bytes": 150_000, "video_streams": 1,
+                              "audio_streams": 0, "duration": 15}}),
+        encoding="utf-8")
     orch = PipelineOrchestrator(store=store, queue_dir=tmp_state / "queue_15s",
                                 root=tmp_state, provider=provider,
                                 sleep=lambda _s: None, poll_interval=0.0)
