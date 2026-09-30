@@ -1,0 +1,100 @@
+=== WebUI /api/state（事实源必须是 jobstore）===
+{
+  "run": {
+    "running": false,
+    "current_stage": null,
+    "stage": null,
+    "progress": 0.0,
+    "message": "就绪",
+    "active": [],
+    "total": 0,
+    "finished": 0,
+    "failed": 0,
+    "cancelled": 0,
+    "run_id": null,
+    "source": null,
+    "dry": false,
+    "source_of_truth": "jobstore",
+    "jobs_by_status": {
+      "FAILED": 1
+    }
+  },
+  "stats": {
+    "trends_total": 0,
+    "trends_today": 0,
+    "jobs_total": 1,
+    "jobs_pending": 0,
+    "jobs_ready": 0,
+    "jobs_published": 0,
+    "jobs_by_status": {
+      "FAILED": 1
+    },
+    "published_today": 0
+  }
+}
+
+=== WebUI /api/jobs ===
+[{"id": 6, "uid": "job_20260930_无spec的选题_20260930_121155_01", "trend_id": null, "status": "FAILED", "script": null, "script_word_count": null, "storyboard": null, "shots": null, "video_path": null, "duration": null, "covers": null, "publish_results": null, "created_at": "2026-09-30T12:11:55", "updated_at": "2026-09-30T12:11:55", "published_at": null, "goal": "无 spec 的选题", "priority": 5, "current_stage": "failed", "error_code": "NO_SPEC", "cost_estimate": 0.0, "cost_spent": 0.0, "budget_cap": null, "config_snapshot": "{\"goal\": \"无 spec 的选题\", \"source\": \"cli\", \"daily_target\": 1, \"gen_concurrency\": 6, \"dry_mode\": false, \"real_publish\": false, \"real_engage\": false, \"publish_platforms\": [\"douyin\"], \"stages\": [\"plan\", \"preflight\", \"generate\", \"qa\", \"compose\", \"package\"], \"max_attempts\": 3, \"budget_cap\": null, \"force\": false, \"created_at\": \"2026-09-30T12:11:55\"}", "fingerprint": "e16dc5cb16312f3c822106373f97e4b8cd04fe0dcec494b2e86e5d742b77f8be", "started_at": "2026-09-30T12:11:55", "finished_at": null, "pause_reason": null}]
+
+=== WebUI /api/start {dry:true} → 真实 Job（不是脚本子进程）===
+{
+  "ok": true,
+  "run_id": "run_20260930_121204",
+  "jobs": [
+    "job_20260930_auto_20260930_121204_01"
+  ],
+  "count": 1,
+  "dry": true,
+  "source": "webui",
+  "config": {
+    "goal": "",
+    "source": "webui",
+    "daily_target": 1,
+    "gen_concurrency": 6,
+    "dry_mode": true,
+    "real_publish": false,
+    "real_engage": false,
+    "publish_platforms": [
+      "douyin"
+    ],
+    "stages": [
+      "plan",
+      "preflight",
+      "generate",
+      "qa",
+      "compose",
+      "package"
+    ],
+    "max_attempts": 3,
+    "budget_cap": null,
+    "force": false,
+    "created_at": "2026-09-30T12:12:04"
+  },
+  "message": "已启动生产：1 条（演练模式）"
+}
+
+=== WebUI /api/logs SSE（取自 JobStore event stream）===
+  event#116 status_change job_20260930_auto_20260930_121204_01 :: 创意策划开始
+  event#117 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 创意策划
+  event#118 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 创意策划：演练：虚拟 spec（不落盘）
+  event#119 status_change job_20260930_auto_20260930_121204_01 :: RESEARCHING → SCRIPTING（system）
+  event#120 status_change job_20260930_auto_20260930_121204_01 :: 预检门禁开始
+  event#121 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 预检门禁
+  event#122 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 预检门禁：演练：跳过门禁
+  event#123 status_change job_20260930_auto_20260930_121204_01 :: 视频生成开始
+  event#124 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 视频生成
+  event#125 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 视频生成：演练：不提交生成
+  event#126 status_change job_20260930_auto_20260930_121204_01 :: 验片开始
+  event#127 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 验片
+  event#128 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 验片：演练：跳过验片
+  event#129 status_change job_20260930_auto_20260930_121204_01 :: 后期合成开始
+  event#130 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 后期合成
+  event#131 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 后期合成：演练：跳过后期
+  event#132 status_change job_20260930_auto_20260930_121204_01 :: 归档打包开始
+  event#133 stage_start job_20260930_auto_20260930_121204_01 :: ▶ 归档打包
+  event#134 stage_end job_20260930_auto_20260930_121204_01 :: ✓ 归档打包：演练：跳过归档核对
+  event#135 status_change job_20260930_auto_20260930_121204_01 :: PACKAGING → READY（system）
+  SSE 帧类型统计: ['event', 'log', 'status']
+
+=== 停止（协作式取消）===
+{"ok": true, "killed": false, "cancelled": [], "count": 0}

@@ -80,10 +80,10 @@ def _build_transitions() -> dict[str, set[str]]:
         if name == JobState.QA:
             nxt.add(JobState.COMPOSING)
         t[name] = nxt
-    # 旁路状态可以恢复到任意"未终结"主线状态
+    # 旁路状态可以恢复到任意"未终结"主线状态，也可以继续取消（人工终止意图永远有效）
     resume = set(JobState.LINEAR) - {JobState.DONE}
     for name in JobState.SIDE:
-        t[name] = set() if name == JobState.CANCELLED else set(resume)
+        t[name] = set() if name == JobState.CANCELLED else (resume | {JobState.CANCELLED})
     # DONE 是终点（仅允许重新打开为 PAUSED/FAILED 之类的人工操作 → 不再放行）
     t[JobState.DONE] = set()
     return t
@@ -307,6 +307,22 @@ class JobStore:
                 "SELECT * FROM events WHERE job_id = ? ORDER BY id ASC LIMIT ?",
                 (job_id, limit)).fetchall()
             return [_decode(r, "data") for r in rows]
+
+    def recent_events(self, after_id: int = 0, limit: int = 200) -> list[dict]:
+        """全库事件流（带 uid）——SSE / 控制台不再猜阶段，直接读事实源。"""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT e.id, e.ts, e.type, e.from_status, e.to_status, e.stage,
+                          e.message, e.data, j.uid
+                   FROM events e JOIN jobs j ON j.id = e.job_id
+                   WHERE e.id > ? ORDER BY e.id ASC LIMIT ?""",
+                (int(after_id), int(limit))).fetchall()
+            return [_decode(r, "data") for r in rows]
+
+    def max_event_id(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()
+            return int(row[0]) if row else 0
 
     # ── attempts ───────────────────────────────────────────────
     def record_attempt(self, uid: str, stage: str, *, attempt_no: int | None = None,

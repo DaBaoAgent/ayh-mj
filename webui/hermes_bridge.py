@@ -275,3 +275,26 @@ def get_bridge() -> HermesBridge:
     if not _BRIDGE:
         _BRIDGE.append(HermesBridge())
     return _BRIDGE[0]
+
+
+# ── 生产入口（Phase 3）─────────────────────────────────────────
+# Hermes 说"生产 N 条视频"时必须调这里 —— 与 WebUI /api/start、CLI orchestrate.py
+# 走的是同一个 PipelineOrchestrator，因此三者在 DB 里的任务结构完全一致。
+
+def request_production(goal: str = "", count: int | None = None, *,
+                       dry: bool | None = None, source: str = "hermes",
+                       stages: list[str] | None = None, background: bool = True) -> dict:
+    """Hermes 侧唯一生产入口（返回 {"ok", "jobs", "count", "config", ...}）。"""
+    from lib.orchestrator import start_production
+    return start_production(goal=goal, count=count, dry=dry, source=source,
+                            stages=stages, background=background)
+
+
+def production_status(uid: str = "") -> dict:
+    """查生产状态：给 uid 返回完整 trace，否则返回编排器总览。"""
+    from lib.jobstore import store
+    from lib.orchestrator import orchestrator
+    if uid:
+        detail = store.detail(uid)
+        return detail or {"error": f"任务不存在：{uid}"}
+    return orchestrator.status()

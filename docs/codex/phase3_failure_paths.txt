@@ -1,0 +1,153 @@
+=== [4] 非演练 + 空队列：拒绝创建任务（不烧钱）===
+✗ 队列为空：把 spec 放进 state/queue_15s/，或给出 goal（演练模式会直接创建虚拟任务）
+
+
+=== [5] 非演练 + 空 goal（占位任务）→ plan 失败即停，不生成、不花钱 ===
+  ✗ job_20260930_无spec的选题_20260930_121155_01 FAILED（NO_SPEC）：没有可执行的 spec：把 spec 放进 state/queue_15s/ 或调用 start(goal=...) 指定选题
+▶ 已启动生产：1 条
+  ❌ job_20260930_无spec的选题_20260930_121155_01 → FAILED NO_SPEC
+完成：成功 0 / 失败 1
+
+
+=== [6] 单条 trace（attempts / events / cost）===
+{
+  "orchestrator": {
+    "running": false,
+    "current_stage": null,
+    "stage": null,
+    "progress": 0.0,
+    "message": "就绪",
+    "active": [],
+    "total": 0,
+    "finished": 0,
+    "failed": 0,
+    "cancelled": 0,
+    "run_id": null,
+    "source": null,
+    "dry": false,
+    "source_of_truth": "jobstore",
+    "jobs_by_status": {
+      "FAILED": 1
+    }
+  },
+  "job": {
+    "id": 6,
+    "uid": "job_20260930_无spec的选题_20260930_121155_01",
+    "trend_id": null,
+    "status": "FAILED",
+    "script": null,
+    "script_word_count": null,
+    "storyboard": null,
+    "shots": null,
+    "video_path": null,
+    "duration": null,
+    "covers": null,
+    "publish_results": null,
+    "created_at": "2026-09-30T12:11:55",
+    "updated_at": "2026-09-30T12:11:55",
+    "published_at": null,
+    "goal": "无 spec 的选题",
+    "priority": 5,
+    "current_stage": "failed",
+    "error_code": "NO_SPEC",
+    "cost_estimate": 0.0,
+    "cost_spent": 0.0,
+    "budget_cap": null,
+    "config_snapshot": "{\"goal\": \"无 spec 的选题\", \"source\": \"cli\", \"daily_target\": 1, \"gen_concurrency\": 6, \"dry_mode\": false, \"real_publish\": false, \"real_engage\": false, \"publish_platforms\": [\"douyin\"], \"stages\": [\"plan\", \"preflight\", \"generate\", \"qa\", \"compose\", \"package\"], \"max_attempts\": 3, \"budget_cap\": null, \"force\": false, \"created_at\": \"2026-09-30T12:11:55\"}",
+    "fingerprint": "e16dc5cb16312f3c822106373f97e4b8cd04fe0dcec494b2e86e5d742b77f8be",
+    "started_at": "2026-09-30T12:11:55",
+    "finished_at": null,
+    "pause_reason": null
+  },
+  "attempts": [
+    {
+      "id": 31,
+      "job_id": 6,
+      "stage": "plan",
+      "attempt_no": 1,
+      "provider": "",
+      "model": "",
+      "workflow": "",
+      "fingerprint": "",
+      "status": "NO_SPEC",
+      "error_code": "NO_SPEC",
+      "cost": 0.0,
+      "message": "没有可执行的 spec：把 spec 放进 state/queue_15s/ 或调用 start(goal=...) 指定选题",
+      "started_at": "2026-09-30T12:11:55",
+      "finished_at": "2026-09-30T12:11:55"
+    }
+  ],
+  "artifacts": [],
+  "events": [
+    {
+      "id": 110,
+      "job_id": 6,
+      "ts": "2026-09-30T12:11:55",
+      "type": "created",
+      "from_status": null,
+      "to_status": "PLANNING",
+      "stage": "planning",
+      "message": "任务创建（PLANNING）",
+      "data": null
+    },
+    {
+      "id": 111,
+      "job_id": 6,
+      "ts": "2026-09-30T12:11:55",
+      "type": "status_change",
+      "from_status": "PLANNING",
+      "to_status": "RESEARCHING",
+      "stage": "researching",
+      "message": "创意策划开始",
+      "data": {
+        "actor": "system"
+      }
+    },
+    {
+      "id": 112,
+      "job_id": 6,
+      "ts": "2026-09-30T12:11:55",
+      "type": "stage_start",
+      "from_status": null,
+      "to_status": null,
+      "stage": "plan",
+      "message": "▶ 创意策划",
+      "data": null
+    },
+    {
+      "id": 113,
+      "job_id": 6,
+      "ts": "2026-09-30T12:11:55",
+      "type": "stage_failed",
+      "from_status": null,
+      "to_status": null,
+      "stage": "plan",
+      "message": "✗ 创意策划：没有可执行的 spec：把 spec 放进 state/queue_15s/ 或调用 start(goal=...) 指定选题",
+      "data": {
+        "error_code": "NO_SPEC",
+        "decision": "stop",
+        "reason": "NO_SPEC 无自动修复动作，停止下游",
+        "metrics": {},
+        "seconds": 0.0,
+        "attempt": 1,
+        "detail": {}
+      }
+    },
+    {
+      "id": 114,
+      "job_id": 6,
+      "ts": "2026-09-30T12:11:55",
+      "type": "stage_failed",
+      "from_status": "RESEARCHING",
+      "to_status": "FAILED",
+      "stage": "failed",
+      "message": "没有可执行的 spec：把 spec 放进 state/queue_15s/ 或调用 start(goal=...) 指定选题",
+      "data": {
+        "actor": "system"
+      }
+    }
+  ],
+  "evaluations": [],
+  "publishes": []
+}
+

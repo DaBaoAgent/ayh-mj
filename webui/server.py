@@ -32,12 +32,12 @@ from fastapi.templating import Jinja2Templates
 from hermes_bridge import blog, get_bridge
 
 from lib import OUT_DIR, STATE_DIR
+from lib.orchestrator import orchestrator, start_production
+from lib.orchestrator.models import FRONTEND_STAGES, FRONTEND_TO_STAGES
 from lib.settings import get_settings
 from lib.state import get_stats, list_jobs
 
 WEBUI_DIR = Path(__file__).parent
-RUN_STATUS_FILE = STATE_DIR / "run_status.json"
-RUN_PROGRESS_FILE = STATE_DIR / "run_progress.jsonl"
 CONSOLE_STATE_FILE = STATE_DIR / "console.json"
 ENGINE_PID_FILE = STATE_DIR / "engine.pid"
 _resource_cache: dict = {"at": 0.0, "value": {}}
@@ -220,35 +220,6 @@ def save_console_state(state: dict):
         json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def load_run_status() -> dict:
-    if RUN_STATUS_FILE.exists():
-        try:
-            return json.loads(RUN_STATUS_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {"running": False, "current_stage": None, "progress": 0,
-            "message": "就绪", "started_at": None}
-
-
-def engine_alive() -> bool:
-    """引擎进程是否真活着（防 run_status 假 running）"""
-    if not ENGINE_PID_FILE.exists():
-        return False
-    try:
-        pid = int(ENGINE_PID_FILE.read_text(encoding="utf-8").strip())
-    except (ValueError, OSError):
-        return False
-    try:
-        import psutil  # 可选依赖
-        return psutil.pid_exists(pid)
-    except ImportError:
-        if sys.platform == "win32":
-            r = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-                               capture_output=True, text=True, errors="replace")
-            return str(pid) in (r.stdout or "")
-        return True
-
-
 # ============ Lifespan：预热 Hermes 内核 ============
 
 @asynccontextmanager
@@ -260,9 +231,23 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             blog(f"内核预热异常: {e}")
 
+    async def recover():
+        """重启恢复：把上一进程遗留的"运行中"任务收敛为 PAUSED（可 resume）。
+
+        查询与恢复都只依赖 JobStore，重启面板不会丢任务事实。
+        """
+        try:
+            recovered = await asyncio.to_thread(orchestrator.recover_interrupted)
+            if recovered:
+                blog(f"启动恢复：{len(recovered)} 个遗留任务已收敛为 PAUSED")
+        except Exception as e:
+            blog(f"启动恢复异常: {e}")
+
     task = asyncio.create_task(warmup())
+    recovery = asyncio.create_task(recover())
     yield
     task.cancel()
+    recovery.cancel()
 
 
 app = FastAPI(title="爱优护AI视频工厂", lifespan=lifespan)
@@ -295,14 +280,11 @@ async def brand_logo():
 
 @app.get("/api/state")
 async def api_state():
-    status = load_run_status()
-    if status.get("running") and not engine_alive():
-        # 引擎进程已死但状态没更新（比如被强杀）——纠正为已停止
-        status["running"] = False
-        status.setdefault("message", "引擎已退出")
+    # 事实源统一为 JobStore/Orchestrator（不再读 run_status.json 猜阶段）
+    run = await asyncio.to_thread(orchestrator.status)
     return {
         "console": load_console_state(),
-        "run": status,
+        "run": run,
         "stats": get_stats(),
         "stages": STAGES,
         "hermes": get_bridge().status(),
@@ -389,48 +371,38 @@ async def api_get_settings():
 
 @app.post("/api/start")
 async def api_start(request: Request):
-    """启动全流程"""
+    """启动全流程 —— 创建/启动真实 Job（唯一执行内核 PipelineOrchestrator）。"""
     body = {}
     with suppress(Exception):
         body = await request.json()
     if not isinstance(body, dict):
         raise HTTPException(status_code=400, detail="请求体必须是 JSON 对象")
     stages = body.get("stages")  # 可选：只跑部分阶段
-    allowed_stages = {stage["id"] for stage in STAGES}
-    if stages is not None and (not isinstance(stages, list) or not stages or any(s not in allowed_stages for s in stages)):
+    if stages is not None and (not isinstance(stages, list) or not stages
+                               or any(s not in FRONTEND_STAGES for s in stages)):
         raise HTTPException(status_code=400, detail="stages 必须是非空、有效的阶段列表")
 
     async with ENGINE_START_LOCK:
-        status = load_run_status()
-        if status.get("running") and engine_alive():
-            return JSONResponse({"error": "已有任务在运行"}, status_code=400)
+        if (await asyncio.to_thread(orchestrator.status)).get("running"):
+            return JSONResponse({"ok": False, "error": "已有任务在运行"}, status_code=400)
 
-        # 面板的演练模式应当真正影响“启动生产”，而非只停留在设置文件里。
+        # 面板的演练模式应当真正影响"启动生产"，而非只停留在设置文件里。
         console = load_console_state()
-        dry = bool(body["dry"]) if "dry" in body else bool(console.get("dry_mode"))
-        engine_script = Path(__file__).parent.parent / "tools" / "run_all.py"
-        cmd = [sys.executable, str(engine_script)]
-        if stages:
-            cmd += ["--only", ",".join(stages)]
-        if dry:
-            cmd.append("--dry")
-
-        proc = subprocess.Popen(
-            cmd, cwd=str(Path(__file__).parent.parent),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
-        ENGINE_PID_FILE.write_text(str(proc.pid), encoding="utf-8")
-        # run_all.py 可能要数秒才落状态文件；立即写入避免用户双击时重复拉起。
-        RUN_STATUS_FILE.write_text(json.dumps({
-            "running": True, "current_stage": None, "progress": 0,
-            "message": "生产引擎启动中…", "started_at": datetime.now().isoformat(),
-        }, ensure_ascii=False), encoding="utf-8")
-        return {"ok": True, "message": "已启动全流程" + ("（演练模式）" if dry else ""), "pid": proc.pid}
+        result = await asyncio.to_thread(
+            start_production, goal=str(body.get("goal") or ""), count=body.get("count"),
+            dry=bool(body["dry"]) if "dry" in body else None, source="webui",
+            console=console, stages=_canonical_stages(stages), background=True)
+        if not result.get("ok"):
+            return JSONResponse(result, status_code=400)
+        return result
 
 
 @app.post("/api/stop")
 async def api_stop():
-    """停止运行（真停止：kill 引擎进程树）"""
+    """停止运行 —— 协作式取消：记 CANCEL_REQUESTED，安全终止子进程，job 进 CANCELLED。"""
+    cancelled = await asyncio.to_thread(orchestrator.cancel, None, all=True,
+                                        reason="WebUI 停止按钮")
+    # 兼容旧版残留的引擎 pid（Phase 3 之前 /api/start 起过子进程）
     killed = False
     if ENGINE_PID_FILE.exists():
         try:
@@ -445,12 +417,8 @@ async def api_stop():
         except (ValueError, ProcessLookupError, subprocess.TimeoutExpired, OSError):
             pass
         ENGINE_PID_FILE.unlink(missing_ok=True)
-
-    status = load_run_status()
-    status["running"] = False
-    status["message"] = "已停止" if killed else "已停止（引擎进程未找到或已退出）"
-    RUN_STATUS_FILE.write_text(json.dumps(status, ensure_ascii=False), encoding="utf-8")
-    return {"ok": True, "killed": killed}
+    return {"ok": True, "killed": killed, "cancelled": cancelled.get("cancelled", []),
+            "count": cancelled.get("count", 0)}
 
 
 @app.post("/api/restart")
@@ -488,29 +456,68 @@ async def api_restart():
 
 @app.get("/api/logs")
 async def api_logs():
-    """SSE 实时日志推送"""
+    """SSE 实时推送 —— 状态取自 JobStore event stream（不再轮询脚本字符串猜阶段）。"""
     async def generate() -> AsyncGenerator[str, None]:
-        # 新连接只回放末尾，避免运行久后一次性推送巨量历史日志。
-        last_pos = max(0, RUN_PROGRESS_FILE.stat().st_size - 12_000) if RUN_PROGRESS_FILE.exists() else 0
+        from lib.jobstore import store
+        # 新连接只回放最近 ~20 条事件，避免运行久后一次性推送巨量历史。
+        try:
+            last_id = max(0, await asyncio.to_thread(store.max_event_id) - 20)
+        except Exception:
+            last_id = 0
         while True:
-            if RUN_PROGRESS_FILE.exists():
-                try:
-                    with open(RUN_PROGRESS_FILE, encoding="utf-8") as f:
-                        f.seek(last_pos)
-                        new_lines = f.readlines()
-                        last_pos = f.tell()
-                    for line in new_lines:
-                        if line.strip():
-                            yield f"data: {line.strip()}\n\n"
-                except OSError:
-                    pass
-            status = load_run_status()
+            try:
+                events = await asyncio.to_thread(store.recent_events, last_id, 100)
+            except Exception:
+                events = []
+            for ev in events:
+                last_id = max(last_id, int(ev.get("id") or 0))
+                yield f"data: {json.dumps({'type': 'event', 'data': ev}, ensure_ascii=False)}\n\n"
+                if ev.get("message"):
+                    level = "error" if ev.get("type") == "stage_failed" else "info"
+                    text = f"[{ev.get('uid')}] {ev.get('message')}"
+                    yield ("data: " + json.dumps(
+                        {"type": "log", "level": level, "message": text},
+                        ensure_ascii=False) + "\n\n")
+            status = await asyncio.to_thread(orchestrator.status)
             yield f"data: {json.dumps({'type': 'status', 'data': status}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(1)
 
     return StreamingResponse(
         generate(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+
+
+def _canonical_stages(frontend_ids: list[str] | None) -> list[str] | None:
+    """前端阶段 id（trend/copy/…）→ 编排 stage 名；None = 跑全流程。"""
+    if not frontend_ids:
+        return None
+    out: list[str] = []
+    for sid in frontend_ids:
+        for name in FRONTEND_TO_STAGES.get(sid, ()):
+            if name not in out:
+                out.append(name)
+    return out or None
+
+
+@app.post("/api/jobs/{uid}/cancel")
+async def api_job_cancel(uid: str):
+    """协作式取消单个任务（无孤儿子进程）。"""
+    result = await asyncio.to_thread(orchestrator.cancel_one, uid, reason="WebUI 取消")
+    return JSONResponse(result, status_code=200 if result.get("ok") else 404)
+
+
+@app.post("/api/jobs/{uid}/retry")
+async def api_job_retry(uid: str):
+    """重试 FAILED/BLOCKED 任务（从失败阶段重新执行）。"""
+    result = await asyncio.to_thread(orchestrator.retry, uid)
+    return JSONResponse(result, status_code=200 if result.get("ok") else 400)
+
+
+@app.post("/api/jobs/{uid}/resume")
+async def api_job_resume(uid: str):
+    """从断点恢复任务（含重启后收敛为 PAUSED 的任务）。"""
+    result = await asyncio.to_thread(orchestrator.resume, uid)
+    return JSONResponse(result, status_code=200 if result.get("ok") else 400)
 
 
 def _job_final_label(jobdir: Path) -> str:

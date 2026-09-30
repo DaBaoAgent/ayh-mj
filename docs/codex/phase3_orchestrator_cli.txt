@@ -1,0 +1,45 @@
+=== [1] CLI adapter (tools/orchestrate.py) dry run: daily_target=2 on the REAL state db ===
+▶ 已启动生产：2 条（演练模式）
+  ✅ job_20260930_Phase3验收_20260930_121146_01 → READY 
+  ✅ job_20260930_Phase3验收_20260930_121146_02 → READY 
+完成：成功 2 / 失败 0
+
+
+=== [2] tools/run_all.py (legacy adapter, --only ignored) dry run ===
+提示：--only 已废弃（现行管线无阶段切分），忽略该参数
+▶ 已启动生产：1 条（演练模式）
+  ✅ job_20260930_auto_20260930_121147_01 → READY 
+完成：成功 1 / 失败 0
+
+
+=== [3] orchestrator status (source_of_truth=jobstore) ===
+{
+  "orchestrator": {
+    "running": false,
+    "current_stage": null,
+    "stage": null,
+    "progress": 0.0,
+    "message": "就绪",
+    "active": [],
+    "total": 0,
+    "finished": 0,
+    "failed": 0,
+    "cancelled": 0,
+    "run_id": null,
+    "source": null,
+    "dry": false,
+    "source_of_truth": "jobstore",
+    "jobs_by_status": {
+      "CANCELLED": 2,
+      "READY": 3
+    }
+  },
+  "counts": {
+    "total": 5,
+    "by_status": {
+      "CANCELLED": 2,
+      "READY": 3
+    }
+  }
+}
+
