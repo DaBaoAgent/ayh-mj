@@ -26,6 +26,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lib import claims as claims_mod
 from lib.console import enable_utf8_console
 from lib.llm import chat
+from lib.safety import EngageGuard
+from lib.safety import load_state as load_engage_state
+from lib.safety import save_state as save_engage_state
+from lib.settings import get_settings
 from lib.state import connect
 
 enable_utf8_console()
@@ -43,6 +47,25 @@ SPAM_MARKERS = ["加v", "加微信", "私聊我", "推广", "刷粉", "兼职", 
                 "telegram.me", "t.me/"]
 
 ENGAGE_CHANNEL = "engage"
+
+ROOT = get_settings().root
+
+
+def build_guard() -> EngageGuard:
+    """Phase 10 任务 10：限流/查重/熔断护栏（阈值来自 lib.settings.engage）。"""
+    e = get_settings().engage
+    return EngageGuard(
+        load_engage_state(ROOT),
+        max_per_hour=e.max_replies_per_hour,
+        cooldown_seconds=e.reply_cooldown_seconds,
+        jitter_seconds=e.reply_jitter_seconds,
+        dup_window=e.duplicate_window,
+        circuit_threshold=e.circuit_breaker_failures,
+    )
+
+
+def flush_guard(guard: EngageGuard) -> None:
+    save_engage_state(ROOT, guard.state)
 
 
 def product_facts(channel: str = ENGAGE_CHANNEL) -> str:
@@ -138,7 +161,9 @@ def handle_comments(platform: str, post_id: str = None, post_url: str = None,
     print(f"  共 {len(comments)} 条", flush=True)
 
     stats = {"total": len(comments), "replied": 0, "escalated": 0,
-             "spam": 0, "skipped": 0, "dry": 0, "blocked_claims": 0}
+             "spam": 0, "skipped": 0, "dry": 0, "blocked_claims": 0,
+             "rate_limited": 0, "duplicate": 0, "circuit_open": False}
+    guard = build_guard()
 
     for c in comments:
         cid = str(c.get("id") or c.get("comment_id") or "")
@@ -180,18 +205,38 @@ def handle_comments(platform: str, post_id: str = None, post_url: str = None,
             stats["dry"] += 1
             continue
 
+        allowed, why = guard.allow()
+        if not allowed:
+            print(f"    ⏸ 护栏拦下（{why}）", flush=True)
+            stats["rate_limited"] += 1
+            if "熔断" in why:
+                stats["circuit_open"] = True
+                break
+            continue
+        if guard.duplicate(reply, target=who):
+            print(f"    ♻ 重复回复检测拦下 @{who}", flush=True)
+            stats["duplicate"] += 1
+            continue
+
         try:
             uploadpost.create_comment(platform, reply,
                                       post_id=post_id, post_url=post_url,
                                       comment_id=cid if platform == "instagram" else None)
             record(platform, post_id or post_url, cid, text, who, "replied", reply)
+            guard.record_reply(reply, target=who)
             print(f"    ✓ 已回 @{who}", flush=True)
             stats["replied"] += 1
         except Exception as e:
-            print(f"    ✗ 回复失败 @{who}: {str(e)[:60]}", flush=True)
+            msg = str(e)[:120]
+            print(f"    ✗ 回复失败 @{who}: {msg[:60]}", flush=True)
             record(platform, post_id or post_url, cid, text, who, "pending", reply)
             stats["skipped"] += 1
+            if guard.record_failure(msg):
+                print("    🛑 账号异常连续失败，已熔断，停止自动回复", flush=True)
+                stats["circuit_open"] = True
+                break
 
+    flush_guard(guard)
     return stats
 
 
@@ -204,7 +249,10 @@ def handle_dms(yes: bool = False) -> dict:
     convs = result.get("conversations") or []
     print(f"  共 {len(convs)} 个会话", flush=True)
 
-    stats = {"total": len(convs), "replied": 0, "escalated": 0, "dry": 0, "blocked_claims": 0}
+    stats = {"total": len(convs), "replied": 0, "escalated": 0, "dry": 0,
+             "blocked_claims": 0, "rate_limited": 0, "duplicate": 0,
+             "circuit_open": False}
+    guard = build_guard()
     for conv in convs[:20]:
         msgs = conv.get("messages") or []
         if not msgs:
@@ -237,13 +285,33 @@ def handle_dms(yes: bool = False) -> dict:
             stats["dry"] += 1
             continue
 
+        allowed, why = guard.allow()
+        if not allowed:
+            print(f"    ⏸ 护栏拦下（{why}）", flush=True)
+            stats["rate_limited"] += 1
+            if "熔断" in why:
+                stats["circuit_open"] = True
+                break
+            continue
+        if guard.duplicate(reply, target=sender):
+            print(f"    ♻ 重复回复检测拦下 {sender}", flush=True)
+            stats["duplicate"] += 1
+            continue
+
         try:
             uploadpost.dm_send(str(recipient_id), reply)
+            guard.record_reply(reply, target=sender)
             print(f"    ✓ 已回私信 {sender}", flush=True)
             stats["replied"] += 1
         except Exception as e:
-            print(f"    ✗ 私信失败 {sender}: {str(e)[:60]}", flush=True)
+            msg = str(e)[:120]
+            print(f"    ✗ 私信失败 {sender}: {msg[:60]}", flush=True)
+            if guard.record_failure(msg):
+                print("    🛑 账号异常连续失败，已熔断，停止自动回复", flush=True)
+                stats["circuit_open"] = True
+                break
 
+    flush_guard(guard)
     return stats
 
 

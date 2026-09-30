@@ -4,7 +4,8 @@
   · `orchestrator` / `start_production()` —— 启动生产的唯一入口；
   · `StageResult` / `RunConfig` —— 阶段契约与配置快照；
   · `PipelineOrchestrator` —— 需要独立实例（测试/多库）时用；
-  · `RepairEngine` / `plan_repair()` —— 失败恢复决策与定点修复计划（Phase 8）。
+  · `RepairEngine` / `plan_repair()` —— 失败恢复决策与定点修复计划（Phase 8）；
+  · `PublishService` —— READY → PUBLISHING → DONE 的唯一发布路径（Phase 10）。
 """
 from .errors import (
     ALL_CODES,
@@ -37,6 +38,12 @@ from .models import (
 )
 from .policies import StagePolicy, policy_for
 from .providers import AutoDLProvider, ProviderTask, build_payload
+from .publishing import (
+    PublishAdapter,
+    PublishOutcome,
+    PublishService,
+    outcome_of,
+)
 from .recovery import RepairDecision, RepairEngine
 from .repairs import PLAYBOOK, REPAIR_TARGET, RepairPlan, plan_repair, repair_target
 from .service import (
@@ -51,6 +58,7 @@ __all__ = [
     "ALL_CODES", "AutoDLProvider", "BudgetExceeded", "Cancelled", "FRONTEND_STAGE",
     "GenerationOutcome", "IdempotentGenerator", "JobNotResumable", "OrchestratorError",
     "PROMPT_MAX", "PROMPT_SAFE", "PipelineOrchestrator", "ProviderTask",
+    "PublishAdapter", "PublishOutcome", "PublishService", "outcome_of",
     "REPAIR_ACTIONS", "REPAIR_TARGET", "PLAYBOOK", "RepairDecision", "RepairEngine",
     "RepairPlan", "RunConfig", "STAGE_LABEL",
     "STAGE_ORDER", "STAGE_STATES", "StageContext", "StageFailure", "StagePolicy",

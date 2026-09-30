@@ -1,0 +1,108 @@
+临时工作目录: C:\Users\ADMINI~1\AppData\Local\Temp\p10ev_0fanhsu5
+
+
+==============================================================================
+① PackagingAgent —— 一条视频的发布物料（真实 spec：S_duo_conflict）
+==============================================================================
+标题候选（3 个，角度互不相同）：
+  [hook_question ] 0.675  子女代购决策者最在意的单手提起，到底怎么看？
+                   └ 用提问把冲突质问提前，制造好奇心缺口
+  [benefit       ] 0.825  单手提起这件事，把卖点收在一个干净利落的动作上
+                   └ 把卖点放在最前面，让不看完的人也记住一句
+  [scene         ] 0.275  双人对撞短剧：质疑能力
+                   └ 复述场景(打脸反转)，让标题与画面互相解释
+
+最终标题: 单手提起这件事，把卖点收在一个干净利落的动作上
+选择理由: 选「benefit」(0.825)：卖点命中(是) +0.300；角度匹配benefit(是) +0.250；长度23适配 +0.200；无历史标题可比 +0.075；好奇心缺口(无) +0.000
+封面文案: 单手提起，一眼看懂
+首帧策略: 首帧停在钩子句对应的动作瞬间，人物与产品同框
+描述:
+    冲突质问｜打脸反转
+    这个真的能行吗
+    单手提起，看完这段就知道了
+    点开头像看看同款
+话题: ['电动轮椅', '轻便折叠', '轻便出行', '适老化', '好物分享', 'AI生成', '双人对撞短剧']
+首评候选: ['子女代购决策者平时最在意哪一点？评论区说说', '这段里单手提起的部分，要不要再拆细一点？']
+claim_ids: ['takeoff_13_8kg']
+ai_generated: True
+声明需求: required_by=['douyin', 'xiaohongshu'] mode={'douyin': 'draft', 'xiaohongshu': 'draft'}
+发布目标:
+    douyin       mode=draft         窗口={'start': '07:00', 'end': '09:00'} 标题≤55字 话题≤5
+    xiaohongshu  mode=draft         窗口={'start': '07:00', 'end': '09:00'} 标题≤20字 话题≤10
+
+==============================================================================
+② 平台策略矩阵（声明要求 / 草稿通道 / 字段上限）
+==============================================================================
+平台          通道        要求AI声明     有草稿     草稿机制                标题上限
+douyin      domestic  True       True    postflow_draft      55
+xiaohongshu domestic  True       True    postflow_draft      20
+shipinhao   domestic  True       True    postflow_draft      22
+tiktok      overseas  True       True    MEDIA_UPLOAD        100
+youtube     overseas  True       True    privacy=private     100
+instagram   overseas  True       False   -                   100
+facebook    overseas  True       False   -                   100
+telegram    overseas  True       False   -                   100
+x           overseas  True       False   -                   100
+
+==============================================================================
+③ 发布 Gate 判定矩阵
+==============================================================================
+  PASS                         完整 packaging（声明未确认 → 草稿）
+  BLOCK REQUIRE_HUMAN_PUBLISH  平台=instagram（无草稿通道）
+      └ AI 声明无法确认且平台无草稿通道，需人工发布：instagram
+  PASS                         声明已人工确认 → 允许直发
+  BLOCK CLAIM_UNMAPPED         标题出现未登记数字 120 公里
+      └ 发布文案未过合规门：『120公里』(numeric) 无法映射到已登记 claim —— 未登记数值参数（禁止自动对外使用）
+  BLOCK CLAIM_FORBIDDEN        描述使用禁用改写「约20kg」（实为13.8kg）
+      └ 发布文案未过合规门：『约20kg』→ light_13.8 不可用 —— 禁用改写，等同伪造参数 —— 是 light_13.8（13.8kg 单手可提）的禁用改写；『20kg』→ light_13.8 不可用 —— 禁
+  BLOCK PACKAGING_INCOMPLETE   标题候选只有 2 个
+      └ packaging artifact 不完整：标题候选不足 3 个（实得 2）
+
+==============================================================================
+④ PublishService —— READY → PUBLISHING → DONE（含幂等 / AUTH_EXPIRED 暂停）
+==============================================================================
+发布结果: ok=True 终态=DONE 适配器调用=[('douyin', 'draft'), ('youtube', 'draft')]
+    douyin     SUCCESS    external_id=P10EV_OK:douyin
+    youtube    SUCCESS    external_id=P10EV_OK:youtube
+    事件: status_change    PUBLISHING   发布 Gate 通过，开始按平台发布
+    事件: publish_done                  发布结果：成功 2 / 失败 0（{'SUCCESS': 2}）
+    事件: status_change    LEARNING     发布完成（{'SUCCESS': 2}），进入学习层
+    事件: status_change    DONE         任务完成（{'SUCCESS': 2}）
+publish_records:
+    douyin     SUCCESS    post_id=douyin-1 ai_disclosure=AI 生成内容（本视频画面/配音由 AI 生成）
+    youtube    SUCCESS    post_id=youtube-1 ai_disclosure=AI 生成内容（本视频画面/配音由 AI 生成）
+
+-- 幂等：已发布平台重入（模拟发帖成功但状态没推进） --
+  适配器调用次数=0（必须为 0）| 该平台结果=SKIPPED_IDEMPOTENT | 终态=DONE
+
+-- AUTH_EXPIRED：立即暂停该平台，之后不再调用通道 --
+  第一次: AUTH_EXPIRED 终态=BLOCKED error_code=PUBLISH_AUTH
+  平台暂停记录: {'douyin': {'reason': '登录失效（cookie expired）', 'at': '2026-09-30T14:47:54'}}
+  第二次: 适配器调用次数=1（必须仍为 1） 结果=PLATFORM_PAUSED | 平台已暂停：登录失效（cookie expired）
+
+-- 部分失败：一个平台失败不抹掉另一个平台的成功 --
+  终态=BLOCKED（部分成功 → PAUSED，可续发）
+    youtube    FAILED     error=通道 500
+
+-- 配额拦截：不调通道，按平台记 QUOTA_BLOCKED --
+  适配器调用=0（必须为 0）| 结果=PLATFORM_PAUSED | 原因=平台已暂停：登录失效（cookie expired）
+
+==============================================================================
+⑤ 自动互动护栏（每小时上限 / 冷却+抖动 / 查重 / 熔断）
+==============================================================================
+  初始放行: (True, 'OK')
+  冷却 30s 后: (False, '距上次回复仅 30s（需 60s）')
+  冷却 61s 后: (True, 'OK')
+  已回 2 条（上限 2）: (False, '近一小时已回复 2/2 条（每小时上限），暂停')
+  一小时后: (True, 'OK')
+  随机安全间隔样本(冷却60 + 抖动0..90): [75, 100, 124, 125, 142, 73, 88, 136]
+  查重（同一句）: True（True=拦下）
+  查重（换个说法）: False
+  连续失败 1: reason='429 too many requests' → 熔断=False
+  连续失败 2: reason='登录失效' → 熔断=False
+  连续失败 3: reason='接口 500' → 熔断=True
+  熔断后放行: (False, '互动已熔断：接口 500')
+  人工复位后放行: (True, 'OK')
+
+==============================================================================
+证据采集完成

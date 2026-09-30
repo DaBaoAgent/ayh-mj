@@ -601,6 +601,22 @@ def stage_package(ctx: StageContext) -> StageResult:
 
     artifacts = [{"type": "final", "path": final}]
     metrics = {"bytes": final.stat().st_size}
+
+    # Phase 10：READY 之前的最后一步 —— 生成并保存 packaging artifact。
+    # "每条 READY 视频至少有一份完整 packaging" 由这里保证；发布路径读同一份。
+    brief = _build_packaging(ctx)
+    problems = packaging_validate(brief)
+    if problems:
+        return StageResult.fail(
+            "package", PACKAGE_FAILED,
+            "packaging artifact 不完整：" + "；".join(problems),
+            metrics={**metrics, "packaging": "incomplete"},
+            data={"problems": problems})
+    path = packaging_save_brief(ctx.root, ctx.uid, brief)
+    artifacts.append({"type": "packaging", "path": path})
+    metrics["packaging"] = True
+    metrics["publish_modes"] = {t["platform"]: t["mode"] for t in brief["targets"]}
+
     title = ""
     if ctx.spec is not None:
         try:
@@ -617,6 +633,36 @@ def stage_package(ctx: StageContext) -> StageResult:
         artifacts.append({"type": "archive", "path": archive})
     return StageResult.ok("package", artifacts=artifacts, metrics=metrics,
                           message="已归档" + (f"：{archive.name}" if archive else "（未找到归档件，需人工确认）"))
+
+
+def _build_packaging(ctx: StageContext) -> dict:
+    """按当前设置把 spec 变成发布物料（不联网、不付费、可重跑）。"""
+    from ..packaging import build_brief
+    from ..settings import get_settings
+
+    s = get_settings()
+    doc = _spec_doc(ctx.spec) if ctx.spec is not None else {}
+    platforms = list(ctx.config.publish_platforms or ["douyin"])
+    return build_brief(
+        doc, uid=ctx.uid, platforms=platforms,
+        ai_generated=bool(getattr(s.publish, "ai_generated", True)),
+        disclosure_confirmable=dict(getattr(s.publish, "ai_disclosure_confirmable", {}) or {}),
+        product_keywords=list(s.product.keywords or []),
+        windows=[dict(w) for w in (s.publish.publish_windows or [])],
+    )
+
+
+def packaging_validate(brief: dict | None) -> list[str]:
+    from ..packaging import validate
+    try:
+        return validate(brief)
+    except Exception as exc:                      # noqa: BLE001 - 校验器本身坏了也别炸
+        return [f"packaging 校验失败：{type(exc).__name__}: {exc}"]
+
+
+def packaging_save_brief(root, uid: str, brief: dict):
+    from ..packaging import save_brief
+    return save_brief(root, uid, brief)
 
 
 BUILTIN_STAGES = {

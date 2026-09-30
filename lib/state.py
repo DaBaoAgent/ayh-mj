@@ -2,7 +2,8 @@
 
 本模块只负责：
   · 数据库连接与 schema migration（`lib.migrations`）；
-  · trends / publishes / interactions 等既有表的读写；
+  · trends / interactions 等既有表的读写（发布状态自 Phase 10 起统一走
+    `publish_records`，旧 `publishes` 表不再写入）；
   · 旧 job API（create_job / update_job / get_job / list_jobs / get_stats）的兼容门面，
     全部委托给 `lib.jobstore.JobStore`，状态转换走状态机校验。
 
@@ -115,8 +116,12 @@ def get_stats() -> dict:
             "jobs_ready": by_status.get(JobState.READY, 0),
             "jobs_published": by_status.get(JobState.DONE, 0),
             "jobs_by_status": by_status,
+            # Phase 10：发布事实的唯一来源是 canonical `publish_records`
+            # （旧 `publishes` 表只保留给历史数据，不再写入）。
             "published_today": conn.execute(
-                "SELECT COUNT(*) FROM publishes WHERE created_at >= ?", (today,)
+                "SELECT COUNT(*) FROM publish_records "
+                "WHERE status IN (?, ?) AND created_at >= ?",
+                ("SUCCESS", "DRAFT", today)
             ).fetchone()[0],
         }
         return stats

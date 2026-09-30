@@ -114,12 +114,23 @@ publish:
     - {start: "07:00", end: "09:00"}
     - {start: "12:00", end: "14:00"}
     - {start: "18:00", end: "22:00"}
+  # ── Phase 10：AI 生成内容声明（发布 Gate 的硬字段）──────────────────
+  # 默认"所有平台都没确认" → 只能上传草稿；无草稿通道的平台转人工。
+  # 人工确认某平台可以程序化提交 AI 声明后，把该平台设为 true（例如 douyin: true）。
+  ai_generated: true
+  ai_disclosure_confirmable: {}
+  # 国内（PostFlow）草稿参数；留空 = 不确认其草稿能力 → 草稿模式拒绝执行
+  domestic_draft_args: []
 
 engage:
   auto_reply: true
   max_replies_per_hour: 20
   reply_cooldown_seconds: 60
   escalate_keywords: ["价格", "多少钱", "优惠", "投诉", "退款"]
+  # Phase 10：冷却之上再叠随机安全间隔 + 重复回复检测窗口 + 连续失败熔断阈值
+  reply_jitter_seconds: 90
+  duplicate_window: 50
+  circuit_breaker_failures: 3
 
 webui:
   host: "127.0.0.1"

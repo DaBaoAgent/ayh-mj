@@ -1,0 +1,49 @@
+Phase 10 证据 —— 验证记录（ruff + pytest，全部实测）
+
+$ python -m ruff check lib tests tools webui s6_publish
+All checks passed!
+
+$ python -m pytest -q tests/unit/test_packaging_agent.py tests/unit/test_packaging_gate.py \
+        tests/unit/test_publish_service.py tests/unit/test_engage_guard.py \
+        tests/unit/test_engage_flow.py tests/unit/test_publish_quota.py \
+        tests/integration/test_publish_pipeline.py
+.....................................................................    [100%]
+69 passed in 1.27s
+
+$ python -m pytest -q        # 全量（Phase 9 结束为 445 passed / 1 skipped）
+........................................................................ [ 14%]
+........................................................................ [ 28%]
+........................................................................ [ 42%]
+........................................................................ [ 56%]
+........................................................................ [ 70%]
+........................................................................ [ 84%]
+........................................................................ [ 99%]
+.....                                                                    [100%]
+============================== warnings summary ===============================
+tests/unit/test_orchestrator.py::test_webui_cli_hermes_create_identical_jobs
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+508 passed, 1 skipped, 1 warning in 298.49s (0:04:58)
+
+$ python -m pytest tests/frontend -q
+...                                                                      [100%]
+3 passed in 2.43s
+
+——————————————————————————————————————————————————————————————
+Phase 10 新增测试（+63 条，全部通过）
+  tests/unit/test_packaging_agent.py    12  标题候选3个/打分理由/封面/描述/话题/首评/claim_ids/声明/目标平台/裁剪/校验/纯函数
+  tests/unit/test_packaging_gate.py     16  Gate 顺序(完整性→AI声明→Claims)/草稿退路/无草稿通道转人工/未登记数字拦截/禁用改写拦截/候选不足
+  tests/unit/test_publish_service.py    12  READY→PUBLISHING→DONE/幂等/部分失败半成功/AUTH_EXPIRED 立即暂停/配额拦截/事件链
+  tests/unit/test_engage_guard.py       12  每小时上限/冷却+抖动/查重/连续失败熔断/落盘/人工复位
+  tests/unit/test_engage_flow.py         4  接入真实回复循环：红线转人工、限额拦截、熔断、正常回复
+  tests/unit/test_publish_quota.py      +1  平台暂停态拦截（原有 6 条保留）
+  tests/integration/test_publish_pipeline.py 6  打包→合规→发布→学习 端到端（fake provider，付费提交数=0）
+
+数值对照（Phase 9 → Phase 10）：
+  pytest 全量   445 passed + 1 skipped  →  508 passed + 1 skipped（+63）
+  前端 smoke     3 passed              →  3 passed
+  ruff          All checks passed!      →  All checks passed!
+
+说明：自动测试对 AutoDL 的付费提交数恒为 0 —— tests/integration/* 用 autouse fixture
+把 s4_generate.autodl_client.create_task 替换为抛错桩，任何意外真实提交都会让用例失败；
+test_publish_pipeline.py 同样把发布通道替换为假通道，全程无网络、无付费、无真实发帖。

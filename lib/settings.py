@@ -122,6 +122,15 @@ class PublishSettings(BaseModel):
         default_factory=lambda: [{"start": "07:00", "end": "09:00"},
                                  {"start": "12:00", "end": "14:00"},
                                  {"start": "18:00", "end": "22:00"}])
+    # ── Phase 10：AI 生成内容声明是发布 Gate 的硬字段 ──────────────
+    # 本产线的画面/配音由 AI 生成，默认必须声明；
+    # ai_disclosure_confirmable 是"哪个平台的声明能被程序化提交"的**人工确认**结果，
+    # 默认空 = 全都没确认 → 该平台只能草稿（无草稿通道则转人工），绝不直发。
+    ai_generated: bool = True
+    ai_disclosure_confirmable: dict[str, bool] = Field(default_factory=dict)
+    # 国内草稿参数（PostFlow CLI）。留空 = 不确认其草稿能力 → 草稿模式直接拒绝执行，
+    # 而不是"猜一个参数发出去"。确认后填例如 ["--draft"]。
+    domestic_draft_args: list[str] = Field(default_factory=list)
 
 
 class EngageSettings(BaseModel):
@@ -129,6 +138,10 @@ class EngageSettings(BaseModel):
     max_replies_per_hour: int = 20
     reply_cooldown_seconds: int = 60
     escalate_keywords: list[str] = Field(default_factory=list)
+    # Phase 10 任务 10：冷却之上再叠一层随机安全间隔；重复回复窗口；连续失败熔断阈值
+    reply_jitter_seconds: int = 90
+    duplicate_window: int = 50
+    circuit_breaker_failures: int = 3
 
 
 class WebuiSettings(BaseModel):

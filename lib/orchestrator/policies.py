@@ -90,6 +90,8 @@ STAGE_POLICIES: dict[str, StagePolicy] = {
     "package": StagePolicy(max_attempts=1, max_cost=0.0, repairable=(), timeout=120.0),
     # 未来的付费/高风险阶段（Phase 7+ 接入时会用到）
     "prescreen": StagePolicy(max_attempts=2, max_cost=0.1, repairable=_FREE, timeout=900.0),
+    # 发布：配额/凭据类问题**不是**失败重试的理由（重试只会把账号撞出风控），
+    # 因此 repairable 为空；由 PublishService 按平台记录 + 暂停处理。
     "publish": StagePolicy(max_attempts=1, max_cost=0.0, repairable=(), timeout=600.0),
 }
 

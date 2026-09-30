@@ -67,6 +67,17 @@ def test_quota_blocked_by_min_interval(frozen, monkeypatch):
     assert "分钟" in reason
 
 
+def test_quota_blocked_when_platform_is_paused(frozen, tmp_path, monkeypatch):
+    """Phase 10 任务 5：AUTH_EXPIRED 后平台被熔断暂停，任何路径都不许再发。"""
+    from lib import packaging
+
+    monkeypatch.setattr(publish, "ROOT", tmp_path, raising=False)
+    packaging.pause_platform(tmp_path, "douyin", "登录失效（AUTH_EXPIRED）")
+    ok, reason = publish.check_quota("douyin")
+    assert not ok
+    assert "暂停" in reason and "登录失效" in reason
+
+
 def test_mark_published_increments_counter(frozen):
     publish.mark_published("douyin")
     publish.mark_published("douyin")

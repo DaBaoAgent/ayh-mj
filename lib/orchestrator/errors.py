@@ -38,6 +38,12 @@ COMPLIANCE_BLOCK = "COMPLIANCE_BLOCK"
 # 发布
 PUBLISH_QUOTA = "PUBLISH_QUOTA"
 PUBLISH_AUTH = "PUBLISH_AUTH"
+PACKAGING_INCOMPLETE = "PACKAGING_INCOMPLETE"        # packaging artifact 缺失/不完整
+AI_DISCLOSURE_UNCONFIRMED = "AI_DISCLOSURE_UNCONFIRMED"  # AI 声明无法确认 → 不许 direct 发布
+REQUIRE_HUMAN_PUBLISH = "REQUIRE_HUMAN_PUBLISH"      # 需要人工确认/人工发布
+PLATFORM_PAUSED = "PLATFORM_PAUSED"                  # 平台因凭据/账号异常被熔断暂停
+NOT_READY = "NOT_READY"                              # 任务还没到 READY，不能发布
+ENGAGE_CIRCUIT_OPEN = "ENGAGE_CIRCUIT_OPEN"          # 自动互动熔断（连续异常/超频）
 # 兜底
 UNKNOWN = "UNKNOWN"
 
