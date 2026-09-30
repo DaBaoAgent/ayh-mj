@@ -13,8 +13,10 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from . import STATE_DIR
+
 ROOT = Path(__file__).resolve().parent.parent
-IDEAS_STATE = ROOT / "state" / "used_ideas.json"
+IDEAS_STATE = STATE_DIR / "used_ideas.json"
 
 
 def load_ideas() -> list[dict]:

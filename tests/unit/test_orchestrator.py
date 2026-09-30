@@ -94,26 +94,47 @@ def test_webui_cli_hermes_create_identical_jobs(tmp_state):
     assert "stage_start" in kinds[0] and "stage_end" in kinds[0]
 
 
-# ── 2. daily_target → 恰好 N 个 job ────────────────────────────
+# ── 2. daily_target → 恰好 N 个 job（Phase 5：同一天补齐到 daily_target）──
 def test_daily_target_creates_exactly_that_many_jobs(tmp_state):
+    """Phase 3 契约：一次启动恰好 N 条；Phase 5 语义：同一天按 daily_target 补齐，不超额。"""
     orch = _orch(tmp_state)
     result = orch.start(_cfg(goal="每日目标", daily_target=2), background=False)
     assert result["ok"] and result["count"] == 2
     assert store.counts()["total"] == 2
     assert all(store.get_job(u)["status"] == JobState.READY for u in result["jobs"])
 
-    # 再按 2 条跑一次 → 又恰好新增 2 条（每次启动都是一批新片，不重复不遗漏）
+    # 同一天再点一次 Start：今日已补齐 → 不再超额生产（Phase 5 任务 1，省钱且不刷屏）
     result2 = orch.start(_cfg(goal="每日目标", daily_target=2), background=False)
-    assert result2["count"] == 2
-    assert store.counts()["total"] == 4
-    assert not set(result["jobs"]) & set(result2["jobs"])
+    assert result2["ok"] is True and result2["count"] == 0
+    assert store.counts()["total"] == 2
+
+    # 提高今日目标 → 只补差额，绝不重跑已完成的那两条
+    result3 = orch.start(_cfg(goal="每日目标", daily_target=3), background=False)
+    assert result3["count"] == 1
+    assert store.counts()["total"] == 3
+    assert not (set(result["jobs"]) & set(result3["jobs"]))
 
 
-def test_empty_queue_without_goal_is_refused(tmp_state):
-    orch = _orch(tmp_state)
+def test_empty_queue_auto_plans_without_manual_spec(tmp_state):
+    """Phase 5 验收①：空队列点 Start → 系统自主产出 job + CreativeDNA（不依赖人工塞 spec）。"""
+    from lib.orchestrator import stages as stages_mod
+    orch = _orch(tmp_state, _stages(plan=stages_mod.stage_plan))
     result = orch.start(_cfg(daily_target=1), background=False)
-    assert result["ok"] is False and result["count"] == 0
-    assert store.counts()["total"] == 0
+    assert result["ok"] is True and result["count"] == 1, result
+    uid = result["jobs"][0]
+    assert store.get_job(uid)["status"] == JobState.READY
+
+    arts = {a["type"]: a["path"] for a in store.list_artifacts(uid)}
+    assert {"spec", "research", "creative_dna", "creative_scores"} <= set(arts)
+    for kind in ("research", "creative_dna", "creative_scores"):
+        assert Path(arts[kind]).is_file(), f"{kind} 未落盘：{arts[kind]}"
+    # spec 出片后按 Phase 3 口径归档进 queue/_done，artifact 只是历史指针
+    assert Path(arts["spec"]).name in {p.name for p in
+                                       (tmp_state / "queue_15s" / "_done").glob("*.json")}
+    dna = json.loads(Path(arts["creative_dna"]).read_text(encoding="utf-8"))["dna"]
+    assert dna["genre"] and dna["hook_type"] and dna["shot_pattern"] and dna["audience"]
+    # 规划过程也要在事件流里可追溯
+    assert any(e["type"] == "stage_end" and e["stage"] == "plan" for e in store.list_events(uid))
 
 
 # ── 3. gen_concurrency 真正限制并行 ───────────────────────────

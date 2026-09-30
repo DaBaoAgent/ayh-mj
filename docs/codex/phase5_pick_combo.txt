@@ -1,0 +1,195 @@
+==============================================================================
+STATE_DIR = C:\Users\ADMINI~1\AppData\Local\Temp\p5combo_cqpdsgek
+==============================================================================
+
+--- pick_combo --json（16 候选 → top3 → 终选）---
+{
+ "hotspot": {
+  "source": "baidu",
+  "source_type": "evergreen",
+  "title": "赵家驹让父母不要心疼",
+  "published_at": "",
+  "heat": 0.0,
+  "engagement": 0,
+  "relevance": 0.6,
+  "freshness": null,
+  "evidence_url": "",
+  "likes": 0,
+  "comments": 0,
+  "shares": 0,
+  "is_evergreen": true
+ },
+ "forced": false,
+ "role_group": {
+  "name": "城市组",
+  "members": [
+   "city_boy_10",
+   "city_dad_50",
+   "city_daughter_35",
+   "city_daughter_in_law_32",
+   "city_delivery_rider_28",
+   "city_girl_8",
+   "city_grandma_70",
+   "city_grandma_maternal_65",
+   "city_grandpa_75",
+   "city_mom_45",
+   "city_neighbor_aunt_55",
+   "city_nurse_28",
+   "city_retired_professor_70",
+   "city_security_guard_45",
+   "city_son_in_law_38",
+   "city_son_teen_16",
+   "city_teacher_woman_42",
+   "city_toddler_girl_5",
+   "city_young_man_30",
+   "city_young_woman_26"
+  ]
+ },
+ "chosen": {
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "赵家驹让父母不要心疼",
+   "genre": "G1",
+   "angle": "B1",
+   "sales_point": "anti_flip",
+   "hook_type": "冲突质问",
+   "narrative_arc": "打脸反转",
+   "shot_pattern": "四镜双人对撞",
+   "cast_pattern": "@elder_male+@mid_male",
+   "product_role": "解题工具",
+   "conflict_type": "质疑能力",
+   "visual_motif": "坡道爬升",
+   "camera_language": "固定机位中景",
+   "dialogue_mode": "双人对白",
+   "audio_mode": "现场同期声",
+   "payoff": "防前翻侧翻后翻，30度陡坡不后翻｜双人对撞短剧把它收在3.0防翻系统上",
+   "ending": "打脸反转收尾，停在子女代购决策者最在意的那一下",
+   "CTA": "评论区扣 1，帮你算算家里老人用不用得上",
+   "risk_flags": [
+    "热点为常青素材，时效性弱"
+   ]
+  },
+  "structure": "S_duo_conflict",
+  "structure_name": "双人对撞短剧",
+  "scores": {
+   "Novelty": 1.0,
+   "AudienceFit": 1.0,
+   "TrendFit": 0.516,
+   "SalesPointFit": 1.0,
+   "VisualPotential": 0.79,
+   "ConflictStrength": 0.95,
+   "GenerationFeasibility": 0.61,
+   "BrandSafety": 0.7,
+   "ClaimRisk": 1.0,
+   "EstimatedCost": 0.4,
+   "total": 0.8227,
+   "reasons": {
+    "Novelty": "历史使用 无（全新组合）",
+    "AudienceFit": "骨架天然受众",
+    "TrendFit": "常青素材（非实时热点，已标 source_type=evergreen）",
+    "SalesPointFit": "产品角色 解题工具，母题与骨架一致",
+    "VisualPotential": "骨架视觉潜力 0.7，母题 坡道爬升",
+    "ConflictStrength": "骨架冲突强度 0.95",
+    "GenerationFeasibility": "成本系数 0.60，角色 2 个，台词模式 双人对白",
+    "BrandSafety": "风险标签：热点为常青素材，时效性弱",
+    "ClaimRisk": "无未核验数值承诺",
+    "EstimatedCost": "相对制作成本 0.60"
+   }
+  },
+  "note": "总分 0.823；强项 Novelty1.00、AudienceFit1.00、SalesPointFit1.00；弱项 EstimatedCost0.40、TrendFit0.52、GenerationFeasibility0.61"
+ },
+ "shortlist": [
+  {
+   "dna": {
+    "audience": "子女代购决策者",
+    "goal": "让人记住一个卖点",
+    "hotspot": "赵家驹让父母不
+
+--- 第二次 --json（使用次数作为 novelty 特征后应变化）---
+{
+ "hotspot": {
+  "source": "baidu",
+  "source_type": "evergreen",
+  "title": "赵家驹让父母不要心疼",
+  "published_at": "",
+  "heat": 0.0,
+  "engagement": 0,
+  "relevance": 0.6,
+  "freshness": null,
+  "evidence_url": "",
+  "likes": 0,
+  "comments": 0,
+  "shares": 0,
+  "is_evergreen": true
+ },
+ "forced": false,
+ "role_group": {
+  "name": "城市组",
+  "members": [
+   "city_boy_10",
+   "city_dad_50",
+   "city_daughter_35",
+   "city_daughter_in_law_32",
+   "city_delivery_rider_28",
+   "city_girl_8",
+   "city_grandma_70",
+   "city_grandma_maternal_65",
+   "city_grandpa_75",
+   "city_mom_45",
+   "city_neighbor_aunt_55",
+   "city_nurse_28",
+   "city_retired_professor_70",
+   "city_security_guard_45",
+   "city_son_in_law_38",
+   "city_son_teen_16",
+   "city_teacher_woman_42",
+   "city_toddler_girl_5",
+   "city_young_man_30",
+   "city_young_woman_26"
+  ]
+ },
+ "chosen": {
+  "dna": {
+   "audience": "子女代购决策者",
+   "goal": "让人记住一个卖点",
+   "hotspot": "赵家驹让父母不要心疼",
+   "genre": "G1",
+   "angle": "B1",
+   "sales_point": "anti_flip",
+   "hook_type": "冲突质问",
+   "narrative_arc": "打脸反转",
+   "shot_pattern": "四镜双人对撞",
+   "cast_pattern": "@elder_male+@mid_male",
+   "product_role": "解题工具",
+   "conflict_type": "质疑能力",
+   "
+
+--- pick_combo --group ... --commit probe_tag（写使用记录）---
+🎯 智能组合（Phase 5 候选评分器｜候选 16 个 → top3 → 终选）
+  选题: 赵家驹让父母不要心疼（source_type=evergreen）
+  角色组: 城市组（20 人可选，样例 city_boy_10, city_dad_50, city_daughter_35, city_daughter_in_law_32, city_delivery_rider_28, city_girl_8）
+  片型: G1 · 剧情短片
+  卖点: anti_flip · 3.0防翻系统
+  角度: B1
+  骨架: 双人对撞短剧（四镜双人对撞｜冲突质问｜质疑能力）
+  总分: 0.823
+    · Novelty                1.000  历史使用 无（全新组合）
+    · AudienceFit            1.000  骨架天然受众
+    · TrendFit               0.516  常青素材（非实时热点，已标 source_type=evergreen）
+    · SalesPointFit          1.000  产品角色 解题工具，母题与骨架一致
+    · VisualPotential        0.790  骨架视觉潜力 0.7，母题 坡道爬升
+    · ConflictStrength       0.950  骨架冲突强度 0.95
+    · GenerationFeasibility  0.610  成本系数 0.60，角色 2 个，台词模式 双人对白
+    · BrandSafety            0.700  风险标签：热点为常青素材，时效性弱
+    · ClaimRisk              1.000  无未核验数值承诺
+    · Estimat
+
+--- 使用记录落盘 ---
+  genres_used.json = {"G1": ["probe_tag"]}
+  groups_used.json = {"城市组": ["probe_tag"]}
+  sales_points_used.json = {"anti_flip": ["probe_tag"]}
+  story_angles_used.json = {"B1": ["probe_tag"]}
+
+returncodes: 0 0 0
+==============================================================================

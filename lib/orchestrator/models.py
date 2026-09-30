@@ -177,6 +177,8 @@ class StageContext:
     config: RunConfig = field(default_factory=RunConfig)
     workspace: Path = field(default_factory=Path)
     root: Path = field(default_factory=Path)
+    queue_dir: Path | None = None     # 队列 spec 目录（Phase 5：Planner 只往这里写 spec）
+    state_dir: Path | None = None     # 状态根目录（Planner 的 research/dna/scores 落这里）
     store: Any = None
     provider: Any = None          # 供应商适配器（Phase 4；缺省时 stage 自己按需构造）
     handle: Any = None

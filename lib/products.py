@@ -2,9 +2,11 @@
 import json
 from pathlib import Path
 
+from . import STATE_DIR
+
 ROOT = Path(__file__).resolve().parent.parent
 POINTS_DIR = ROOT / "assets" / "products"
-STATE = ROOT / "state" / "sales_points_used.json"
+STATE = STATE_DIR / "sales_points_used.json"
 
 # ── 卖点池（每条视频轮换主打——宝哥规则 2026-09-23）──
 SALES_POINTS = [
@@ -54,6 +56,12 @@ TEMPLATE_FIT = {
     "T09": ["shock_18", "recline_145", "brake_light"],                     # 舒适细节
     "T10": ["auto_stop", "anti_flip", "plane_ok"],                         # 安全/认证
 }
+
+
+def use_counts() -> dict:
+    """每个卖点的使用次数 {point_id: n}（供 Planner 当 novelty 特征，只读不改）。"""
+    used = _used()
+    return {p["id"]: len(used.get(p["id"], [])) for p in SALES_POINTS}
 
 
 def next_point(template_id: str = "") -> dict:

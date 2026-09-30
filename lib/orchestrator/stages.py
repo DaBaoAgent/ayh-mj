@@ -23,7 +23,9 @@ from .errors import (
     MISSING_INPUT,
     NO_SPEC,
     PACKAGE_FAILED,
+    PLAN_FAILED,
     PREFLIGHT_FAILED,
+    PROMPT_NOT_COMPILED,
     QA_FAILED,
     ProviderError,
 )
@@ -49,19 +51,78 @@ def _spec_uid(ctx: StageContext) -> str:
 
 
 # ── 1. plan ────────────────────────────────────────────────────
+def _spec_doc(spec_path: Path) -> dict:
+    """读 spec JSON（读不到当空 dict，调用方各自决定怎么处理）。"""
+    with suppress(OSError, ValueError):
+        data = json.loads(Path(spec_path).read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def _creative_artifacts(spec_path: Path) -> list[dict]:
+    """spec 里 `creative.artifacts` 指向的研究依据 / CreativeDNA / 评分文件 → artifact 清单。
+
+    这是"CreativeDNA、研究依据和筛选评分都能在 artifact/event 中追溯"的落地点：
+    出片之后从 job 的 artifacts 就能直接翻到当初为什么选这个方案。
+    """
+    paths = (_spec_doc(spec_path).get("creative") or {}).get("artifacts") or {}
+    out: list[dict] = []
+    for type_, key in (("research", "research"), ("creative_dna", "dna"),
+                       ("creative_scores", "scores")):
+        path = paths.get(key)
+        if path and Path(path).is_file():
+            out.append({"type": type_, "path": path})
+    return out
+
+
+def _plan_for(ctx: StageContext):
+    """跑一次自主规划（唯一实现是 lib.creative.CreativePlanner）。"""
+    from ..creative import CreativePlanner
+    planner = CreativePlanner(store=ctx.store, queue_dir=ctx.queue_dir, state_dir=ctx.state_dir)
+    return planner.plan_for(ctx.uid, goal=ctx.config.goal)
+
+
 def stage_plan(ctx: StageContext) -> StageResult:
-    if ctx.spec is not None and Path(ctx.spec).is_file():
+    spec_path = Path(ctx.spec) if ctx.spec else None
+    if spec_path is not None and spec_path.is_file():
+        doc = _spec_doc(spec_path)
+        creative = doc.get("creative") or {}
+        dna = creative.get("dna") or {}
         return StageResult.ok(
-            "plan", artifacts=[{"type": "spec", "path": ctx.spec}],
-            metrics={"spec_bytes": Path(ctx.spec).stat().st_size},
-            message=f"spec 就绪：{Path(ctx.spec).name}")
+            "plan", artifacts=[{"type": "spec", "path": spec_path}] + _creative_artifacts(spec_path),
+            metrics={"spec_bytes": spec_path.stat().st_size,
+                     "structure": creative.get("structure", ""),
+                     "genre": dna.get("genre", ""), "hook_type": dna.get("hook_type", ""),
+                     "shot_pattern": dna.get("shot_pattern", ""),
+                     "sales_point": dna.get("sales_point", ""),
+                     "plan_only": bool(doc.get("plan_only"))},
+            message=f"spec 就绪：{spec_path.name}",
+            data={"dna": dna, "hotspot": creative.get("hotspot") or {}})
     if ctx.dry:
         return StageResult.ok("plan", artifacts=[{"type": "spec", "path": None,
                                                   "label": f"dry:{ctx.uid}"}],
                               metrics={"dry": True}, message="演练：虚拟 spec（不落盘）")
-    return StageResult.fail(
-        "plan", NO_SPEC,
-        "没有可执行的 spec：把 spec 放进 state/queue_15s/ 或调用 start(goal=...) 指定选题")
+    # Phase 5：没有现成 spec → 系统自己选题（选题 → 研究依据 → CreativeDNA 候选 → 评分 → StorySpec）
+    from ..creative.planner import PlannerError
+    try:
+        planned = _plan_for(ctx)
+    except PlannerError as exc:
+        return StageResult.fail("plan", PLAN_FAILED, f"自主规划失败：{exc}")
+    except Exception as exc:
+        return StageResult.fail("plan", PLAN_FAILED, f"自主规划异常：{type(exc).__name__}: {exc}")
+    return StageResult.ok(
+        "plan", artifacts=planned.artifacts(),
+        metrics={"structure": planned.structure.get("name", ""),
+                 "genre": planned.dna.genre, "hook_type": planned.dna.hook_type,
+                 "shot_pattern": planned.dna.shot_pattern, "angle": planned.dna.angle,
+                 "sales_point": planned.dna.sales_point,
+                 "score_total": float(planned.scores.get("total") or 0.0),
+                 "candidates": int((planned.decision or {}).get("candidate_count") or 0),
+                 "plan_only": True},
+        message=f"自主规划完成：{planned.message}",
+        data={"dna": planned.dna.to_dict(), "hotspot": planned.hotspot,
+              "shortlist": planned.shortlist, "decision": planned.decision.get("rule", "")})
 
 
 # ── 2. preflight ───────────────────────────────────────────────
@@ -71,6 +132,17 @@ def stage_preflight(ctx: StageContext) -> StageResult:
 
     metrics: dict = {}
     problems: list[str] = []
+
+    # Phase 5 边界：StorySpec 就绪但 H3 提示词还没编译（Phase 7 PromptCompiler）时，
+    # 绝不放行到付费生成 —— 宁可把任务停在 BLOCKED 等编译，也不烧钱出一条空 prompt 的片。
+    if ctx.spec is not None and Path(ctx.spec).is_file():
+        doc = _spec_doc(Path(ctx.spec))
+        if doc.get("plan_only"):
+            return StageResult.fail(
+                "preflight", PROMPT_NOT_COMPILED,
+                "StorySpec 已就绪，但 H3 提示词尚未编译（Phase 7 PromptCompiler）——"
+                "为不浪费付费额度，本次不进入生成。可先人工审阅 StorySpec 与 CreativeDNA。",
+                metrics={"plan_only": True, "prompt_ready": bool(doc.get("prompt_ready"))})
 
     uid = _spec_uid(ctx)
     try:

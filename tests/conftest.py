@@ -75,6 +75,10 @@ def tmp_state(tmp_path, monkeypatch) -> Path:
     import lib.products as products
     monkeypatch.setattr(products, "STATE", state / "sales_points_used.json", raising=False)
 
+    # Phase 5：Planner 也会写角色组使用记录，测试必须同样隔离
+    import lib.creative.cast_groups as cast_groups
+    monkeypatch.setattr(cast_groups, "GROUPS_STATE", state / "groups_used.json", raising=False)
+
     return state
 
 

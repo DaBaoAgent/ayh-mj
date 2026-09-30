@@ -1,0 +1,111 @@
+==============================================================================
+STATE_DIR = C:\Users\ADMINI~1\AppData\Local\Temp\p5ev_0snorwc0
+==============================================================================
+score dimensions: ['Novelty', 'AudienceFit', 'TrendFit', 'SalesPointFit', 'VisualPotential', 'ConflictStrength', 'GenerationFeasibility', 'BrandSafety', 'ClaimRisk', 'EstimatedCost']   weights sum = 1.0
+
+--- 自主规划 5 条（空队列，无人工 spec）---
+uid                       genre      hook_typeshot_pattern  structure            total
+--------------------------------------------------------------------------------------
+job_20260930_Phase5验收空队列自主规划5_20260930_123258_01G1         冲突质问     四镜双人对撞        S_duo_conflict      0.8227
+job_20260930_Phase5验收空队列自主规划5_20260930_123258_02G4         悬念设问     悬念三段式         S_suspense_reveal   0.8133
+job_20260930_Phase5验收空队列自主规划5_20260930_123258_03G8         反差打脸     实验对比双线        S_product_test      0.7967
+job_20260930_Phase5验收空队列自主规划5_20260930_123258_04G7         夸张数字     三镜魔性循环        S_magic_loop        0.7877
+job_20260930_Phase5验收空队列自主规划5_20260930_123258_05G3         身份代入     手持街访          S_street_interview  0.7797
+  distinct genre          =  5  -> ['G1', 'G3', 'G4', 'G7', 'G8']
+  distinct hook_type      =  5  -> ['冲突质问', '反差打脸', '夸张数字', '悬念设问', '身份代入']
+  distinct shot_pattern   =  5  -> ['三镜魔性循环', '四镜双人对撞', '实验对比双线', '悬念三段式', '手持街访']
+  distinct structure      =  5  -> ['S_duo_conflict', 'S_magic_loop', 'S_product_test', 'S_street_interview', 'S_suspense_reveal']
+  distinct cast_pattern   =  5  -> ['@elder_male', '@elder_male+@mid_male', '@mid_female+@elder_female', '@mid_male+@young_male', '@neighbor_any+@mid_male']
+  distinct audience       =  3  -> ['子女代购决策者', '社区邻里围观者', '银发自用人群']
+  distinct titles        = 5
+
+--- 每条完整 CreativeDNA ---
+
+[job_20260930_Phase5验收空队列自主规划5_20260930_123258_01] 赵家驹让父母不要心疼｜冲突质问·双人对撞短剧
+  genre=G1  angle=B1  sales_point=anti_flip  goal=让人记住一个卖点
+  hook_type=冲突质问  shot_pattern=四镜双人对撞  arc=打脸反转
+  audience=子女代购决策者  cast=@elder_male+@mid_male  motif=坡道爬升
+  camera=固定机位中景  dialogue=双人对白  audio=现场同期声
+  conflict=质疑能力  product_role=解题工具  ending=打脸反转收尾，停在子女代购决策者最在意的那一下  CTA=评论区扣 1，帮你算算家里老人用不用得上
+  risk_flags=['热点为常青素材，时效性弱']
+  scores={'Novelty': 1.0, 'AudienceFit': 1.0, 'TrendFit': 0.516, 'SalesPointFit': 1.0, 'VisualPotential': 0.79, 'ConflictStrength': 0.95, 'GenerationFeasibility': 0.61, 'BrandSafety': 0.7, 'ClaimRisk': 1.0, 'EstimatedCost': 0.4, 'total': 0.823}
+  reasons={'Novelty': '历史使用 无（全新组合）', 'AudienceFit': '骨架天然受众', 'TrendFit': '常青素材（非实时热点，已标 source_type=evergreen）', 'SalesPointFit': '产品角色 解题工具，母题与骨架一致', 'VisualPotential': '骨架视觉潜力 0.7，母题 坡道爬升', 'ConflictStrength': '骨架冲突强度 0.95', 'GenerationFeasibility': '成本系数 0.60，角色 2 个，台词模式 双人对白', 'BrandSafety': '风险标签：热点为常青素材，时效性弱', 'ClaimRisk': '无未核验数值承诺', 'EstimatedCost': '相对制作成本 0.60'}
+
+[job_20260930_Phase5验收空队列自主规划5_20260930_123258_02] 大爷撞脸《大耳朵图图》牛爷爷走红，亲属：本人不知道成了网红，很开心这么多人喜欢他｜悬念设问·悬念揭晓
+  genre=G4  angle=B13  sales_point=fold_1s  goal=场景代入种草
+  hook_type=悬念设问  shot_pattern=悬念三段式  arc=悬念揭晓
+  audience=子女代购决策者  cast=@mid_female+@elder_female  motif=后备箱装车
+  camera=近景特写  dialogue=字幕驱动  audio=BGM+音效
+  conflict=家人反对  product_role=惊喜礼物  ending=悬念揭晓收尾，停在子女代购决策者最在意的那一下  CTA=有疑问直接评论，下一条视频现场回答
+  risk_flags=['热点为常青素材，时效性弱']
+  scores={'Novelty': 1.0, 'AudienceFit': 1.0, 'TrendFit': 0.516, 'SalesPointFit': 1.0, 'VisualPotential': 0.825, 'ConflictStrength': 0.7, 'GenerationFeasibility': 0.665, 'BrandSafety': 0.7, 'ClaimRisk': 1.0, 'EstimatedCost': 0.5, 'total': 0.813}
+  reasons={'Novelty': '历史使用 无（全新组合）', 'AudienceFit': '骨架天然受众', 'TrendFit': '常青素材（非实时热点，已标 source_type=evergreen）', 'SalesPointFit': '产品角色 惊喜礼物', 'VisualPotential': '骨架视觉潜力 0.75，母题 后备箱装车', 'ConflictStrength': '骨架冲突强度 0.70', 'GenerationFeasibility': '成本系数 0.50，角色 2 个，台词模式 字幕驱动', 'BrandSafety': '风险标签：热点为常青素材，时效性弱', 'ClaimRisk': '无未核验数值承诺', 'EstimatedCost': '相对制作成本 0.50'}
+
+[job_20260930_Phase5验收空队列自主规划5_20260930_123258_03] 健康早餐要包含哪些食物｜反差打脸·产品实验/对比
+  genre=G8  angle=B28  sales_point=auto_stop  goal=让人记住一个卖点
+  hook_type=反差打脸  shot_pattern=实验对比双线  arc=对比实验
+  audience=子女代购决策者  cast=@mid_male+@young_male  motif=折叠收放
+  camera=低角度仰拍  dialogue=单人口播  audio=人声+字幕
+  conflict=价格攀比  product_role=对比主角  ending=对比实验收尾，停在子女代购决策者最在意的那一下  CTA=想要同款细节的，评论区留言「轻便」
+  risk_flags=['热点为常青素材，时效性弱']
+  scores={'Novelty': 1.0, 'AudienceFit': 1.0, 'TrendFit': 0.516, 'SalesPointFit': 1.0, 'VisualPotential': 0.79, 'ConflictStrength': 0.75, 'GenerationFeasibility': 0.583, 'BrandSafety': 0.7, 'ClaimRisk': 1.0, 'EstimatedCost': 0.35, 'total': 0.797}
+  reasons={'Novelty': '历史使用 无（全新组合）', 'AudienceFit': '骨架天然受众', 'TrendFit': '常青素材（非实时热点，已标 source_type=evergreen）', 'SalesPointFit': '产品角色 对比主角', 'VisualPotential': '骨架视觉潜力 0.7，母题 折叠收放', 'ConflictStrength': '骨架冲突强度 0.75', 'GenerationFeasibility': '成本系数 0.65，角色 2 个，台词模式 单人口播', 'BrandSafety': '风险标签：热点为常青素材，时效性弱', 'ClaimRisk': '无未核验数值承诺', 'EstimatedCost': '相对制作成本 0.65'}
+
+[job_20260930_Phase5验收空队列自主规划5_20260930_123258_04] 中方回应美方“超级智能”提法｜夸张数字·魔性动作循环
+  genre=G7  angle=B27  sales_point=fold_1s  goal=制造讨论转发
+  hook_type=夸张数字  shot_pattern=三镜魔性循环  arc=重复强化
+  audience=银发自用人群  cast=@elder_male  motif=折叠收放
+  camera=固定机位中景  dialogue=无对白  audio=纯音效
+  conflict=无冲突氛围向  product_role=解题工具  ending=重复强化收尾，停在银发自用人群最在意的那一下  CTA=评论区扣 1，帮你算算家里老人用不用得上
+  risk_flags=['热点为常青素材，时效性弱', '无对白需字幕/音效兜底']
+  scores={'Novelty': 0.955, 'AudienceFit': 1.0, 'TrendFit': 0.516, 'SalesPointFit': 1.0, 'VisualPotential': 0.895, 'ConflictStrength': 0.2, 'GenerationFeasibility': 0.963, 'BrandSafety': 0.4, 'ClaimRisk': 1.0, 'EstimatedCost': 0.75, 'total': 0.788}
+  reasons={'Novelty': '历史使用 point×1', 'AudienceFit': '骨架天然受众', 'TrendFit': '常青素材（非实时热点，已标 source_type=evergreen）', 'SalesPointFit': '产品角色 解题工具，母题与骨架一致', 'VisualPotential': '骨架视觉潜力 0.85，母题 折叠收放', 'ConflictStrength': '骨架冲突强度 0.20', 'GenerationFeasibility': '成本系数 0.25，角色 1 个，台词模式 无对白', 'BrandSafety': '风险标签：热点为常青素材，时效性弱、无对白需字幕/音效兜底', 'ClaimRisk': '无未核验数值承诺', 'EstimatedCost': '相对制作成本 0.25'}
+
+[job_20260930_Phase5验收空队列自主规划5_20260930_123258_05] 老人摔倒之后，全家生活都变了｜身份代入·街访/伪纪录
+  genre=G3  angle=B12  sales_point=joystick_360  goal=建立安全信任
+  hook_type=身份代入  shot_pattern=手持街访  arc=误会解除
+  audience=社区邻里围观者  cast=@neighbor_any+@mid_male  motif=单手提起
+  camera=手持跟拍  dialogue=街访问答  audio=现场同期声
+  conflict=陌生人误解  product_role=实验对象  ending=误会解除收尾，停在社区邻里围观者最在意的那一下  CTA=点个关注，下一条拍你家门口那段坡
+  risk_flags=['热点为常青素材，时效性弱']
+  scores={'Novelty': 1.0, 'AudienceFit': 1.0, 'TrendFit': 0.516, 'SalesPointFit': 1.0, 'VisualPotential': 0.65, 'ConflictStrength': 0.6, 'GenerationFeasibility': 0.637, 'BrandSafety': 0.7, 'ClaimRisk': 1.0, 'EstimatedCost': 0.45, 'total': 0.78}
+  reasons={'Novelty': '历史使用 无（全新组合）', 'AudienceFit': '骨架天然受众', 'TrendFit': '常青素材（非实时热点，已标 source_type=evergreen）', 'SalesPointFit': '产品角色 实验对象，母题与骨架一致', 'VisualPotential': '骨架视觉潜力 0.5，母题 单手提起', 'ConflictStrength': '骨架冲突强度 0.60', 'GenerationFeasibility': '成本系数 0.55，角色 2 个，台词模式 街访问答', 'BrandSafety': '风险标签：热点为常青素材，时效性弱', 'ClaimRisk': '无未核验数值承诺', 'EstimatedCost': '相对制作成本 0.55'}
+
+--- 可追溯性：artifact 落盘 ---
+  spec      exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5ev_0snorwc0\queue_15s\job_20260930_Phase5验收空队列自主规划5_20260930_123258_01.json
+  research  exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5ev_0snorwc0\creative\research_job_20260930_Phase5验收空队列自主规划5_20260930_123258_01.json
+  dna       exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5ev_0snorwc0\creative\dna_job_20260930_Phase5验收空队列自主规划5_20260930_123258_01.json
+  scores    exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5ev_0snorwc0\creative\scores_job_20260930_Phase5验收空队列自主规划5_20260930_123258_01.json
+  scores: candidates=16 dimensions=10 shortlist=3 rule=综合分最高；同分依次比 Novelty > TrendFit > SalesPointFit；再同分按骨架指纹稳定哈希（可复现，绝不用'第一个未使用'）
+  scores decision note = 总分 0.823；强项 Novelty1.00、AudienceFit1.00、SalesPointFit1.00；弱项 EstimatedCost0.40、TrendFit0.52、GenerationFeasibility0.61
+  scores decision      = {'structure': 'S_duo_conflict', 'hook_type': '冲突质问', 'shot_pattern': '四镜双人对撞', 'genre': 'G1', 'note': '总分 0.823；强项 Novelty1.00、AudienceFit1.00、SalesPointFit1.00；弱项 EstimatedCost0.40、TrendFit0.52、GenerationFeasibility0.61'}
+  top5 totals          = [0.8227, 0.8133, 0.8133, 0.8099, 0.7967]
+  shortlist structures = ['S_duo_conflict', 'S_suspense_reveal', 'S_suspense_reveal']
+  dna artifact keys = ['day', 'dna', 'hotspot', 'rationale', 'role_group', 'scores', 'structure', 'structure_name', 'uid']
+  dna artifact rationale = {"rule": "综合分最高；同分依次比 Novelty > TrendFit > SalesPointFit；再同分按骨架指纹稳定哈希（可复现，绝不用'第一个未使用'）", "candidate_count": 16}
+  research artifact keys = ['brief', 'day', 'uid']  brief keys=['benchmark_patterns', 'hotspot', 'inventory', 'related_topics', 'short_drama_patterns', 'short_drama_rules', 'viral_examples']
+  research hotspot source_type=None freshness=None
+  queue spec keys = ['creative', 'duration', 'fallback_workflows', 'goal', 'job_uid', 'plan_only', 'prompt', 'prompt_ready', 'ref_audios', 'ref_images', 'resolution', 'story_spec', 'title', 'workflow']
+  spec.plan_only=True prompt_ready=False prompt='' workflow=multi_image_15s
+  spec.creative keys=['artifacts', 'dna', 'hotspot', 'rationale', 'structure', 'structure_name'] structure=S_duo_conflict
+  spec.story_spec keys=['dna', 'duration', 'fallback_workflows', 'hotspot', 'prompt', 'prompt_ready', 'ref_audios', 'ref_images', 'research_refs', 'resolution', 'shots', 'structure_id', 'structure_name', 'title', 'uid', 'workflow'] shot_count=4
+
+  day ledger keys=['day', 'entries']  entries=5
+    - job_20260930_Phase5验收空队列自主规划5_20260930_123258_01  genre=G1 hook=冲突质问 shot_pattern=四镜双人对撞 structure=S_duo_conflict cast=@elder_male+@mid_male
+    - job_20260930_Phase5验收空队列自主规划5_20260930_123258_02  genre=G4 hook=悬念设问 shot_pattern=悬念三段式 structure=S_suspense_reveal cast=@mid_female+@elder_female
+    - job_20260930_Phase5验收空队列自主规划5_20260930_123258_03  genre=G8 hook=反差打脸 shot_pattern=实验对比双线 structure=S_product_test cast=@mid_male+@young_male
+    - job_20260930_Phase5验收空队列自主规划5_20260930_123258_04  genre=G7 hook=夸张数字 shot_pattern=三镜魔性循环 structure=S_magic_loop cast=@elder_male
+    - job_20260930_Phase5验收空队列自主规划5_20260930_123258_05  genre=G3 hook=身份代入 shot_pattern=手持街访 structure=S_street_interview cast=@neighbor_any+@mid_male
+
+--- 幂等 ---
+  replan same uid -> job_20260930_Phase5验收空队列自主规划5_20260930_123258_01 (缓存命中，不新建/不重复计费)
+
+--- 补齐语义（daily_target - 今日已存在/已完成）---
+  store 内今日 job 数 = 3
+  needed(5) = 2   needed(8) = 5   needed(12) = 9
+  plan_missing(daily_target=8) 补齐 = 5 条 -> ['01', '02', '03', '04', '05']
+  把这些 spec 落库后，store 内今日 job 数 = 8
+  needed(8) 现在 = 0
+  plan_missing(daily_target=8) 再跑 = 0 条（已补齐 -> 0）
+  needed(12) 仍缺 = 4 条
+==============================================================================

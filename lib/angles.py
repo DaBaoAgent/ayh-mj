@@ -7,8 +7,10 @@
 import json
 from pathlib import Path
 
+from . import STATE_DIR
+
 ROOT = Path(__file__).resolve().parent.parent
-STATE = ROOT / "state" / "story_angles_used.json"
+STATE = STATE_DIR / "story_angles_used.json"
 
 # ── 思路池（每次不同的叙事框架）──
 ANGLES = [
@@ -75,6 +77,12 @@ def _used() -> dict:
         except Exception:
             return {}
     return {}
+
+
+def use_counts() -> dict:
+    """每个思路的使用次数 {angle_id: n}（供 Planner 当 novelty 特征，只读不改）。"""
+    used = _used()
+    return {a["id"]: len(used.get(a["id"], [])) for a in ANGLES}
 
 
 def next_angle() -> dict:

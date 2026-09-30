@@ -1,0 +1,31 @@
+==============================================================================
+STATE_DIR = C:\Users\ADMINI~1\AppData\Local\Temp\p5gate_mhsra63i
+==============================================================================
+  ✗ job_20260930_auto_20260930_123322_01 BLOCKED（PROMPT_NOT_COMPILED）：StorySpec 已就绪，但 H3 提示词尚未编译（Phase 7 PromptCompiler）——为不浪费付费额度，本次不进入生成。可先人工审阅 StorySpec 与 CreativeDNA。
+  ✗ job_20260930_auto_20260930_123322_02 BLOCKED（PROMPT_NOT_COMPILED）：StorySpec 已就绪，但 H3 提示词尚未编译（Phase 7 PromptCompiler）——为不浪费付费额度，本次不进入生成。可先人工审阅 StorySpec 与 CreativeDNA。
+
+--- 空队列 Start（dry_mode=False，无人工 spec）---
+ok = True  count = 2  jobs = ['job_20260930_auto_20260930_123322_01', 'job_20260930_auto_20260930_123322_02']
+
+--- 每条 job 的终态 / 错误码 / 已跑阶段 / 提交数 ---
+  job_20260930_auto_20260930_123322_01: status=BLOCKED  error_code=PROMPT_NOT_COMPILED  cost=0.0
+      已跑阶段=['plan', 'preflight']
+  job_20260930_auto_20260930_123322_02: status=BLOCKED  error_code=PROMPT_NOT_COMPILED  cost=0.0
+      已跑阶段=['plan', 'preflight']
+
+付费提交数 provider.submit_count = 0  (必须为 0：未编译 prompt 不得付费)
+store.counts() = {'total': 2, 'by_status': {'BLOCKED': 2}}
+
+--- artifact 追溯（job -> spec/research/dna/scores）---
+  [spec          ] exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5gate_mhsra63i\queue_15s\job_20260930_auto_20260930_123322_01.json
+  [research      ] exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5gate_mhsra63i\creative\research_job_20260930_auto_20260930_123322_01.json
+  [creative_dna  ] exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5gate_mhsra63i\creative\dna_job_20260930_auto_20260930_123322_01.json
+  [creative_scores] exists=True  C:\Users\ADMINI~1\AppData\Local\Temp\p5gate_mhsra63i\creative\scores_job_20260930_auto_20260930_123322_01.json
+
+--- event 追溯（plan 阶段 metrics 携带 CreativeDNA 决策）---
+  stage=plan       status=None metrics_keys=['genre', 'hook_type', 'plan_only', 'sales_point', 'shot_pattern', 'spec_bytes', 'structure']
+     hook_type=冲突质问 shot_pattern=四镜双人对撞 genre=G1 structure=S_duo_conflict plan_only=True
+
+  队列 spec: plan_only=True  prompt_ready=False  workflow=multi_image_15s  prompt=''
+  → 因 prompt 未编译，preflight 直接 BLOCKED(PROMPT_NOT_COMPILED)，绝不进入付费 GENERATING
+==============================================================================

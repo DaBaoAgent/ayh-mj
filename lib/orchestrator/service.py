@@ -26,6 +26,8 @@ from datetime import datetime
 from pathlib import Path
 
 from .. import STATE_DIR
+from ..creative import CreativePlanner
+from ..creative.planner import PlannerError
 from ..dispatch import sync_queue
 from ..jobstore import InvalidTransition, JobState, can_transition, sha256_of
 from ..jobstore import store as default_store
@@ -167,11 +169,22 @@ class PipelineOrchestrator:
         cfg.goal = cfg.goal or goal
         cfg.source = cfg.source or source
 
-        items = self._plan_batch(cfg, specs=specs, count=count)
+        try:
+            items, info = self._plan_batch(cfg, specs=specs, count=count)
+        except PlannerError as exc:
+            # 规划失败必须在**创建任何任务之前**收口：不进付费阶段，不留下半成品 job
+            return {"ok": False, "jobs": [], "count": 0, "error_code": "PLAN_FAILED",
+                    "error": f"自主规划失败：{exc}",
+                    "message": "规划未通过，未创建任何任务（更未进入付费生成）"}
         if not items:
+            if info.get("up_to_date"):
+                return {"ok": True, "jobs": [], "count": 0, "skipped": [],
+                        "dry": cfg.dry_mode, "source": cfg.source,
+                        "message": f"今日 daily_target={info.get('daily_target')} 已补齐，"
+                                   "没有需要新建的任务"}
             return {"ok": False, "jobs": [], "count": 0, "error_code": "NO_SPEC",
-                    "error": "队列为空：把 spec 放进 state/queue_15s/，"
-                             "或给出 goal（演练模式会直接创建虚拟任务）"}
+                    "error": "没有需要生产的任务：今日 daily_target 已补齐，"
+                             "或把 spec 放进 state/queue_15s/ 手动指定选题"}
 
         run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         snapshot = cfg.to_dict()
@@ -224,7 +237,8 @@ class PipelineOrchestrator:
                 "message": f"已启动生产：{len(uids)} 条"
                            + ("（演练模式）" if cfg.dry_mode else "")}
 
-    def _plan_batch(self, cfg: RunConfig, *, specs, count) -> list[dict]:
+    def _plan_batch(self, cfg: RunConfig, *, specs, count) -> tuple[list[dict], dict]:
+        """算出这一批要跑哪些 job：(items, info)。info 说明"为什么是这些"。"""
         target = max(1, int(count if count is not None else cfg.daily_target))
         items: list[dict] = []
         if specs:
@@ -232,16 +246,37 @@ class PipelineOrchestrator:
                 p = Path(raw)
                 items.append({"uid": p.stem, "spec": p, "goal": cfg.goal,
                               "fingerprint": _fingerprint(p)})
-        else:
-            registered = sync_queue(self.queue_dir, store=self.store)
-            for uid, path in sorted(registered.items()):
-                p = Path(path)
-                items.append({"uid": uid, "spec": p, "goal": cfg.goal,
-                              "fingerprint": _fingerprint(p)})
+            return items[:target], {"explicit": True, "daily_target": target}
+
+        registered = sync_queue(self.queue_dir, store=self.store)
+        for uid, path in sorted(registered.items()):
+            p = Path(path)
+            items.append({"uid": uid, "spec": p, "goal": cfg.goal,
+                          "fingerprint": _fingerprint(p)})
         items = items[:target]
-        if len(items) < target and (cfg.goal or cfg.dry_mode):
+        if len(items) >= target:
+            return items, {"queued": len(registered), "daily_target": target}
+
+        # Phase 5：队列里没有现成 spec 时，系统自己选题（不再依赖人工塞 spec）。
+        #   队列为空 → 按"daily_target - 今日已存在/已完成"补齐（计划 §Phase 5 任务 1）；
+        #   队列已有料 → 只补这一批的缺口（用户手工投料的语义保持不变）。
+        if cfg.dry_mode:
+            # 演练免费但**不落盘**：保持 Phase 3 的"虚拟 spec"口径，避免演练污染队列
             items += [self._placeholder(cfg, i) for i in range(len(items), target)]
-        return items
+            return items, {"dry_placeholder": True, "daily_target": target}
+
+        planner = CreativePlanner(store=self.store, queue_dir=self.queue_dir,
+                                  state_dir=self.queue_dir.parent)
+        need = (planner.needed(target) if not registered
+                else max(0, target - len(items)))
+        if need <= 0:
+            return items, {"up_to_date": True, "daily_target": target,
+                           "today": planner.active_or_completed_today()}
+        for planned in planner.plan_batch(need, goal=cfg.goal):
+            items.append({"uid": planned.uid, "spec": planned.spec_path,
+                          "goal": planned.dna.hotspot or cfg.goal,
+                          "fingerprint": _fingerprint(planned.spec_path)})
+        return items, {"auto_planned": len(items), "daily_target": target}
 
     def _placeholder(self, cfg: RunConfig, index: int) -> dict:
         day = datetime.now().strftime("%Y%m%d")
@@ -333,6 +368,7 @@ class PipelineOrchestrator:
             ctx = StageContext(uid=uid, stage=name, spec=self._spec_path(uid),
                                job=self.store.get_job(uid) or {}, config=cfg,
                                workspace=self._workspace(uid), root=self.root,
+                               queue_dir=self.queue_dir, state_dir=self.queue_dir.parent,
                                store=self.store, provider=self.provider,
                                handle=handle, log=self._log, sleep=self._sleep,
                                poll_interval=self.poll_interval,
@@ -699,6 +735,11 @@ class PipelineOrchestrator:
             meta = {k: v for k, v in art.items() if k not in ("type", "path")} or None
         else:
             type_, path, meta = stage, art, None
+        # 同一个 (type, path) 只登记一次：job 建立时已登记的 spec 不必在 plan 阶段重登。
+        if path is not None:
+            existing = {str(a.get("path")) for a in self.store.list_artifacts(uid, type_)}
+            if str(path) in existing:
+                return
         with suppress(Exception):
             self.store.add_artifact(uid, type_, path, stage=stage, meta=meta)
 

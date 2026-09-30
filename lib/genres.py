@@ -8,8 +8,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from . import STATE_DIR
+
 ROOT = Path(__file__).resolve().parent.parent
-STATE = ROOT / "state" / "genres_used.json"
+# 状态文件跟随 lib.STATE_DIR（可被 AYHMJ_STATE_DIR 覆盖 → 测试/多实例天然隔离）
+STATE = STATE_DIR / "genres_used.json"
 
 GENRES = [
     {"id": "G1", "name": "剧情短片", "dir": "单场景小故事+产品自然融入（T06/T07 型）", "shots": 4},

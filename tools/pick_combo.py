@@ -1,22 +1,24 @@
-"""智能组合选择器 — 角色组 × 卖点 × 角度 × 片型（保新优先，2026-09-25 宝哥令）
+"""智能组合选择器（Phase 5 升级版）—— 从"最少使用就选"升级为**候选评分器**。
 
-出片标准流程第一步：每出一条片都先跑本工具选组合（模板已停用，除非宝哥指定）。
+变化（计划 §Phase 5 必做任务 5）：
+  · 不再由"谁用得少谁先上"直接定稿，而是先出 10–20 个结构化候选，
+    再由 CreativeDirector 按 10 个维度打分 → top3 → 终选（`lib.creative`，与主链同一实现）；
+  · 使用次数**没有丢**：它是 Novelty 维度的主特征（用得越多分越低）；
+  · 角色组定义从本文件搬到 `lib.creative.cast_groups`，与 Planner 共用一份。
 
 用法:
-  python tools/pick_combo.py                      # 全自动选一套组合
-  python tools/pick_combo.py --genre G4           # 指定片型
-  python tools/pick_combo.py --group 时尚组        # 指定角色组
-  python tools/pick_combo.py --point shock_18     # 指定卖点
-  python tools/pick_combo.py --angle B20          # 指定角度
-  python tools/pick_combo.py --new                # 只从"从未用过"里选（默认即保新）
-输出: 组合方案（打印）+ state/combo_<时间戳>.json
+  python tools/pick_combo.py                       # 16 候选 → 评分 → top3 → 终选
+  python tools/pick_combo.py --candidates 12       # 候选数量（10–20）
+  python tools/pick_combo.py --group 时尚组 --genre G4 --point shock_18 --angle B20
+                                                   # 指定即锁定（评分只作参考）
+  python tools/pick_combo.py --commit <tag>        # 记录四池 + 角色组使用（防下条重复）
+  python tools/pick_combo.py --json                # 机器可读输出
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,114 +26,125 @@ sys.path.insert(0, str(ROOT))
 
 from lib import angles as angles_mod
 from lib import genres, products
+from lib.creative import CreativeDirector, CreativePlanner, cast_groups
+from lib.creative.hotspot import normalize_hotspot
+from lib.creative.scoring import SCORE_DIMENSIONS
 
-LIB = ROOT / "assets/cast/library"
-GROUPS_USED = ROOT / "state" / "groups_used.json"
-ANGLES_USED = ROOT / "state" / "story_angles_used.json"
-
-GROUP_DEFS = [
-    {"name": "核心卡司", "prefix": "core_", "base": ["elder_portrait", "mother_portrait", "son_portrait", "courier_portrait", "dog_portrait"], "desc": "老王宇宙常驻（老王家人/亲友/社区）"},
-    {"name": "城市组", "prefix": "city_", "base": [], "desc": "城市家庭与邻里日常"},
-    {"name": "欧美组", "prefix": "western_", "base": [], "desc": "外国角色讲中文"},
-    {"name": "时尚组", "prefix": "fashion_", "exclude": "fashion_western", "base": [], "desc": "时尚感人群（脑洞/时尚广告）"},
-    {"name": "老外时尚组", "prefix": "fashion_western", "base": [], "desc": "老外时尚人群"},
-]
+GROUP_NAMES = tuple(g["name"] for g in cast_groups.GROUP_DEFS)
+GENRE_IDS = tuple(g["id"] for g in genres.GENRES)
+ANGLE_IDS = tuple(a["id"] for a in angles_mod.ANGLES)
+POINT_IDS = tuple(p["id"] for p in products.SALES_POINTS)
 
 
-def group_members(g: dict) -> list[str]:
-    out = list(g.get("base", []))
-    if g["prefix"]:
-        for f in sorted(LIB.glob(f"{g['prefix']}*.png")):
-            if g.get("exclude") and f.stem.startswith(g["exclude"]):
-                continue
-            out.append(f.stem)
-    return out
+def _hotspot(goal: str):
+    """借研究库定一个选题；研究库不可用时回退到命令行给的选题（CLI 不阻塞）。"""
+    try:
+        from lib.creative_research import build_research_brief
+        brief = build_research_brief()
+        return normalize_hotspot(brief.get("hotspot") or {}), brief
+    except Exception:
+        return normalize_hotspot({"platform": "cli", "title": goal or "手动选题"}), {}
 
 
-def load_json(p: Path, default):
-    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
+def _point_name(point_id: str) -> str:
+    return next((p["name"] for p in products.SALES_POINTS if p["id"] == point_id), "")
 
 
-def pick_group(name: str | None) -> dict:
-    used = load_json(GROUPS_USED, {})
-    if name:
-        for g in GROUP_DEFS:
-            if g["name"] == name:
-                return g
-        raise SystemExit(f"未知角色组: {name}（可选: {[g['name'] for g in GROUP_DEFS]}）")
-    return min(GROUP_DEFS, key=lambda g: len(used.get(g["name"], [])))
+def _genre_name(genre_id: str) -> str:
+    return next((g["name"] for g in genres.GENRES if g["id"] == genre_id), "")
 
 
-def pick_angle(aid: str | None) -> dict:
-    used = load_json(ANGLES_USED, {})
-    pool = angles_mod.ANGLES if hasattr(angles_mod, "ANGLES") else None
-    if pool is None:
-        # 兼容：从模块里找列表
-        for v in vars(angles_mod).values():
-            if isinstance(v, list) and v and isinstance(v[0], dict) and "id" in v[0]:
-                pool = v
-                break
-    if aid:
-        for a in pool:
-            if a["id"] == aid:
-                return a
-        raise SystemExit(f"未知角度: {aid}")
-    fresh = [a for a in pool if not used.get(a["id"]) and not a.get("used_up")]
-    return (fresh or pool)[0]
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--group")
-    ap.add_argument("--point")
-    ap.add_argument("--angle")
-    ap.add_argument("--genre")
-    ap.add_argument("--commit", metavar="TAG", help="记录四池使用（tag=job uid），防止下条片重复")
-    args = ap.parse_args()
-
-    g = pick_group(args.group)
-    members = group_members(g)
-
+def _apply_forced(dna, args) -> list[str]:
+    """把命令行指定的池 id 写进候选；返回未通过的校验项（一律打印出来，不静默）。"""
+    if args.genre:
+        dna.genre = args.genre
+    if args.angle:
+        dna.angle = args.angle
     if args.point:
-        pt = next(p for p in products.SALES_POINTS if p["id"] == args.point)
+        dna.sales_point = args.point
+    return dna.validate()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--group", help=f"角色组（可选: {'/'.join(GROUP_NAMES)}）")
+    parser.add_argument("--point", help="指定卖点 id（锁定）")
+    parser.add_argument("--angle", help="指定叙事思路 id（锁定）")
+    parser.add_argument("--genre", help="指定片型 id（锁定）")
+    parser.add_argument("--candidates", type=int, default=16, help="候选数量（10–20）")
+    parser.add_argument("--goal", default="", help="选题（研究库不可用时兜底）")
+    parser.add_argument("--commit", metavar="TAG", help="记录四池 + 角色组使用（tag=job uid）")
+    parser.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    args = parser.parse_args()
+
+    if args.group and args.group not in GROUP_NAMES:
+        raise SystemExit(f"未知角色组: {args.group}（可选: {list(GROUP_NAMES)}）")
+    for value, pool, label in ((args.genre, GENRE_IDS, "片型"), (args.angle, ANGLE_IDS, "思路"),
+                               (args.point, POINT_IDS, "卖点")):
+        if value and value not in pool:
+            raise SystemExit(f"未知{label}: {value}")
+
+    hotspot, brief = _hotspot(args.goal)
+    planner = CreativePlanner(candidate_count=max(10, min(20, args.candidates)))
+    candidates = planner.candidates(planner.candidate_count, hotspot=hotspot)
+
+    forced = bool(args.genre or args.angle or args.point)
+    if forced:
+        dna, structure = candidates[0]
+        problems = _apply_forced(dna, args)
+        if problems:
+            print("  ⚠️ 指定组合未通过校验：" + "；".join(problems))
+        candidates = [(dna, structure)]
+    if args.group:
+        candidates = [(dna, {**structure, "_role_group": args.group})
+                      for dna, structure in candidates]
+
+    director = CreativeDirector()
+    ranked = director.rank(candidates, context={"trend": hotspot.to_dict(),
+                                                "used_counts": planner.used_counts()})
+    decision = director.decide(ranked)
+    chosen = decision["chosen"]
+    group_name = chosen.structure.get("_role_group", "")
+    group = cast_groups.pick_group(group_name) if group_name else cast_groups.pick_group()
+
+    if args.json:
+        print(json.dumps({"hotspot": hotspot.to_dict(), "forced": forced,
+                          "role_group": {"name": group["name"],
+                                         "members": cast_groups.group_members(group)},
+                          "chosen": chosen.to_dict(), "shortlist": decision["shortlist"],
+                          "rule": decision["rule"], "candidate_count": len(ranked)},
+                         ensure_ascii=False, indent=1))
     else:
-        pt = products.next_point("")  # 全池选最少用
-
-    ag = pick_angle(args.angle)
-
-    gr = (next(x for x in genres.GENRES if x["id"] == args.genre)
-          if args.genre else genres.next_genre())
-
-    combo = {
-        "picked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "group": {"name": g["name"], "count": len(members), "members": members, "desc": g["desc"]},
-        "point": pt,
-        "angle": ag,
-        "genre": gr,
-    }
-    out = ROOT / f"state/combo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    out.write_text(json.dumps(combo, ensure_ascii=False, indent=1), encoding="utf-8")
-
-    print("🎯 智能组合（保新优先）")
-    print(f"  角色组: {g['name']}（{len(members)}人可选）— {g['desc']}")
-    print(f"    成员样例: {', '.join(members[:8])}{' ...' if len(members) > 8 else ''}")
-    print(f"  卖点:   {pt['id']} · {pt['name']} — {pt['hook']}")
-    print(f"  角度:   {ag['id']} · {ag['name']} — {ag['dir']}")
-    print(f"  片型:   {gr['id']} · {gr['name']} — {gr['dir']}（{gr['shots']}镜）")
-    print(f"  方案已存: {out}")
+        members = cast_groups.group_members(group)
+        print(f"🎯 智能组合（Phase 5 候选评分器｜候选 {len(ranked)} 个 → top3 → 终选）")
+        print(f"  选题: {hotspot.title}（source_type={hotspot.source_type}）")
+        print(f"  角色组: {group['name']}（{len(members)} 人可选，样例 {', '.join(members[:6])}）")
+        print(f"  片型: {chosen.dna.genre} · {_genre_name(chosen.dna.genre)}")
+        print(f"  卖点: {chosen.dna.sales_point} · {_point_name(chosen.dna.sales_point)}")
+        print(f"  角度: {chosen.dna.angle}")
+        print(f"  骨架: {chosen.structure.get('name', '')}"
+              f"（{chosen.dna.shot_pattern}｜{chosen.dna.hook_type}｜{chosen.dna.conflict_type}）")
+        print(f"  总分: {chosen.total:.3f}")
+        for dim in SCORE_DIMENSIONS:
+            print(f"    · {dim:<22} {chosen.scores[dim]:.3f}  {chosen.scores['reasons'][dim]}")
+        print("  top3：")
+        for item in decision["shortlist"]:
+            print(f"    - {item['structure_name']}｜{item['dna']['hook_type']}"
+                  f"｜{item['dna']['shot_pattern']}  总分 {item['scores']['total']:.3f}")
+        print(f"  终选规则: {decision['rule']}")
 
     if args.commit:
         tag = args.commit
-        used = load_json(GROUPS_USED, {})
-        used.setdefault(g["name"], [])
-        if tag not in used[g["name"]]:
-            used[g["name"]].append(tag)
-        GROUPS_USED.write_text(json.dumps(used, ensure_ascii=False, indent=1), encoding="utf-8")
-        products.record_point(pt["id"], tag)
-        angles_mod.record_angle(ag["id"], tag)
-        genres.record_genre(gr["id"], tag)
-        print(f"  ✅ 已记录四池使用（tag={tag}）：组/卖点/角度/片型 各+1")
+        genres.record_genre(chosen.dna.genre, tag)
+        products.record_point(chosen.dna.sales_point, tag)
+        angles_mod.record_angle(chosen.dna.angle, tag)
+        if group_name:
+            cast_groups.record_group(group_name, tag)
+        print(f"  ✅ 已记录使用（tag={tag}）：片型/卖点/角度/角色组 各 +1（使用次数=Novelty 特征）")
+    if not args.json and not brief:
+        print("  ⚠️ 研究库不可用，选题来自命令行兜底")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
