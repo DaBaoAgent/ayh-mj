@@ -33,7 +33,7 @@ from hermes_bridge import blog, get_bridge
 
 from lib import OUT_DIR, STATE_DIR
 from lib.settings import get_settings
-from lib.state import get_job, get_stats, list_jobs
+from lib.state import get_stats, list_jobs
 
 WEBUI_DIR = Path(__file__).parent
 RUN_STATUS_FILE = STATE_DIR / "run_status.json"
@@ -345,10 +345,12 @@ async def api_jobs(status: str | None = None, limit: int = Query(default=20, ge=
 
 @app.get("/api/job/{uid}")
 async def api_job(uid: str):
-    job = get_job(uid)
-    if not job:
+    """完整任务视图：job + attempts + artifacts + events + evaluations + publishes。"""
+    from lib.jobstore import store
+    detail = store.detail(uid)
+    if not detail:
         return JSONResponse({"error": "任务不存在"}, status_code=404)
-    return job
+    return detail
 
 
 @app.post("/api/settings")

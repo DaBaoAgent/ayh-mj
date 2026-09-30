@@ -1,0 +1,23 @@
+=== Phase 2 验收证据：一个任务从 PLANNING 走到 DONE（全部落 DB）===
+uid / goal       : job_20260930_120343_011089 / 今天生产 1 条：菜场试坐
+最终状态          : DONE（stage=done）
+attempts/artifacts/evaluations/events : 1/1/1/13
+性能指标：views=1200 likes=88 skip_2s=None（缺失必须为 NULL，不编造 0）
+
+状态转换链（events.type=status_change）：
+      PLANNING → RESEARCHING  stage=researching
+   RESEARCHING → SCRIPTING    stage=scripting
+     SCRIPTING → PREFLIGHT    stage=preflight
+     PREFLIGHT → GENERATING   stage=generating
+    GENERATING → QA           stage=qa
+            QA → REPAIRING    stage=repairing
+     REPAIRING → COMPOSING    stage=composing
+     COMPOSING → PACKAGING    stage=packaging
+     PACKAGING → READY        stage=ready
+         READY → PUBLISHING   stage=publishing
+    PUBLISHING → LEARNING     stage=learning
+      LEARNING → DONE         stage=done
+
+非法转换拒绝示例：
+  DONE → PLANNING 被拒绝：非法状态转换: DONE → PLANNING；DONE 只允许转到 （终态，不可再转）
+  PLANNING → READY 被拒绝：非法状态转换: PLANNING → READY；PLANNING 只允许转到 BLOCKED, CANCELLED, FAILED, PAUSED, RESEARCHING

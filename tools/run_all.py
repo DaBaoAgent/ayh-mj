@@ -30,6 +30,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 STATE = ROOT / "state"
 QUEUE = STATE / "queue_15s"
 DONE = QUEUE / "_done"
@@ -42,6 +44,19 @@ PY = str(ROOT / ".venv/Scripts/python.exe") if (ROOT / ".venv/Scripts/python.exe
 # 前端进度条把这 6 个 id 当阶段序列（webui/static/app.js），出片过程中停在 generate→compose
 STAGE_GENERATE = "generate"
 STAGE_COMPOSE = "compose"
+
+from lib.dispatch import sync_queue  # noqa: E402
+from lib.jobstore import InvalidTransition, JobState, store  # noqa: E402
+
+
+def _transition(uid: str, state: str, **kw) -> None:
+    """任务状态推进（queue 只是缓存，事实源是 JobStore）；非法转换只记日志不中断出片。"""
+    try:
+        store.transition(uid, state, **kw)
+    except InvalidTransition as exc:
+        log_line(f"  ⚠ {uid} 状态未推进：{exc}")
+    except KeyError:
+        pass
 
 
 def write_status(**kw) -> None:
@@ -97,6 +112,15 @@ def main() -> int:
     write_status(running=True, current_stage=STAGE_GENERATE, progress=0,
                  message=f"出片队列启动（0/{total}）", started_at=time.strftime("%Y-%m-%d %H:%M:%S"))
 
+    # queue JSON = 分发缓存；任务事实登记进 JobStore（幂等，按 spec 指纹去重）
+    registered: dict[str, str] = {}
+    if not args.dry:
+        try:
+            registered = sync_queue(QUEUE)
+            log_line(f"  · JobStore 已登记 {len(registered)} 个任务")
+        except Exception as exc:  # 登记失败不阻断出片，但要留痕
+            log_line(f"  ⚠ JobStore 登记失败：{exc}")
+
     ok = fail = 0
     for i, spec in enumerate(specs, start=1):
         uid = spec.stem
@@ -110,6 +134,9 @@ def main() -> int:
         if args.force:
             cmd.append("--force")
         log_line(f"  ▷ {uid}：{' '.join(cmd[1:])}")
+        if uid in registered:
+            _transition(uid, JobState.GENERATING, stage="generate",
+                        message=f"开始出片（{i}/{total}）")
         r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, errors="replace")
         el = time.time() - t0
         out = (r.stdout or "") + (r.stderr or "")
@@ -119,11 +146,19 @@ def main() -> int:
         if success:
             ok += 1
             log_line(f"  ✅ {uid} 完成（{el / 60:.1f} 分钟）")
+            if uid in registered:
+                _transition(uid, JobState.QA, message="抽帧验收通过")
+                _transition(uid, JobState.COMPOSING, message="后期合成完成")
+                _transition(uid, JobState.READY, message="成片就绪，等待发布")
             if not args.dry:
                 shutil.move(str(spec), str(DONE / spec.name))
         else:
             fail += 1
             log_line(f"  ❌ {uid} 失败（{el / 60:.1f} 分钟）\n{tail}")
+            if uid in registered:
+                _transition(uid, JobState.FAILED, error_code=f"EXIT_{r.returncode}",
+                            message=f"出片失败（returncode={r.returncode}）",
+                            data={"tail": tail[-400:]})
         append_progress({
             "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "uid": uid, "ok": success,
             "minutes": round(el / 60, 1), "returncode": r.returncode,
