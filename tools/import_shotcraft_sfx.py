@@ -11,7 +11,7 @@ sparkle / whoosh-big）——软广是商用场景，不能用授权不明的素
 落地：assets/sfx_shotcraft/<类>/ + INDEX.md（含用途映射：哪句台词/哪个动作配哪个音）
 
 用法：
-  python tools/import_shotcraft_sfx.py --src D:/@kaifa/video-shotcraft
+  python tools/import_shotcraft_sfx.py --src <video-shotcraft 检出目录>
   python tools/import_shotcraft_sfx.py --src ... --check   # 只列清单不复制
 """
 from __future__ import annotations

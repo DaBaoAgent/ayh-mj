@@ -25,7 +25,11 @@ REVERB = "aecho=0.8:0.9:40|60:0.12|0.08"
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"
 VOICE_CHAIN = f"{REVERB},{LOUDNORM}"
 
-BGM_LIB = Path("D:/BaiduSyncdisk/3 艾伦和艾薇/免费音乐")
+# BGM 素材库：settings.paths（AYHMJ_PATHS__*）→ 仓库 assets/bgm_trending
+from lib.settings import get_settings  # noqa: E402
+
+_settings = get_settings()
+BGM_LIB = Path(_settings.paths.bgm_lib) if _settings.paths.bgm_lib else (_settings.root / "assets" / "bgm_trending")
 BGM_PREFERRED = ["轻快", "清新", "爵士-片头"]
 BGM_TRENDING = ROOT / "assets/bgm_trending"  # 抖音热门库（宝哥 2026-09-25 精选 36 首）
 SFX_DIR = ROOT / "assets/sfx"

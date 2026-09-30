@@ -19,10 +19,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import functools
 
-from lib.tools import ffmpeg
+from lib.settings import get_settings
+from lib.tools import ffmpeg, font_dir
 
-# 转写用系统 Python（.venv 无 faster-whisper）
-SYS_PYTHON = Path("C:/Users/xxx13/AppData/Local/Programs/Python/Python312/python.exe")
+_settings = get_settings()
+
+# 转写用 Python：settings.paths.python（可指向装了 faster-whisper 的解释器）→ 当前解释器
+SYS_PYTHON = Path(_settings.paths.python) if _settings.paths.python else Path(sys.executable)
 
 # 竖版字幕样式（白字黑边、居中、微软雅黑）
 # 垂直位置（宝哥规则 2026-09-24）：字幕底边落在画面「下方三分之一」处（原来贴在画面最底部 8% 会被抖音 UI 压住）
@@ -35,9 +38,21 @@ SUBTITLE_BOTTOM_RATIO = 0.25
 SUBTITLE_MARGIN_V = round(ASS_PLAY_RES_Y * SUBTITLE_BOTTOM_RATIO)
 
 # 字幕字体（2026-09-25 宝哥令：统一改为「新青年体」= 文悦新青年体，抖音/剪映同款）
-FONT_NAME = "文悦新青年体 (非商用) W8"
-FONTS_DIR = "D:/@kaifa/fonts-douyin"  # 字体文件所在目录（libass fontsdir 扫描）
-FONTS_DIR_ARG = "D\\:/@kaifa/fonts-douyin"  # ffmpeg filter 内用的转义路径（冒号需 \:）
+# Phase 1：字体目录不再写死本机路径，走 settings.fonts_dir / assets/fonts / 系统字体。
+FONT_NAME = _settings.compose.subtitle.font
+
+
+def _fonts_dir() -> str:
+    return str(font_dir())
+
+
+def _ffmpeg_path_arg(path: str) -> str:
+    """ffmpeg filter 内的路径转义：反斜杠归一 + 冒号转义。"""
+    return path.replace("\\", "/").replace(":", "\\:")
+
+
+FONTS_DIR = _fonts_dir()
+FONTS_DIR_ARG = _ffmpeg_path_arg(FONTS_DIR)
 
 SUB_STYLE = (f"FontName={FONT_NAME},FontSize=13,PrimaryColour=&HFFFFFF,"
              "OutlineColour=&H000000,BorderStyle=1,Outline=1.0,Shadow=0,"

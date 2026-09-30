@@ -203,7 +203,7 @@ const Hermes = {
         try {
             const r = await this.rpc('session.create', {
                 title: '轻便侠控制台',
-                cwd: 'D:/@kaifa/ayh-mj',
+                cwd: window.__AYHMJ_ROOT__ || '.',
             });
             this.sid = r.session_id;
             if (r.stored_session_id) localStorage.setItem('console_session_id', r.stored_session_id);
@@ -221,7 +221,7 @@ const Hermes = {
 
     async newChat() {
         try {
-            const r = await this.rpc('session.create', { cwd: 'D:/@kaifa/ayh-mj' });
+            const r = await this.rpc('session.create', { cwd: window.__AYHMJ_ROOT__ || '.' });
             this.sid = r.session_id;
             if (r.stored_session_id) localStorage.setItem('console_session_id', r.stored_session_id);
             this.clearView(false);

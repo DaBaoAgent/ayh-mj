@@ -1,0 +1,127 @@
+# ayh-mj 唯一权威非敏感默认配置（Phase 1 起）
+#
+# 优先级：环境变量 AYHMJ_<SECTION>__<KEY> > 本文件 > （已废弃的 config/pipeline.yaml，仅兼容）
+# 任何"本机才存在"的绝对路径都不允许写进业务代码；只能用下面的可配置项 + 环境变量覆盖。
+# 敏感值（API key / token）一律不进本文件，见 .env.example 与 lib/secrets.py。
+
+product:
+  name: "轻便侠218电动轮椅"
+  brand: "爱优护"
+  slogan: "轻便出行，自由生活"
+  keywords: ["电动轮椅", "轻便折叠", "老年代步", "出行辅具"]
+  assets_dir: "assets/products"
+
+paths:
+  # 全部相对于仓库根（ROOT 由 lib/settings.py 从仓库自身解析，不写死盘符）
+  state_dir: "state"
+  out_dir: "out"
+  logs_dir: "logs"
+  assets_dir: "assets"
+  config_dir: "config"
+  # 外部工具：留空 = 自动探测（环境变量 → PATH → 常见位置）；填绝对路径则强制使用
+  ffmpeg: ""
+  ffprobe: ""
+  # 字幕字体目录（libass fontsdir）；留空 = 自动在 assets/fonts 下找
+  fonts_dir: ""
+  # Python 解释器（默认用当前解释器；转写等重依赖可指向另一个解释器）
+  python: ""
+  # PostFlow CLI（国内发布）根目录；留空 = <root>/vendor/postflow
+  postflow_dir: ""
+  # 成片同步的桌面目录；留空 = <用户桌面>/ayh-mj
+  desktop_dir: ""
+  # BGM 素材库；留空 = <root>/assets/bgm_trending
+  bgm_lib: ""
+  # 旧式 API key 文本文件（可选兼容，非必需）
+  keyfile: ""
+  # 历史遗留的 key 文件（可选兼容：不存在就静默跳过，绝不是运行必需条件）
+  legacy_keyfiles:
+    - "D:/BaiduSyncdisk/2 @AI编程/Api Key/爱优护api.txt"
+    - "D:/自动剪辑/AutoDL/scripts/.env"
+    - "D:/自动剪辑/AutoDL/佳康顺/.env"
+  # dotenv 风格 KEY=VALUE 文件（相对仓库根；不存在即跳过）
+  dotenv_files:
+    - "state/ark.env"
+
+llm:
+  provider: "deepseek"
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-flash"
+  timeout_seconds: 120
+
+generate:
+  provider: "autodl"
+  base_url: "https://autodl.art"
+  default_workflow: "minimax_h3_lightx2v_v5"
+  resolution: "768p竖"
+  duration: 15
+  quality: "standard"
+  poll_interval_seconds: 20
+  max_wait_minutes: 25
+  prompt_max_chars: 10000
+  prompt_safe_chars: 9800
+
+asr:
+  # 本地转写（faster-whisper）；未安装时 health check 报 DEGRADED
+  backend: "faster-whisper"
+  model: "medium"
+  draft_model: "small"
+  device: "cpu"
+  compute_type: "int8"
+  language: "zh"
+
+trend:
+  platforms: ["douyin"]
+  keywords: ["电动轮椅", "轮椅生活", "适老化", "老年出行"]
+  competitor_accounts: []
+  pages_per_keyword: 3
+  min_likes: 1000
+
+storyboard:
+  shots_count: {min: 4, max: 6}
+  shot_duration: {min: 2, max: 5}
+  product_shots: 2
+
+compose:
+  subtitle:
+    font: "文悦新青年体 (非商用) W8"
+    font_size: 13
+    color: "white"
+    outline_color: "black"
+    outline_width: 1.0
+    bottom_ratio: 0.25
+    max_chars_per_line: 10
+  output:
+    resolution: "1080x1920"
+    fps: 30
+    codec: "libx264"
+    preset: "veryfast"
+    crf: 23
+
+publish:
+  domestic:
+    enabled: true
+    account_name: "ayh-main"
+    platforms: ["douyin", "xiaohongshu", "shipinhao"]
+  overseas:
+    enabled: true
+    profile: "xiangge"
+    platforms: ["tiktok", "youtube", "instagram", "facebook", "telegram", "x"]
+  daily_limit: 6
+  min_interval_minutes: 30
+  inter_platform_gap_seconds: 30
+  night_silence: {start: "23:00", end: "07:00"}
+  publish_windows:
+    - {start: "07:00", end: "09:00"}
+    - {start: "12:00", end: "14:00"}
+    - {start: "18:00", end: "22:00"}
+
+engage:
+  auto_reply: true
+  max_replies_per_hour: 20
+  reply_cooldown_seconds: 60
+  escalate_keywords: ["价格", "多少钱", "优惠", "投诉", "退款"]
+
+webui:
+  host: "127.0.0.1"
+  port: 8899
+  debug: false

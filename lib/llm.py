@@ -1,39 +1,24 @@
 """DeepSeek API 接口
 
 模型名（2026-09 实测）：本账号 DeepSeek API 只认 `deepseek-flash` / `deepseek-v4-pro`
-密钥来源优先级：环境变量 → hermes .env 文件
+密钥与超时统一走 lib.secrets / lib.settings（Phase 1：不再各自猜文件位置）。
 """
 import json
-import os
-from pathlib import Path
 
 import httpx
 
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEFAULT_MODEL = "deepseek-flash"
+from .settings import get_settings
+
+_settings = get_settings()
+DEEPSEEK_BASE_URL = _settings.llm.base_url
+DEFAULT_MODEL = _settings.llm.model
+DEFAULT_TIMEOUT = _settings.llm.timeout_seconds
 
 
 def _load_key() -> str:
-    """加载 API Key：统一key文件优先 → 环境变量 → hermes .env（2026-09-23 文件为权威源）"""
-    try:
-        from lib.keyfile import load_from_keyfile
-        k = load_from_keyfile("deepseek")
-        if k:
-            return k
-    except Exception:
-        pass
-
-    key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if key:
-        return key
-
-    env_file = Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / ".env"
-    if env_file.exists():
-        for raw in env_file.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if line.startswith("DEEPSEEK_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+    """加载 DeepSeek API Key（env → keyring → dotenv → 兼容 keyfile）。"""
+    from .secrets import get_secret
+    return get_secret("deepseek")
 
 
 DEEPSEEK_API_KEY = _load_key()
@@ -47,11 +32,12 @@ def chat(
     stream: bool = False,
 ) -> str:
     """调用 DeepSeek Chat API"""
-    if not DEEPSEEK_API_KEY:
-        raise ValueError("DEEPSEEK_API_KEY 未设置（环境变量或 hermes .env 都没有）")
+    api_key = DEEPSEEK_API_KEY or _load_key()
+    if not api_key:
+        raise ValueError("DEEPSEEK_API_KEY 未配置（见 .env.example；env/keyring/dotenv 都没有）")
 
     headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
@@ -65,7 +51,7 @@ def chat(
 
     # 直连 api.deepseek.com（trust_env=False 真正禁用环境变量代理——此前 proxy=None
     # 仍会走 HTTPS_PROXY，代理抖动时返回空响应导致"无法解析 JSON"）
-    with httpx.Client(timeout=120, trust_env=False) as client:
+    with httpx.Client(timeout=DEFAULT_TIMEOUT, trust_env=False) as client:
         resp = client.post(f"{DEEPSEEK_BASE_URL}/chat/completions",
                            headers=headers, json=payload)
         resp.raise_for_status()

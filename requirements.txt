@@ -1,29 +1,38 @@
-# ayh-mj 依赖
+# ayh-mj 运行依赖（Phase 1 起与 pyproject.toml 的 [project.dependencies] 保持一致）
+#
+# 安装（推荐 uv）：
+#   uv venv .venv
+#   uv pip install -r requirements.txt
+#   uv pip install -e ".[asr]"      # 可选：本地转写 / 字级字幕
+#   uv pip install -e ".[metrics]"  # 可选：psutil 资源遥测
+#   uv pip install -e ".[dev]"      # 可选：ruff / pytest / playwright
+#
+# 缺少某个可选依赖时不是崩溃，而是 health check 报 DEGRADED（见 tools/health_check.py）。
 
-# Web 框架
+# ── Web 服务 ────────────────────────────────────────────────
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 jinja2>=3.1.0
+websockets>=13.0
 
-# HTTP 客户端
+# ── 配置（强类型 settings）──────────────────────────────────
+pydantic>=2.5.0
+pyyaml>=6.0
+
+# ── HTTP 客户端 ─────────────────────────────────────────────
 httpx[socks]>=0.25.0
 requests>=2.31.0
-
-# 数据处理
-pyyaml>=6.0
 python-multipart>=0.0.6
-# 图像预处理：参考图缩放（autodl_client.to_data_url / ark_image）
+
+# ── 图像预处理：参考图缩放（autodl_client.to_data_url / ark_image）──
 Pillow>=10.0.0
 
-# 浏览器采集
+# ── 浏览器采集（抖音热点/发布）──────────────────────────────
 playwright>=1.40.0
 
-# TTS
+# ── TTS ─────────────────────────────────────────────────────
 edge-tts>=6.1.0
 
-# 工具
+# ── 密钥与 dotenv ───────────────────────────────────────────
 keyring>=24.0.0
 python-dotenv>=1.0.0
-
-# 开发
-ruff>=0.1.0

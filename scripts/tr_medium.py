@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -12,9 +13,10 @@ from faster_whisper import WhisperModel
 
 wav = sys.argv[1]
 out = Path(sys.argv[2])
+download_root = os.environ.get("WHISPER_DOWNLOAD_ROOT") or None
 model = WhisperModel(
     "medium", device="cpu", compute_type="int8",
-    download_root=r"C:\Users\xxx13\.cache\modelscope\Systran",
+    download_root=download_root,
 )
 segs, info = model.transcribe(wav, language="zh", beam_size=5, vad_filter=False)
 rows = []

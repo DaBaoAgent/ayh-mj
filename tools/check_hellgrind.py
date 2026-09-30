@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -31,7 +32,7 @@ print("Higgsfield《Hell Grind》三件套 —— 接入自检")
 print("=" * 74)
 
 # ── 1. 官方原文（本地副本 + MD5）──
-print("\n【1】官方原文（D:\\@kaifa\\higgsfield-hell-grind-skills）")
+print("\n【1】官方原文（AYHMJ_HELLGRIND_SRC 或仓库 assets/references）")
 import hashlib
 
 EXPECT = {
@@ -39,7 +40,7 @@ EXPECT = {
     "CINEDANCE HIGGSFIELD SKILL.md": "1ad963e23e869929b562e5a8609c1bd6",
     "ACTING SKILL.md": "070c75fc8e8a0bdc977de937a7fef983",
 }
-SRC = Path("D:/@kaifa/higgsfield-hell-grind-skills")
+SRC = Path(os.environ.get("AYHMJ_HELLGRIND_SRC", "") or (ROOT / "assets" / "references"))
 for name, md5 in EXPECT.items():
     p = SRC / name
     if not p.exists():

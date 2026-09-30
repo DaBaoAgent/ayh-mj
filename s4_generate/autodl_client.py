@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-import os
 import sys
 import time
 from pathlib import Path
@@ -20,7 +19,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
 
-BASE_URL = "https://autodl.art"
+from lib.secrets import get_secret
+from lib.settings import get_settings
+
+_settings = get_settings()
+
+BASE_URL = _settings.generate.base_url
 WORKFLOWS = {
     "multi_image": "minimax_h3_lightx2v_v5",       # 多图参考 1-10s
     "text2video": "minimax_h3_lightx2v_no_pic",     # 文生视频 1-10s
@@ -32,60 +36,24 @@ WORKFLOWS = {
 }
 RESOLUTIONS = ["480p竖", "768p竖", "1080p竖", "480p横", "768p横", "1080p横"]
 PRICE_PER_SEC = {"480p": 0.04, "768p": 0.06, "1080p": 0.10}
-POLL_INTERVAL = 20
-MAX_WAIT = 25 * 60
+POLL_INTERVAL = _settings.generate.poll_interval_seconds
+MAX_WAIT = _settings.generate.max_wait_minutes * 60
 RESIZE_MAX_SIDE = 1280
 RESIZE_MAX_BYTES = 1.5 * 1024 * 1024
 
-# 已知 token 位置
-KNOWN_ENV_FILES = [
-    Path("D:/BaiduSyncdisk/2 @AI编程/Api Key/爱优护api.txt"),  # 最新（2026-09-23 老板更新）
-    Path("D:/自动剪辑/AutoDL/scripts/.env"),
-    Path("D:/自动剪辑/AutoDL/佳康顺/.env"),
-]
-
-
-def _parse_key_file(env_file: Path) -> str:
-    """解析两类格式：AUTODL_API_KEY=xxx / 中文标签行+裸key"""
-    import re
-    lines = [ln.strip() for ln in env_file.read_text(encoding="utf-8").splitlines() if ln.strip()]
-    for line in lines:
-        if line.startswith("AUTODL_API_KEY="):
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
-    for line in lines:
-        m = re.search(r"([A-Za-z0-9+/=]{30,})", line)
-        if m:
-            return m.group(1).strip("=")
-    return ""
-
-
 def load_key() -> str:
-    """加载 AUTODL_API_KEY：统一key文件优先 → 环境变量 → 已知 .env（2026-09-23 文件为权威源）"""
-    try:
-        from lib.keyfile import load_from_keyfile
-        k = load_from_keyfile("autodl")
-        if k:
-            return k
-    except Exception:
-        pass
-    key = os.environ.get("AUTODL_API_KEY", "")
-    if key:
-        return key
-    for env_file in KNOWN_ENV_FILES:
-        if env_file.exists():
-            k = _parse_key_file(env_file)
-            if k:
-                return k
-    return ""
+    """加载 AUTODL_API_KEY（env → keyring → dotenv → 兼容 keyfile）。"""
+    return get_secret("autodl")
 
 
 API_KEY = load_key()
 
 
 def _headers() -> dict:
-    if not API_KEY:
-        raise ValueError("AUTODL_API_KEY 未设置（环境变量或已知 .env 位置都没有）")
-    return {"Authorization": API_KEY, "Content-Type": "application/json"}
+    key = API_KEY or load_key()
+    if not key:
+        raise ValueError("AUTODL_API_KEY 未配置（见 .env.example：env / keyring / dotenv / 兼容 keyfile）")
+    return {"Authorization": key, "Content-Type": "application/json"}
 
 
 def to_data_url(path_or_url: str, resize: bool = True) -> str:

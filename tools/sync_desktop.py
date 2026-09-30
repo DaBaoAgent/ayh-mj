@@ -1,6 +1,6 @@
 """成片自动同步到桌面 — 宝哥令（2026-09-25）
 
-out/approved/ 的成片 + 分镜元数据 → C:/Users/xxx13/Desktop/ayh-mj/
+out/approved/ 的成片 + 分镜元数据 → settings.paths.desktop_dir（默认 <桌面>/ayh-mj）
 规则：只复制「新增 / 更新」的文件（按大小+时间戳判定），幂等、可重复跑。
 
 用法：
@@ -15,8 +15,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 SRC = ROOT / "out" / "approved"
-DST = Path("C:/Users/xxx13/Desktop/ayh-mj")
+from lib.settings import get_settings  # noqa: E402
+
+DST = get_settings().desktop_dir
 PATTERNS = ("*.mp4", "*.json")
 
 

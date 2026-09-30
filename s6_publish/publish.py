@@ -21,13 +21,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-
-from lib import CONFIG_DIR, STATE_DIR
+from lib import STATE_DIR
+from lib.settings import get_settings
 from lib.state import connect, get_job, list_jobs, update_job
 
 # PostFlow CLI（ayh-mj 自有 vendor，2026-09-25 从 AutoAYH 迁入）
-POSTFLOW_DIR = Path("D:/@kaifa/ayh-mj/vendor/postflow")
+POSTFLOW_DIR = get_settings().postflow_dir
 POSTFLOW_EXE = POSTFLOW_DIR / ".venv" / "Scripts" / "postflow.exe"
 
 # 平台映射：我们的名字 → (通道, PostFlow子命令)
@@ -42,7 +41,14 @@ PACING_FILE = STATE_DIR / "publish_pacing.json"
 
 
 def load_config() -> dict:
-    return yaml.safe_load((CONFIG_DIR / "pipeline.yaml").read_text(encoding="utf-8"))
+    """配置唯一来源：lib.settings（config/default.yaml + AYHMJ_* 环境变量）。"""
+    s = get_settings()
+    return {
+        "publish": s.publish.model_dump(),
+        "engage": s.engage.model_dump(),
+        "product": s.product.model_dump(),
+        "webui": s.webui.model_dump(),
+    }
 
 
 def load_pacing() -> dict:
@@ -60,10 +66,16 @@ def check_quota(platform: str) -> tuple[bool, str]:
     config = load_config()
     pub = config.get("publish", {})
 
-    # 晚间静默 23:00-07:00
+    # 晚间静默（可配置，默认 23:00-07:00）
     now = datetime.now()
-    if now.hour >= 23 or now.hour < 7:
-        return False, "夜间静默期（23:00-07:00）"
+    silence = pub.get("night_silence") or {"start": "23:00", "end": "07:00"}
+    s_start, s_end = silence.get("start", "23:00"), silence.get("end", "07:00")
+    hhmm = now.strftime("%H:%M")
+    if s_start > s_end:            # 跨零点
+        if hhmm >= s_start or hhmm < s_end:
+            return False, f"夜间静默期（{s_start}-{s_end}）"
+    elif s_start <= hhmm < s_end:
+        return False, f"夜间静默期（{s_start}-{s_end}）"
 
     # 发布窗口
     windows = pub.get("publish_windows", [])
@@ -228,7 +240,7 @@ def publish_job(uid: str, platforms: list[str], yes: bool = False) -> dict:
 
         # 平台间留间隔（真发时）
         if yes and platform != platforms[-1]:
-            gap = 30
+            gap = load_config().get("publish", {}).get("inter_platform_gap_seconds", 30)
             print(f"    等待 {gap}s 再发下一个平台...", flush=True)
             time.sleep(gap)
 

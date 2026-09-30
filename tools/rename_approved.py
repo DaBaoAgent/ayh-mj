@@ -7,7 +7,7 @@
 
 特性：
   · 幂等：已是「N 主体.mp4」的文件按同一规则参与排序，可反复跑
-  · 同步改名桌面副本（C:/Users/xxx13/Desktop/ayh-mj/），避免 sync_desktop 产生新旧两份
+  · 同步改名桌面副本（settings.paths.desktop_dir），避免 sync_desktop 产生新旧两份
   · 只改名不删除；重名自动加 (2)
 
 用法：
@@ -23,8 +23,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 SRC = ROOT / "out" / "approved"
-DST = Path("C:/Users/xxx13/Desktop/ayh-mj")
+from lib.settings import get_settings  # noqa: E402
+
+DST = get_settings().desktop_dir
 ORDER_FILE = ROOT / "state" / "approved_order.json"
 
 PREFIX = re.compile(r"^(?:T\d+[a-z]?|B\d+(?:_\d+)?|W\d+|D2_\d+)_")

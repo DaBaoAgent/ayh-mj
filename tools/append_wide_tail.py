@@ -22,8 +22,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parent.parent
-FF = r"C:\Users\xxx13\ffmpeg\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"
-FP = FF.replace("ffmpeg.exe", "ffprobe.exe")
+sys.path.insert(0, str(ROOT))
+from lib.tools import ffmpeg, ffprobe  # noqa: E402
+
+FF = ffmpeg()
+FP = ffprobe()
 ENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "24",
        "-c:a", "aac", "-b:a", "128k", "-ar", "32000", "-ac", "2"]
 

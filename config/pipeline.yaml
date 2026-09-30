@@ -1,4 +1,10 @@
-# ayh-mj 流水线配置
+# ⚠️ DEPRECATED（Phase 1 起）—— 请改用 config/default.yaml
+#
+# 本文件不再是权威配置来源。lib/settings.py 只会在 config/default.yaml 缺少某键时
+# 用它兜底，并在启动时打印 deprecation 警告。新增配置一律写进 config/default.yaml。
+# Phase 14 将在确认无引用后删除本文件。
+
+# ayh-mj 流水线配置（legacy）
 
 # 产品信息
 product:

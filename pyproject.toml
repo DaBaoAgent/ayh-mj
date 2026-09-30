@@ -3,6 +3,29 @@ name = "ayh-mj"
 version = "0.1.0"
 description = "轻便侠·AI视频工厂 — 电动轮椅软广视频全自动生产流水线"
 requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "jinja2>=3.1.0",
+    "websockets>=13.0",
+    "pydantic>=2.5.0",
+    "pyyaml>=6.0",
+    "httpx[socks]>=0.25.0",
+    "requests>=2.31.0",
+    "python-multipart>=0.0.6",
+    "Pillow>=10.0.0",
+    "playwright>=1.40.0",
+    "edge-tts>=6.1.0",
+    "keyring>=24.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+# 可选能力：缺失时 health check 报 DEGRADED，不影响主链 import
+[project.optional-dependencies]
+asr = ["faster-whisper>=1.0.0"]
+metrics = ["psutil>=5.9.0"]
+learn = ["opencc-python-reimplemented>=0.1.7", "shazamio>=0.6.0"]
+dev = ["ruff>=0.1.0", "pytest>=7.0", "pytest-asyncio>=0.23", "pytest-playwright>=0.4"]
 
 [tool.ruff]
 line-length = 110

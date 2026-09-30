@@ -16,7 +16,10 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 ROOT = Path(__file__).resolve().parent.parent
-FF = r"C:\Users\xxx13\ffmpeg\ffmpeg-8.1.1-essentials_build\bin\ffmpeg.exe"
+sys.path.insert(0, str(ROOT))
+from lib.tools import ffmpeg  # noqa: E402
+
+FF = ffmpeg()
 VOICE = ROOT / "assets/cast/voice"
 TMP = VOICE / "_audition_tmp"
 LABEL_VOICE = "zh-CN-XiaoxiaoNeural"   # 报号嗓（与候选明显区分）

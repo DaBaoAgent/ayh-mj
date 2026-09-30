@@ -12,9 +12,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from PIL import Image, ImageDraw, ImageFont
 
-from lib.tools import ffmpeg
+from lib.tools import ffmpeg, find_font
 
-FONT_B = "C:/Windows/Fonts/msyhbd.ttc"
+_font = find_font(bold=True)
+FONT_B = str(_font) if _font else "msyhbd.ttc"
 
 
 def grab(video: Path, t: float, out: Path) -> bool:

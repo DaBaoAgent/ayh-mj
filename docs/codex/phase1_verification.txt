@@ -1,0 +1,21 @@
+=== 1) 仓库复制到不同目录后运行 health_check.py（无改源码）===
+目标目录           : C:\Users\ADMINI~1\AppData\Local\Temp\ayh-mj-relocated
+进程退出码         : 0
+报告 root          : C:\Users\Administrator\AppData\Local\Temp\ayh-mj-relocated
+总状态             : DEGRADED
+阻塞               : []
+降级               : ['whisper', 'douyin_profile', 'postflow']
+state/ 自动创建    : True
+ROOT 跟随仓库      : True
+
+=== 2) lib/secrets.py 密钥来源（不打印密钥值）===
+autodl: ✓ keyfile(legacy)
+deepseek: ✓ dotenv
+火山: ✓ keyfile(legacy)
+uploadpost: ✓ keyring
+
+=== 3) AYHMJ_<SECTION>__<KEY> 环境变量覆盖 ===
+AYHMJ_LLM__MODEL 覆盖后 llm.model = deepseek-v4-pro
+未覆盖 generate.duration 仍用 default.yaml = 15
+state_dir = D:\@kaifa\ayh-mj\state
+root = D:\@kaifa\ayh-mj

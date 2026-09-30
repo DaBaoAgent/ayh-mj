@@ -32,6 +32,7 @@ from fastapi.templating import Jinja2Templates
 from hermes_bridge import blog, get_bridge
 
 from lib import OUT_DIR, STATE_DIR
+from lib.settings import get_settings
 from lib.state import get_job, get_stats, list_jobs
 
 WEBUI_DIR = Path(__file__).parent
@@ -282,7 +283,7 @@ templates = Jinja2Templates(directory=WEBUI_DIR / "templates")
 async def index(request: Request):
     return templates.TemplateResponse(
         request=request, name="index.html",
-        context={"stages": STAGES})
+        context={"stages": STAGES, "root_json": json.dumps(get_settings().root.as_posix())})
 
 
 @app.get("/brand-logo.png", include_in_schema=False)
@@ -306,7 +307,30 @@ async def api_state():
         "stages": STAGES,
         "hermes": get_bridge().status(),
         "resources": await asyncio.to_thread(resource_stats),
+        "health": await asyncio.to_thread(health_summary),
     }
+
+
+def health_summary() -> dict:
+    """Phase 1：能力体检摘要（唯一来源 tools.health_check）。"""
+    try:
+        from tools.health_check import run_health
+        report = run_health()
+    except Exception as exc:  # 体检本身失败不能拖垮 /api/state
+        return {"status": "UNKNOWN", "error": str(exc), "capabilities": []}
+    return {
+        "status": report["status"],
+        "root": report["root"],
+        "blocking": report["blocking"],
+        "degraded": report["degraded"],
+        "capabilities": report["capabilities"],
+    }
+
+
+@app.get("/api/system/health")
+async def api_system_health():
+    """能力矩阵（WebUI System Health 面板 / 部署自检用）。"""
+    return await asyncio.to_thread(health_summary)
 
 
 @app.get("/api/stats")

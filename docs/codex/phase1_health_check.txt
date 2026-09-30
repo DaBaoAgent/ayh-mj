@@ -1,0 +1,20 @@
+🏥 ayh-mj 能力体检 ｜ 总状态 △ DEGRADED
+   仓库根：D:\@kaifa\ayh-mj
+================================================================
+  ✓ python           [必需] 3.12.9 @ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+  ✓ ffmpeg           [必需] C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffmpeg.EXE | C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffprobe.EXE
+  ✓ font             [可选] msyh.ttc @ C:\Windows\Fonts
+  △ whisper          [可选] faster_whisper 未安装：转写/字级字幕不可用
+      ↳ 修复：uv pip install faster-whisper（或 pip install -e '.[asr]'）
+  ✓ autodl           [可选] 来源 keyfile(legacy)
+  ✓ deepseek         [可选] 来源 dotenv
+  △ douyin_profile   [可选] 登录态目录不存在或为空：D:\@kaifa\ayh-mj\state\browser-profile
+      ↳ 修复：python s1_trend/browser.py --login 扫码
+  △ postflow         [可选] 未安装：D:\@kaifa\ayh-mj\vendor\postflow（国内发布不可用）
+      ↳ 修复：设置 AYHMJ_POSTFLOW_DIR 或把 PostFlow 放到 vendor/postflow
+  ✓ upload_post      [可选] 来源 keyring
+  ✓ db               [必需] D:\@kaifa\ayh-mj\state\pipeline.db
+  ✓ disk             [可选] 剩余 443.8 GB（阈值 2.0 GB）
+================================================================
+DEGRADED｜阻塞 0 项 / 降级 3 项
+[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。

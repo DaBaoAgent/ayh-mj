@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import base64
 import mimetypes
-import os
 import sys
 import time
 from pathlib import Path
@@ -26,6 +25,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx
+
+from lib.secrets import get_secret
 
 ARK_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations"
 MODEL = "doubao-seedream-5-0-lite-260128"  # 新账号开通5.0-lite(pro/4.5/4.0未开通；换账号或开通后调整)
@@ -41,26 +42,8 @@ SIZE_MAP = {
 
 
 def load_key() -> str:
-    """VOLCANO_API_KEY：统一key文件优先 → 环境变量 → 常见位置（2026-09-23 老板指定文件为权威源）"""
-    # 统一 key 文件（爱优护api.txt）
-    try:
-        from lib.keyfile import load_from_keyfile
-        k = load_from_keyfile("火山")
-        if k:
-            return k
-    except Exception:
-        pass
-    key = os.environ.get("VOLCANO_API_KEY", "")
-    if key:
-        return key
-    for env_file in [Path("D:/@kaifa/ayh-mj/state/ark.env"),
-                     Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / ".env"]:
-        if env_file.exists():
-            for raw in env_file.read_text(encoding="utf-8").splitlines():
-                line = raw.strip()
-                if line.startswith("VOLCANO_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+    """VOLCANO_API_KEY（env → keyring → dotenv → 兼容 keyfile）。"""
+    return get_secret("火山")
 
 
 API_KEY = load_key()

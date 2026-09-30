@@ -30,7 +30,7 @@ Thumbs.db
 desktop.ini
 
 # 临时文件
-_staging_tmp/
-*.tmp
-*.bak
-vendor/
+# 可选第三方工具（PostFlow 等）不随仓库分发，见 vendor/README.md 安装步骤；
+# 可通过 AYHMJ_POSTFLOW_DIR / settings.paths.postflow_dir 指向任意目录。
+vendor/*
+!vendor/README.md

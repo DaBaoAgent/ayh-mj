@@ -3,14 +3,20 @@
 用法: python tools/make_review_card.py
 输出: docs/review_card_T06_20260924.png
 """
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from lib.tools import find_font  # noqa: E402
+
 W = 1240
-FONT = "C:/Windows/Fonts/msyh.ttc"
-FONT_B = "C:/Windows/Fonts/msyhbd.ttc"
+_font = find_font()
+_font_b = find_font(bold=True) or _font
+FONT = str(_font) if _font else "msyh.ttc"
+FONT_B = str(_font_b) if _font_b else "msyhbd.ttc"
 
 
 def font(size, bold=False):
