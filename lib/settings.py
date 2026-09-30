@@ -144,6 +144,23 @@ class EngageSettings(BaseModel):
     circuit_breaker_failures: int = 3
 
 
+class LearnSettings(BaseModel):
+    """Phase 11 学习层：只学**本账号自己的**历史表现，不写死"爆款权重"。"""
+
+    enabled: bool = True
+    # 80% exploitation + 20% exploration（计划任务 6：比例可配，不是不可改的规则）
+    exploit_ratio: float = 0.8
+    # 学习窗口（天）：每条结论都必须能追到这个窗口（计划任务 9）
+    window_days: int = 30
+    # HistoricalPerformance 在候选综合分里的权重（0 = 关掉先验，退回 Phase 5 行为）
+    history_weight: float = 0.25
+    # 小样本平滑伪计数（计划任务 7：一条偶然爆/扑不许永久淘汰某片型）
+    prior_n: float = 5.0
+    # 置信度阈值：n < medium 一律 low confidence（数据不足必须显式说出来）
+    min_samples_medium: int = 8
+    min_samples_high: int = 30
+
+
 class WebuiSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8899
@@ -164,6 +181,7 @@ class Settings(BaseModel):
     compose: ComposeSettings = Field(default_factory=ComposeSettings)
     publish: PublishSettings = Field(default_factory=PublishSettings)
     engage: EngageSettings = Field(default_factory=EngageSettings)
+    learn: LearnSettings = Field(default_factory=LearnSettings)
     webui: WebuiSettings = Field(default_factory=WebuiSettings)
 
     # ── 路径解析（全部相对 ROOT，除非已是绝对路径）────────────────

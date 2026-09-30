@@ -635,6 +635,36 @@ class JobStore:
             conn.commit()
             return int(cur.lastrowid)
 
+    def list_performance_metrics(self, uid: str | None = None, *, platform: str | None = None,
+                                 since: str | None = None,
+                                 limit: int | None = None) -> list[dict]:
+        """读取表现快照（Phase 11 学习层，只读）。
+
+        缺失字段在行里就是 None —— 上层据此知道"平台没给这个数"，不必也不许拿 0 顶替。
+        """
+        sql = ["SELECT pm.*, j.uid AS job_uid FROM performance_metrics pm",
+               "JOIN jobs j ON j.id = pm.job_id"]
+        where: list[str] = []
+        args: list = []
+        if uid:
+            where.append("j.uid = ?")
+            args.append(uid)
+        if platform:
+            where.append("pm.platform = ?")
+            args.append(platform)
+        if since:
+            where.append("pm.snapshot_time >= ?")
+            args.append(since)
+        if where:
+            sql.append("WHERE " + " AND ".join(where))
+        sql.append("ORDER BY pm.snapshot_time ASC, pm.id ASC")
+        if limit:
+            sql.append("LIMIT ?")
+            args.append(int(limit))
+        with self._connect() as conn:
+            rows = conn.execute(" ".join(sql), args).fetchall()
+        return [_decode(r, "raw") for r in rows]
+
     # ── 聚合读取 ───────────────────────────────────────────────
     def detail(self, uid: str) -> dict | None:
         """完整任务视图（job + attempts + artifacts + events + evaluations + publishes）。"""

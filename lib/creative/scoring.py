@@ -27,6 +27,12 @@ DIMENSION_WEIGHTS: dict[str, float] = {
     "BrandSafety": 0.08, "ClaimRisk": 0.06, "EstimatedCost": 0.06,
 }
 
+# Phase 11：HistoricalPerformance 是**先验层**，不是第 11 个计划维度 ——
+# 计划 §Phase 5 钉死的 10 维与权重一个都不动；历史表现只按权重把 total 往
+# "历史上更像它的片子表现更好"的方向拉。没有历史（context 不带 history）时行为与 Phase 5 完全一致。
+HISTORICAL_DIMENSION = "HistoricalPerformance"
+DEFAULT_HISTORY_WEIGHT = 0.25
+
 # 骨架 → 天然贴合的受众（不是"只能给这些人看"，只是亲和度更高）
 STRUCTURE_AUDIENCES: dict[str, tuple[str, ...]] = {
     "S_duo_conflict": ("子女代购决策者", "社区邻里围观者"),
@@ -177,6 +183,21 @@ def score_dna(dna: CreativeDNA, *, structure: dict | None = None,
         "EstimatedCost": round(_clamp(est_cost), 4),
     }
     total = sum(DIMENSION_WEIGHTS[d] * scores[d] for d in SCORE_DIMENSIONS)
+
+    # ── HistoricalPerformance（Phase 11 任务 5）：只在拿到历史时才生效 ──
+    history = ctx.get("history")
+    if history is not None:
+        try:
+            prior = history(dna, st) if callable(history) else dict(history or {})
+        except Exception:                      # noqa: BLE001 - 学习层坏了不能阻断规划
+            prior = None
+        prior_score = (prior or {}).get("score")
+        if prior_score is not None:
+            weight = _clamp(ctx.get("history_weight", DEFAULT_HISTORY_WEIGHT))
+            total = (1.0 - weight) * total + weight * _clamp(prior_score)
+            scores[HISTORICAL_DIMENSION] = round(_clamp(prior_score), 4)
+            reasons[HISTORICAL_DIMENSION] = str(prior.get("reason") or "")
+
     return {**scores, "total": round(total, 4), "reasons": reasons}
 
 
@@ -185,5 +206,10 @@ def explain(score: dict, limit: int = 3) -> str:
     dims = {d: score.get(d, 0.0) for d in SCORE_DIMENSIONS}
     top = sorted(dims, key=lambda d: dims[d], reverse=True)[:limit]
     weak = sorted(dims, key=lambda d: dims[d])[:limit]
-    return (f"总分 {score.get('total', 0):.3f}；强项 " + "、".join(f"{d}{dims[d]:.2f}" for d in top)
+    note = (f"总分 {score.get('total', 0):.3f}；强项 "
+            + "、".join(f"{d}{dims[d]:.2f}" for d in top)
             + "；弱项 " + "、".join(f"{d}{dims[d]:.2f}" for d in weak))
+    prior = score.get(HISTORICAL_DIMENSION)
+    if prior is not None:
+        note += f"；历史表现 {float(prior):.2f}"
+    return note

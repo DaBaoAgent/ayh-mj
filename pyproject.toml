@@ -65,6 +65,7 @@ ignore = [
 "s4_generate/*.py" = ["E402"]
 "s5_compose/*.py" = ["E402"]
 "s6_publish/*.py" = ["E402"]
+"s7_learn/*.py" = ["E402"]
 "webui/*.py" = ["E402"]
 "tests/*.py" = ["E402"]
 

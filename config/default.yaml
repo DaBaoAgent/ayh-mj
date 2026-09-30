@@ -132,6 +132,20 @@ engage:
   duplicate_window: 50
   circuit_breaker_failures: 3
 
+learn:
+  # ── Phase 11：创意反馈闭环。只学本账号自己的表现，绝不写死"爆款权重" ──
+  enabled: true
+  # 80% exploitation + 20% exploration（可配，不是不可改的规则）
+  exploit_ratio: 0.8
+  # 学习窗口（天）：每条结论都要能追到这个窗口
+  window_days: 30
+  # HistoricalPerformance 在候选综合分里的权重（0 = 关闭先验）
+  history_weight: 0.25
+  # 小样本平滑伪计数 + 置信度阈值（样本不足一律 low confidence）
+  prior_n: 5.0
+  min_samples_medium: 8
+  min_samples_high: 30
+
 webui:
   host: "127.0.0.1"
   port: 8899

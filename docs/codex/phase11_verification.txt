@@ -1,0 +1,60 @@
+Phase 11 证据 —— 验证记录（ruff + pytest，全部实测）
+
+$ python -m ruff check lib tests tools webui s6_publish s7_learn
+All checks passed!
+
+$ python -m pytest -q tests/unit/test_learn_collector.py tests/unit/test_learn_normalizer.py \
+        tests/unit/test_learn_features.py tests/unit/test_learn_scorer.py \
+        tests/unit/test_learn_report.py tests/unit/test_planner_history.py \
+        tests/integration/test_learn_pipeline.py
+...............................................................          [100%]
+63 passed in 3.77s
+
+$ python -m pytest -q        # 全量（Phase 10 结束为 508 passed / 1 skipped）
+.......................................................s................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 62%]
+........................................................................ [ 75%]
+........................................................................ [ 88%]
+....................................................................     [100%]
+============================== warnings summary ===============================
+tests/unit/test_orchestrator.py::test_webui_cli_hermes_create_identical_jobs
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+571 passed, 1 skipped, 1 warning in 306.11s (0:05:06)
+
+$ python -m pytest tests/frontend -q
+...                                                                      [100%]
+3 passed in 3.02s
+
+——————————————————————————————————————————————————————————————
+Phase 11 新增测试（+63 条，全部通过）
+  tests/unit/test_learn_collector.py    11  16 指标字段/缺失不编造 0/幂等导入/快照键/四形状 fixture/只读 collect/无通道即拒绝
+  tests/unit/test_learn_normalizer.py    8  逐平台参照分布/样本不足不产百分位/p10-p90 线性映射+clamp/缺失保持 NULL/仅存在维度重归一
+  tests/unit/test_learn_features.py      6  CreativeDNA 20 字段一个不排除/risk_flags 多值/无 DNA 必丢弃/非法 DNA 跳过
+  tests/unit/test_learn_scorer.py       14  平滑拉回先验/置信度分档/无模型→None/结论带 n 窗口 uid/ratio=1 必利用 ratio=0 必探索/探索池空回退
+  tests/unit/test_learn_report.py        7  计划点名 6 个维度都在/中文字段名/JSON 与 Markdown 同源/落盘路径/日报周报
+  tests/unit/test_planner_history.py    10  历史先验改变排序/10 维契约不动/无样本不进先验/探索候选进 shortlist/失败静默降级
+  tests/integration/test_learn_pipeline.py 7  导入→标准化→特征→学习→复盘 端到端 + Planner 接线 + 无 DNA 丢弃
+
+数值对照（Phase 10 → Phase 11）：
+  pytest 全量   508 passed + 1 skipped  →  571 passed + 1 skipped（+63）
+  前端 smoke     3 passed              →  3 passed
+  ruff          All checks passed!      →  All checks passed!
+
+关键数值（docs/codex/phase11_performance_learning.txt 实测）：
+  幂等导入      首次 imported=16 skipped=0  →  再次 imported=0 skipped=16（库里恒为 16 行）
+  跨平台参照    douyin n=13（completion p10=0.109 median=0.463 p90=0.563）
+                xiaohongshu n=3（同字段完全不同的分位：p10=0.231 median=0.258 p90=0.288）
+  缺失保持 NULL 小红书样本 16 项指标只拿到 7 项，impressions norm = None（不是 0）
+  学习结论      G1 n=6 均值 0.890 平滑 0.705 / G5 n=6 均值 0.032 平滑 0.236（全库均值 0.482）
+  置信度        15 条样本 medium；1 条样本 low（不因一条偶然爆款淘汰片型）
+  历史先验      16 个候选全部因历史改分；top3 G6/G1/G10 → G6/G9/G10
+  探索保留      ratio=0.8 时探索池 16 个；ratio=1.0 必利用、ratio=0.0 必探索（explored 翻转）
+  可追溯        每条结论带 n + 窗口天数 + 样本 uid 列表
+
+说明：自动测试对 AutoDL 的付费提交数恒为 0 —— tests/integration/* 用 autouse fixture
+把 s4_generate.autodl_client.create_task 替换为抛错桩，任何意外真实提交都会让用例失败；
+Phase 11 的学习闭环全程只读本地库 + 本地 fixture，无网络、无付费、无真实平台采集。

@@ -30,7 +30,13 @@ from .prescreen import (
     record_prescreen,
     risk_of,
 )
-from .scoring import DIMENSION_WEIGHTS, SCORE_DIMENSIONS, score_dna
+from .scoring import (
+    DEFAULT_HISTORY_WEIGHT,
+    DIMENSION_WEIGHTS,
+    HISTORICAL_DIMENSION,
+    SCORE_DIMENSIONS,
+    score_dna,
+)
 from .storiespec import SPEC_VERSION, StorySpec, build_story_spec, summarize_research
 from .structures import STORY_STRUCTURES, structure_by_id
 from .workflow import (
@@ -50,6 +56,7 @@ __all__ = [
     "STORY_STRUCTURES", "structure_by_id", "StorySpec", "SPEC_VERSION", "build_story_spec",
     "summarize_research",
     "SCORE_DIMENSIONS", "DIMENSION_WEIGHTS", "score_dna",
+    "HISTORICAL_DIMENSION", "DEFAULT_HISTORY_WEIGHT",
     "CreativeDirector", "ScoredDNA", "CreativePlanner", "PlannedJob",
     # Phase 7：编译 / 路由 / 预筛 / 表演
     "PromptCompiler", "CompiledPrompt", "PromptBudget", "PromptBudgetExceeded",

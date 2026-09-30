@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -127,7 +128,9 @@ class CreativePlanner:
                  state_dir: Path | str | None = None, store=None,
                  director: CreativeDirector | None = None,
                  candidate_count: int = 16, seed: str = "",
-                 now: datetime | None = None) -> None:
+                 now: datetime | None = None,
+                 learn: bool | None = None, explore_ratio: float | None = None,
+                 rng: random.Random | None = None) -> None:
         self.state_dir = Path(state_dir) if state_dir else Path(STATE_DIR)
         self.queue_dir = Path(queue_dir) if queue_dir else self.state_dir / "queue_15s"
         self.creative_dir = self.state_dir / "creative"
@@ -136,6 +139,12 @@ class CreativePlanner:
         self.candidate_count = max(CANDIDATE_MIN, min(CANDIDATE_MAX, int(candidate_count)))
         self.seed = str(seed or "")
         self._now = now
+        # Phase 11：学习层（None = 跟随 settings.learn.enabled）
+        self._learn = learn
+        self._explore_ratio = explore_ratio
+        self._rng = rng
+        self._model = None
+        self._model_loaded = False
 
     # ── 时间 / 今日已存在任务 ──────────────────────────────────
     def now(self) -> datetime:
@@ -276,6 +285,45 @@ class CreativePlanner:
             "role_group": cast_groups.use_counts(),
         }
 
+    # ── 学习层（Phase 11）：历史表现先验 ───────────────────────
+    def learn_config(self) -> dict:
+        """读 settings.learn（配置不可用时退回内置默认值，绝不让规划挂掉）。"""
+        defaults = {"enabled": True, "exploit_ratio": 0.8, "window_days": 30,
+                    "history_weight": 0.25, "prior_n": 5.0, "min_medium": 8, "min_high": 30}
+        try:
+            from ..settings import get_settings
+            cfg = get_settings().learn
+        except Exception:                          # noqa: BLE001 - 缺 yaml/配置也要能规划
+            return defaults
+        return {"enabled": bool(cfg.enabled), "exploit_ratio": float(cfg.exploit_ratio),
+                "window_days": int(cfg.window_days), "history_weight": float(cfg.history_weight),
+                "prior_n": float(cfg.prior_n), "min_medium": int(cfg.min_samples_medium),
+                "min_high": int(cfg.min_samples_high)}
+
+    def performance_model(self):
+        """读本地表现快照建模型（只读、可空；失败一律退回 None）。"""
+        if self._model_loaded:
+            return self._model
+        self._model_loaded = True
+        cfg = self.learn_config()
+        if self._learn is False or (self._learn is None and not cfg["enabled"]):
+            return None
+        try:
+            from s7_learn import pipeline as learn_pipeline
+            store = self.store
+            if store is None:
+                from ..jobstore import store as default_store
+                store = default_store
+            model = learn_pipeline.history_for_planner(
+                self.state_dir.parent, store, window_days=cfg["window_days"],
+                prior_n=cfg["prior_n"], min_medium=cfg["min_medium"],
+                min_high=cfg["min_high"])
+            # 一条可用样本都没有 → 当作"没有历史"，而不是交出一个空模型让人误会
+            self._model = model if (model is not None and model.n_samples > 0) else None
+        except Exception:                          # noqa: BLE001 - 学习不可用不能阻断生产
+            self._model = None
+        return self._model
+
     # ── 规划一个 job ───────────────────────────────────────────
     def plan_for(self, uid: str, *, index: int = 0, goal: str = "", day: str | None = None,
                  force: bool = False) -> PlannedJob:
@@ -295,10 +343,21 @@ class CreativePlanner:
             raise PlannerError("研究结果没有可用的热点选题")
 
         cands = self.candidates(self.candidate_count, registry=registry, hotspot=hotspot)
+        # Phase 11：把历史表现当先验注入候选评分（无历史时行为与 Phase 5 完全一致）
+        from s7_learn import scorer as learn_scorer
+        cfg = self.learn_config()
+        model = self.performance_model()
+        hook = learn_scorer.history_hook(model)
         context = {"used_counts": self.used_counts(), "day_registry": self._registry_lists(registry),
-                   "trend": hotspot.to_dict(), "claim_points": sorted(NUMERIC_CLAIM_POINTS)}
+                   "trend": hotspot.to_dict(), "claim_points": sorted(NUMERIC_CLAIM_POINTS),
+                   "history_weight": cfg["history_weight"]}
+        if hook is not None:
+            context["history"] = hook
         ranked = self.director.rank(cands, context=context)
-        decision = self.director.decide(ranked)
+        ratio = (self._explore_ratio if self._explore_ratio is not None
+                 else cfg["exploit_ratio"])
+        selection = learn_scorer.select(ranked, model, ratio=ratio, rng=self._rng, hook=hook)
+        decision = self.director.decide(ranked, selection=selection)
         chosen = decision["chosen"]
         if chosen is None:
             raise PlannerError("候选评分没有产生终选方案")
@@ -314,6 +373,14 @@ class CreativePlanner:
             "reasons": dict(decision.get("reasons") or {}),
             "candidate_count": len(ranked),
             "claim_ids": claim_ids,
+            "history": {
+                "model": ({"n_samples": model.n_samples, "confidence": model.confidence(),
+                           "global_mean": model.global_mean, "window_days": model.window_days,
+                           "window": dict(model.window), "low_confidence": model.low_confidence(),
+                           "platforms": list(model.platforms)}
+                          if model is not None else None),
+                "selection": {k: v for k, v in selection.items() if k != "chosen"},
+            },
         }
         spec = build_story_spec(uid=uid, structure=structure, dna=dna, hotspot=hotspot.to_dict(),
                                 research_refs=summarize_research(brief), rationale=rationale,

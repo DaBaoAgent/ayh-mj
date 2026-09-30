@@ -72,16 +72,33 @@ class CreativeDirector:
     def shortlist(self, ranked: list[ScoredDNA], *, size: int | None = None) -> list[ScoredDNA]:
         return list(ranked[: max(1, int(size or self.shortlist_size))])
 
-    def decide(self, ranked: list[ScoredDNA], *, size: int | None = None) -> dict:
-        """top3 + 终选（终选必定来自 shortlist 的第一名，而不是候选表的第一名）。"""
+    def decide(self, ranked: list[ScoredDNA], *, size: int | None = None,
+               selection: dict | None = None) -> dict:
+        """top3 + 终选（终选必定来自 shortlist 的第一名，而不是候选表的第一名）。
+
+        Phase 11 起可传 `selection`（`s7_learn.scorer.select()` 的结果）：它选"探索"时，
+        终选就是"最有希望的未知"，并被并入 shortlist —— 保证 TOP3 里始终看得见那条
+        探索候选，而不是被历史先验悄悄挤掉（计划任务 5：必须保留探索机会）。
+        """
         short = self.shortlist(ranked, size=size)
         chosen = short[0] if short else None
+        explored = False
+        if selection and selection.get("chosen") is not None:
+            picked = selection["chosen"]
+            explored = bool(selection.get("explored"))
+            if picked is not chosen:
+                short = [picked, *[s for s in short if s is not picked]]
+                short = short[: max(1, int(size or self.shortlist_size))]
+            chosen = picked
         return {
-            "rule": DECISION_RULE,
+            "rule": DECISION_RULE + ("" if not selection else "；终选另受利用/探索策略约束"),
             "chosen": chosen,
             "shortlist": [s.to_dict() for s in short],
             "candidate_count": len(ranked),
             "dimensions": list(SCORE_DIMENSIONS),
+            "explored": explored,
+            "exploration": ({k: v for k, v in selection.items() if k != "chosen"}
+                            if selection else None),
             "note": explain(chosen.scores) if chosen else "",
             "reasons": dict(chosen.scores.get("reasons") or {}) if chosen else {},
         }
