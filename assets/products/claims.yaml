@@ -30,7 +30,7 @@ claims:
     certificate: ""
     valid_from: "2026-09-23"
     valid_to: ""
-    allowed_channels: [script, packaging, engage, cover]
+    allowed_channels: [script, packaging, engage, cover, subtitle]
     risk_level: low
     status: verified
     numeric_tokens: ["13.8", "十三点八", "13.8kg", "13.8公斤"]
@@ -48,7 +48,7 @@ claims:
     certificate: ""
     valid_from: "2026-09-23"
     valid_to: ""
-    allowed_channels: [script, packaging, engage, cover]
+    allowed_channels: [script, packaging, engage, cover, subtitle]
     risk_level: low
     status: verified
     numeric_tokens: ["1秒", "一秒", "1 秒"]
@@ -489,7 +489,7 @@ claims:
     certificate: ""
     valid_from: "2026-09-23"
     valid_to: ""
-    allowed_channels: [script, packaging, engage, cover]
+    allowed_channels: [script, packaging, engage, cover, subtitle]
     risk_level: low
     status: verified
     numeric_tokens: []

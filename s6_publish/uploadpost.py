@@ -67,24 +67,25 @@ def api_key() -> str:
 
 
 def default_profile() -> str:
-    """profile 解析：环境变量 UPLOADPOST_PROFILE → config/pipeline.yaml 的 uploadpost.profile。
+    """profile 解析：环境变量 UPLOADPOST_PROFILE → config/default.yaml 的 publish.overseas.profile。
 
     **不再有内置默认值**：早期版本默认 'xiangge'，结果没配 profile 时会悄悄发到别人的账号上。
-    现在没配就明确报错，绝不猜。
+    现在没配就明确报错，绝不猜。Phase 14：配置来源改成唯一权威的 lib.settings。
     """
     if (v := os.environ.get("UPLOADPOST_PROFILE")):
         return v.strip()
     try:
-        import yaml
-        cfg = yaml.safe_load((ROOT / "config" / "pipeline.yaml").read_text(encoding="utf-8")) or {}
-        v = (((cfg.get("publish") or {}).get("overseas") or {}).get("profile") or "").strip()
+        from lib.settings import get_settings
+
+        overseas = get_settings().publish.overseas or {}
+        v = str(overseas.get("profile") or "").strip()
         if v:
             return v
     except Exception:
         pass
     raise SystemExit(
         "还没配置 Upload-Post profile。二选一：\n"
-        "  1) 改 config/pipeline.yaml 的 uploadpost.profile: \"<profile名>\"\n"
+        "  1) 改 config/default.yaml 的 publish.overseas.profile: \"<profile名>\"\n"
         "  2) setx UPLOADPOST_PROFILE \"<profile名>\"\n"
         "（profile 是 Upload-Post 后台里的子账号名，与各平台 @handle 不同）")
 

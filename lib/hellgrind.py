@@ -5,7 +5,7 @@
   · CINEDANCE — 视频提示词导演（V4，Seedance 2.0 / H3）         → 本仓「one-take 提示词」环节
   · ACTING    — 表演系统（角色行为层，压力下的行为≠情绪展示）  → 本仓新增的「表演层」
 
-本地完整原文：D:\\@kaifa\\higgsfield-hell-grind-skills\\
+（本机不再保留原文本地副本，规则骨架已内化到本模块；不要在此写本机绝对路径。）
 Hermes 技能：media/lira-image-prompts · media/cinedance-seedance · media/acting-performance
 
 ⚠️ 冲突处理铁律：本模块只提供三件套的**通用规则骨架**。

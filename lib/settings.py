@@ -3,15 +3,14 @@
 设计要点
   1. ROOT 由仓库自身解析，绝不写死盘符；仓库复制到任何目录都能跑。
   2. 权威来源是 `config/default.yaml`；环境变量 `AYHMJ_<SECTION>__<KEY>` 覆盖。
-  3. 旧的 `config/pipeline.yaml` 已废弃：存在时只发一条 deprecation 警告，且仅填补
-     default.yaml 里没有的键（保证"只有一个权威来源"）。
+  3. `config/pipeline.yaml` 已于 Phase 14 删除：**唯一权威来源就是本文件**，
+     不再有"遗留配置兜底"这条第二路径。
   4. 所有"本机才存在"的外部依赖（ffmpeg/字体/PostFlow/Python/桌面目录）都走
      `paths.*` + 环境变量 + 自动探测，业务代码不得再写绝对路径。
 """
 from __future__ import annotations
 
 import os
-import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -22,7 +21,6 @@ from pydantic import BaseModel, Field
 ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_CONFIG = ROOT / "config" / "default.yaml"
-LEGACY_CONFIG = ROOT / "config" / "pipeline.yaml"
 
 
 class ProductSettings(BaseModel):
@@ -280,24 +278,14 @@ def _read_yaml(path: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-_WARNED = {"legacy_config": False}
-
-
 def load_settings(config_path: Path | str | None = None) -> Settings:
-    """读取权威配置 + 环境覆盖，返回强类型 Settings（每次都新建，便于测试）。"""
+    """读取权威配置 + 环境覆盖，返回强类型 Settings（每次都新建，便于测试）。
+
+    Phase 14：不再有 `config/pipeline.yaml` 兜底——default.yaml + 环境变量是唯
+    一来源，缺键就是缺键（"只有一个权威来源"从此是结构保证，不是纪律）。
+    """
     path = Path(config_path or os.environ.get("AYHMJ_CONFIG") or DEFAULT_CONFIG)
     data = _read_yaml(path)
-
-    if path != LEGACY_CONFIG and LEGACY_CONFIG.exists():
-        legacy = _read_yaml(LEGACY_CONFIG)
-        if legacy:
-            if not _WARNED["legacy_config"]:
-                _WARNED["legacy_config"] = True
-                print(
-                    "[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；"
-                    "本次仅用它填补缺失键。", file=sys.stderr)
-            data = _deep_merge(legacy, data)  # 权威源优先
-
     data = _deep_merge(data, _env_overrides())
     return Settings.model_validate(data)
 

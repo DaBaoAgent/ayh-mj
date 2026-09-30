@@ -1,6 +1,7 @@
 # ayh-mj 唯一权威非敏感默认配置（Phase 1 起）
 #
-# 优先级：环境变量 AYHMJ_<SECTION>__<KEY> > 本文件 > （已废弃的 config/pipeline.yaml，仅兼容）
+# 优先级：环境变量 AYHMJ_<SECTION>__<KEY> > 本文件。
+# Phase 14：config/pipeline.yaml 已删除，本文件是唯一权威来源，不再有兜底。
 # 任何"本机才存在"的绝对路径都不允许写进业务代码；只能用下面的可配置项 + 环境变量覆盖。
 # 敏感值（API key / token）一律不进本文件，见 .env.example 与 lib/secrets.py。
 
@@ -34,10 +35,10 @@ paths:
   # 旧式 API key 文本文件（可选兼容，非必需）
   keyfile: ""
   # 历史遗留的 key 文件（可选兼容：不存在就静默跳过，绝不是运行必需条件）
+  # Phase 14 清理：本机不存在的路径已删除，只保留下面这一个**仍在用**的例外。
+  # 换机器时请改这里（或设 AYHMJ_KEYFILE 指向单个 key 文件），不要把它写进业务代码。
   legacy_keyfiles:
     - "D:/BaiduSyncdisk/2 @AI编程/Api Key/爱优护api.txt"
-    - "D:/自动剪辑/AutoDL/scripts/.env"
-    - "D:/自动剪辑/AutoDL/佳康顺/.env"
   # dotenv 风格 KEY=VALUE 文件（相对仓库根；不存在即跳过）
   dotenv_files:
     - "state/ark.env"

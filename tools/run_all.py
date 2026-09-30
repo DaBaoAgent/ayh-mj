@@ -1,4 +1,4 @@
-"""15 秒软广管线 · 旧入口（Phase 3 起降级为纯 CLI adapter）。
+"""15 秒软广管线 · 旧入口（Phase 3 降级为 CLI adapter，Phase 14 标记 DEPRECATED）。
 
 ⚠️ 2026-09-30（Phase 3）：**核心编排已统一到 `lib/orchestrator`**。
    本脚本不再承担任何业务编排（不再自己扫队列、不再自己推状态、不再自己写
@@ -44,6 +44,8 @@ def _translate(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    print("[deprecated] tools/run_all.py 是旧入口（只做参数翻译）。"
+          "生产请直接用 tools/orchestrate.py，或走 WebUI「启动生产」。", file=sys.stderr)
     raw = list(sys.argv[1:] if argv is None else argv)
     return orchestrate_main(["start", *_translate(raw)])
 

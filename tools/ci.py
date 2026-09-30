@@ -33,10 +33,13 @@ ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 
 # 需要 compileall 的包（有 .py 的全部生产/测试目录）
-TYPECHECK_TARGETS = [
+# Phase 14：s2_copy / s3_storyboard 已随老管线归档，目录不存在时不再让 compileall
+# 每次都打印 "Can't list"（那只是噪音，会让真正的语法错误更难被发现）。
+_MAYBE_TARGETS = [
     "lib", "s1_trend", "s2_copy", "s3_storyboard", "s4_generate", "s5_compose",
     "s6_publish", "s7_learn", "tools", "webui", "tests",
 ]
+TYPECHECK_TARGETS = [d for d in _MAYBE_TARGETS if (ROOT / d).is_dir()]
 
 # 目录 与 该目录唯一允许的 marker（分类纪律）
 MARKER_DIRS = [

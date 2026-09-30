@@ -1,7 +1,7 @@
 """s1_trend 阶段入口：热榜 + 关键词搜索 + 同行对标 → 全部写入 trends 表
 
 用法：
-    python s1_trend/run.py                    # 按 config/pipeline.yaml 全量跑
+    python s1_trend/run.py                    # 按 config/default.yaml 全量跑
     python s1_trend/run.py --keywords 电动轮椅 轮椅生活
     python s1_trend/run.py --hot-only         # 只跑热榜
     python s1_trend/run.py --competitor-only  # 只跑对标账号
@@ -15,14 +15,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import yaml
-
-from lib import CONFIG_DIR
+from lib.settings import get_settings
 from lib.state import connect
 
 
 def load_config() -> dict:
-    return yaml.safe_load((CONFIG_DIR / "pipeline.yaml").read_text(encoding="utf-8"))
+    """趋势抓取配置：唯一来源是 config/default.yaml（经 lib.settings）。
+
+    Phase 14：不再直接读已删除的 config/pipeline.yaml。
+    """
+    s = get_settings()
+    return {"trend": {"platforms": list(s.trend.platforms),
+                      "keywords": list(s.trend.keywords),
+                      "competitor_accounts": list(s.trend.competitor_accounts),
+                      "pages_per_keyword": s.trend.pages_per_keyword,
+                      "min_likes": s.trend.min_likes}}
 
 
 def run(keywords: list[str] = None, hot: bool = True, competitor: bool = True,

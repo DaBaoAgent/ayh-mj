@@ -1,0 +1,217 @@
+Phase 14 证据 —— Legacy 收敛 / 文档更新 / 最终架构清理
+生成时间: 2026-09-30T16:43:29
+
+==============================================================================
+① 环境与基线
+==============================================================================
+分支      : codex/ayh-mj-vNext
+HEAD      : 218ad06 phase-13: establish ci and autonomous development guardrails
+autocrlf  : true
+python    : 3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]
+ruff      : ruff 0.16.9
+pytest    : pytest 9.1.1
+tracked   : 1151 files
+
+==============================================================================
+② 旧配置事实源 config/pipeline.yaml
+==============================================================================
+文件存在  : False (期望 False)
+git 跟踪  : False (期望 False)
+
+-- 业务代码里把 'pipeline.yaml' 当路径字面量用的位置（AST，排除注释/docstring）--
+命中      : （无）
+
+-- 只剩注释/docstring 提及（不算依赖）--
+lib/settings.py:6:  3. `config/pipeline.yaml` 已于 Phase 14 删除：**唯一权威来源就是本文件**，
+lib/settings.py:284:    Phase 14：不再有 `config/pipeline.yaml` 兜底——default.yaml + 环境变量是唯
+s1_trend/run.py:25:    Phase 14：不再直接读已删除的 config/pipeline.yaml。
+tests/contract/test_production_wiring.py:143:    """隔离凭据与 profile，避免测试真的去读 keyring / pipeline.yaml。"""
+tests/unit/test_settings.py:4:仓库换目录后仍可用（ROOT 不写死）；Phase 14 起 pipeline.yaml 已删除，唯一来源就是 default.yaml。
+
+==============================================================================
+③ 旧入口 tools/run_all.py 的废弃声明
+==============================================================================
+含 [deprecated] : True
+含 DEPRECATED   : True
+指向 orchestrate: True
+    """15 秒软广管线 · 旧入口（Phase 3 降级为 CLI adapter，Phase 14 标记 DEPRECATED）。
+    生产执行请直接看 `tools/orchestrate.py`（WebUI 的「启动生产」走的是同一个
+    tools/run_all.py --dry            → tools/orchestrate.py start --dry
+    tools/run_all.py --force          → tools/orchestrate.py start --force
+    print("[deprecated] tools/run_all.py 是旧入口（只做参数翻译）。"
+    "生产请直接用 tools/orchestrate.py，或走 WebUI「启动生产」。", file=sys.stderr)
+
+==============================================================================
+④ BGM / SFX 唯一策略入口
+==============================================================================
+-- 唯一入口定义处 --
+  lib/post/audio_director.py: ['load_library', 'score_track', 'select_bgm', 'pick_bgm']
+  lib/post/sfx.py: ['plan_sfx', 'resolve_files']
+
+-- 调用方（只允许这两个文件调 select_bgm / plan_sfx）--
+    lib/post/__init__.py:21:    select_bgm,
+    lib/post/__init__.py:41:from .sfx import GENRE_SFX_POLICY, SFX_FILES, SfxHit, plan_sfx, policy_for, resolve_files
+    lib/post/__init__.py:65:    "pick_bgm", "plan_sfx",
+    lib/post/__init__.py:66:    "policy_for", "resolve_files", "select_bgm", "story_audio_brief", "summarize_loudness",
+    lib/post/audio_director.py:186:def select_bgm(mood_curve=None, beat_map=None, *, genre: str = "", library=None,
+    lib/post/audio_director.py:225:    """兼容门面：老调用点要一个 Path。内部走 select_bgm（无 random、无 filesize）。"""
+    lib/post/audio_director.py:226:    track, _ = select_bgm(mood_curve, beat_map, genre=genre, recent=recent, lib_dir=lib_dir)
+    lib/post/sfx.py:114:def plan_sfx(spans, lines, *, genre: str = "", story: dict | None = None,
+    tools/audio_polish.py:7:  · 音效交给 `lib.post.sfx.plan_sfx`（动作/反转/punchline/品牌 beat 动态放置 + 片型 policy）；
+    tools/audio_polish.py:27:from lib.post.audio_director import select_bgm  # noqa: E402
+    tools/audio_polish.py:28:from lib.post.sfx import plan_sfx, resolve_files  # noqa: E402
+    tools/audio_polish.py:68:    track, rationale = select_bgm(brief.get("mood_curve"), brief.get("beat_map"),
+    tools/audio_polish.py:87:    hits = plan_sfx(spans, lines, genre=str(brief.get("genre") or ""), story=brief)
+    tools/make_15s.py:50:# 改由 lib.post.sfx.plan_sfx 依「动作 / 反转 / punchline / 品牌 beat」+ 片型 policy 动态放置。
+    tools/make_15s.py:321:        from lib.post.audio_director import select_bgm
+    tools/make_15s.py:322:        track, rationale = select_bgm(brief.get("mood_curve"), brief.get("beat_map"),
+    tools/make_15s.py:423:    触发点来自 `lib.post.sfx.plan_sfx`：动作/反转/punchline/品牌 beat + 片型 policy。
+    tools/make_15s.py:427:    from lib.post.sfx import plan_sfx, resolve_files
+    tools/make_15s.py:431:    hits = plan_sfx(spans, lines, genre=str(brief.get("genre") or ""), story=brief)
+
+-- 全仓 'random.choice/sample/randint/shuffle' 搜索（业务代码）--
+    lib/post/audio_director.py:5:  · `tools/audio_polish.py`：`random.choice` —— 每次不同，不可复现、不可解释。
+    tools/audio_polish.py:3:Phase 9 之前这里 `random.choice` 选 BGM、SFX_RULES 关键词命中就插、响度口径
+   合计: 2 处（预期只剩注释/文档）
+
+==============================================================================
+⑤ _deprecated_* 隔离（运行 / 测试 / import / WebUI）
+==============================================================================
+-- 四个守门点 --
+  pyproject.toml: "_deprecated_*", "vendor", "assets", "docs", "scripts",
+  pyproject.toml: norecursedirs = [".venv", "state", "out", "logs", "_deprecated_*", "vendor", "node_modules", "docs"]
+  lib/claims.py: SKIP_DIRS = {"_deprecated_20260925", "logs", ".venv", ".git", ".pytest_cache", ".ruff_cache",
+  tools/cleanup_project.py: if any(x in r for x in (".venv", ".git", os.sep + "vendor", "node_modules")) or r.endswith("_deprecated_20260925"):
+  tests/unit/test_no_hardcoded_paths.py: if "_deprecated" in f.parts or "vendor" in f.parts:
+
+-- import 扫描（AST：不得 import 归档目录）--
+命中 : （无）
+
+-- pytest 收集（norecursedirs 生效的行为证据）--
+    收集到的用例数: 742
+    来自归档目录的用例: （无，符合预期）
+    归档目录下确有的测试文件: ['_deprecated_20260925\\test_template_pipeline.py', '_deprecated_20260925\\tools\\test_emotion_tag.py', '_deprecated_20260925\\tools\\test_onetake_dualvoice.py', '_deprecated_20260925\\tools\\test_onetake_exchange.py', '_deprecated_20260925\\tools\\test_onetake_order.py', '_deprecated_20260925\\tools\\test_product_ref.py', '_deprecated_20260925\\tools\\test_t11_shot1.py', '_deprecated_20260925\\tools\\test_t12_track.py', '_deprecated_20260925\\tools\\test_t13_recline.py', '_deprecated_20260925\\tools\\test_t13_slope.py', '_deprecated_20260925\\tools\\test_t13_slope2.py', '_deprecated_20260925\\tools\\test_t13_slope3.py', '_deprecated_20260925\\tools\\test_t14_light.py', '_deprecated_20260925\\tools\\test_t16_market.py', '_deprecated_20260925\\tools\\test_t17_race.py', '_deprecated_20260925\\tools\\test_t18_battery.py', '_deprecated_20260925\\tools\\test_t19_wedding.py']
+
+==============================================================================
+⑥ 配置唯一权威 config/default.yaml
+==============================================================================
+root      : D:\@kaifa\ayh-mj
+state_dir : D:\@kaifa\ayh-mj\state
+product   : 爱优护 轻便侠218电动轮椅
+publish.overseas.profile : xiangge
+llm       : deepseek deepseek-flash
+generate  : autodl minimax_h3_lightx2v_v5
+lib/settings.py 提到 pipeline.yaml 次数: 2 （均为注释/docstring，非读取路径）
+
+-- lib/secrets.py（应无 deprecation 警告）--
+autodl: ✓ keyfile(legacy)
+deepseek: ✓ dotenv
+火山: ✓ keyfile(legacy)
+uploadpost: ✓ keyring
+
+==============================================================================
+⑦ 去硬编码本机路径
+==============================================================================
+-- tools/unit 回归 --
+10 passed in 0.99s
+
+-- 业务代码/配置里的本机绝对路径 --
+config/default.yaml:41:    - "D:/BaiduSyncdisk/2 @AI编程/Api Key/爱优护api.txt"
+
+-- 归档的试听缓存目录（已 untrack + gitignore）--
+   tracked: False (期望 False)
+   ignored: .gitignore:33:assets/cast/voice/_audition_tmp/	assets/cast/voice/_audition_tmp/list.txt
+
+==============================================================================
+⑧ tools/ 脚本分类（不复用清单，只看有没有被引用）
+==============================================================================
+被代码/配置/测试引用的（B 类，19 个）:
+    append_wide_tail.py          <- ['lib/prompt_parts.py']
+    audio_polish.py              <- ['lib/post/audio_director.py', 'tools/import_shotcraft_sfx.py', 'tools/make_15s.py']
+    check-take.mjs               <- ['tools/transcribe_local.py']
+    check_dialogue.mjs           <- ['lib/creative/compiler.py', 'lib/orchestrator/stages.py', 'tools/make_15s.py', 'tools/prep_g5_jingdian.py', 'tools/prep_h1_hero.py', 'tools/prep_s30_park.py', 'tools/prep_xinao10.py']
+    ci.py                        <- ['.github/workflows/ci.yml']
+    cleanup_project.py           <- ['webui/server.py']
+    frames_card.py               <- ['tools/make_15s.py', 'tools/prescreen.py']
+    gen_cast_scene.py            <- ['tools/check_hellgrind.py', 'tools/prep_g5_jingdian.py']
+    health_check.py              <- ['tools/bootstrap.py']
+    lines_to_srt.py              <- ['lib/post/transcript.py', 'tools/make_15s.py', 'tools/transcribe_local.py']
+    make_15s.py                  <- ['lib/creative/planner.py', 'lib/creative/storiespec.py', 'lib/orchestrator/stages.py', 'lib/post/audio_director.py', 'lib/post/sfx.py', 'tools/check_dialogue.mjs']
+    orchestrate.py               <- ['tools/run_all.py', 'webui/hermes_bridge.py']
+    pick_combo.py                <- ['lib/creative/__init__.py', 'lib/creative/cast_groups.py', 'lib/genres.py']
+    prep_g5_jingdian.py          <- ['tools/check_hellgrind.py']
+    rename_approved.py           <- ['tools/make_15s.py']
+    run_all.py                   <- ['tests/unit/test_orchestrator.py', 'webui/server.py']
+    sync_desktop.py              <- ['tools/make_15s.py']
+    transcribe_local.py          <- ['lib/post/transcript.py', 's5_compose/burn_subtitles.py', 'tools/lines_to_srt.py', 'tools/make_15s.py']
+    trim_onetake.py              <- ['tests/unit/test_trim_validation.py', 'tools/make_15s.py']
+
+没有任何代码引用的（C 类，27 个）:
+    ask_img.py, bootstrap.py, build_real_voice_library.py, check_collision.py, check_hellgrind.py, check_xinao10.py, check_xinao10_takes.py, concat_takes.py, fetch_bridges.py, fetch_trends_multi.py, gen_sfx.py, import_shotcraft_sfx.py, make_review_card.py, make_voice_audition.py, make_voice_sample.py, podcast_voice_harvest.py, prep_h1_hero.py, prep_s30_park.py, prep_t20_v3.py, prep_w1_magic.py, prep_w3_lunyizu.py, prep_xinao10.py, prescreen.py, rescore_lines.py, resume_task.py, retime.mjs, update_real_index.py
+
+注：orchestrate / ci / health_check / bootstrap 只由**人或 CI**调用，
+    所以也在 C 类里；它们是不是'入口'看 tools/README.md 的 A 类定义，不看引用数。
+
+tools/README.md 存在: True
+
+==============================================================================
+⑨ fresh clone 步骤 -> DEGRADED/READY 可解释状态
+==============================================================================
+-- ① 依赖清单存在 --
+   requirements.txt: True
+   pyproject.toml: True
+   .env.example: True
+   uv.lock: True
+
+-- ② venv 解释器 --
+    D:\@kaifa\ayh-mj\.venv\Scripts\python.exe 存在: True
+
+-- ③ health_check（fresh clone 的判定口径）--
+🏥 ayh-mj 能力体检 ｜ 总状态 △ DEGRADED
+   仓库根：D:\@kaifa\ayh-mj
+================================================================
+  ✓ python           [必需] 3.12.9 @ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+  ✓ ffmpeg           [必需] C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffmpeg.EXE | C:\Users\Administrator\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.1-essentials_build\bin\ffprobe.EXE
+  ✓ font             [可选] msyh.ttc @ C:\Windows\Fonts
+  △ whisper          [可选] faster_whisper 未安装：转写/字级字幕不可用
+      ↳ 修复：uv pip install faster-whisper（或 pip install -e '.[asr]'）
+  ✓ autodl           [可选] 来源 keyfile(legacy)
+  ✓ deepseek         [可选] 来源 dotenv
+  △ douyin_profile   [可选] 登录态目录不存在或为空：D:\@kaifa\ayh-mj\state\browser-profile
+      ↳ 修复：python s1_trend/browser.py --login 扫码
+  △ postflow         [可选] 未安装：D:\@kaifa\ayh-mj\vendor\postflow（国内发布不可用）
+      ↳ 修复：设置 AYHMJ_POSTFLOW_DIR 或把 PostFlow 放到 vendor/postflow
+  ✓ upload_post      [可选] 来源 keyring
+  ✓ db               [必需] D:\@kaifa\ayh-mj\state\pipeline.db
+  ✓ disk             [可选] 剩余 443.4 GB（阈值 2.0 GB）
+================================================================
+DEGRADED｜阻塞 0 项 / 降级 3 项
+
+-- ④ DB schema 版本（fresh clone 迁移到 v4）--
+SCHEMA_VERSION = 4
+applied        = [1, 2, 3, 4]
+tables         = ['artifacts', 'attempts', 'evaluations', 'events', 'interactions', 'jobs', 'performance_metrics', 'provider_tasks', 'publish_records', 'publishes', 'repairs', 'schema_migrations', 'sqlite_sequence', 'trends']
+
+
+==============================================================================
+⑩ 交付文档
+==============================================================================
+  README.md                                    9406 chars   269 lines
+  tools/README.md                              2742 chars    57 lines
+  docs/architecture/vnext.md                  11782 chars   350 lines
+  docs/operations.md                           6069 chars   190 lines
+  docs/creative_system.md                      9592 chars   253 lines
+  docs/codex_phase_14_acceptance.md          缺失
+
+-- README 必覆盖小节（计划任务 8）--
+   安装       ✓
+   Health check ✓
+   启动       ✓
+   创建目标     ✓
+   观察与恢复    ✓
+   人工阻断     ✓
+   发布安全     ✓
+   测试方法     ✓
+
+==============================================================================
+END OF PHASE 14 EVIDENCE

@@ -1,0 +1,83 @@
+Phase 14 证据补充 —— 验证记录（ruff + pytest + marker 分布 + CI 门禁，全部实测）
+
+$ python -m ruff check lib tests tools webui s6_publish s7_learn
+All checks passed!
+
+$ python -m pytest -q tests/unit/test_legacy_fact_sources.py
+7 passed
+
+$ python -m pytest -q -m "not live and not paid"          # 全量（Phase 13 结束为 734 passed / 1 skipped）
+........................................................................ [  9%]
+.........................................s.............................. [ 19%]
+........................................................................ [ 29%]
+........................................................................ [ 39%]
+........................................................................ [ 48%]
+........................................................................ [ 58%]
+........................................................................ [ 68%]
+........................................................................ [ 78%]
+........................................................................ [ 88%]
+........................................................................ [ 97%]
+...............                                                          [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  .../fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+741 passed, 1 deselected, 1 warning in 313.57s (0:05:13)
+
+$ python -m pytest --collect-only -q
+742 tests collected in 0.38s          # 741 passed + 1 deselected（该 paid 用例同时带 live marker）
+
+$ python -m pytest tests -m "live or paid" -q -rs     # 不带任何 AYHMJ_RUN_* 环境变量
+1 skipped, 741 deselected
+SKIPPED [1] tests\paid\test_paid_placeholder.py: paid test: set AYHMJ_RUN_PAID=1 to enable
+
+marker 分布：unit 628 / contract 50 / integration 54 / frontend 9 / paid(+live) 1
+             （合计 742，与 collected 数一致；unit 628 = Phase 13 的 621 + 本阶段新增 7）
+
+$ python tools/ci.py                          # 一条命令跑全部非 live 测试（验收标准 ③）
+>>> lint          All checks passed!
+>>> typecheck
+>>> unit          628 passed, 1 warning
+>>> contract      50 passed
+>>> integration   54 passed
+>>> frontend      9 passed
+>>> migration     5 passed
+  汇总
+  PASS  lint            0.1s
+  PASS  typecheck       0.1s
+  PASS  unit           17.4s
+  PASS  contract        0.5s
+  PASS  integration   289.2s
+  PASS  frontend       10.8s
+  PASS  migration       0.5s
+
+全部门禁通过（总耗时 318.7s）
+returncode = 0
+
+（原始输出见 logs/_p14_ci2.txt。logs/_p14_ci.txt 是修正 TYPECHECK_TARGETS 之前的对照跑，
+  其 typecheck 一步原样打印 “Can't list 's2_copy'” 与 “Can't list 's3_storyboard'”；
+  修正后该噪音消失，两次运行均全 PASS、returncode = 0）
+
+——————————————————————————————————————————————————————————————
+Phase 14 新增测试（+7 条，全部通过。全仓 735 -> 742 collected）
+
+  tests/unit/test_legacy_fact_sources.py        7  用 AST 判定“真实依赖”（注释 / docstring 不算），
+                                                   守住四类已废弃事实源加一条配置卫生规则：
+                                                     ① config/pipeline.yaml 不得再被当路径读取
+                                                     ② 音频选曲不得回到 random.choice/sample/shuffle
+                                                     ③ _deprecated_* 不得被 import 或拼进 sys.path
+                                                     ④ tools/run_all.py 必须自声明 DEPRECATED
+                                                     ⑤ config/default.yaml 不得含本机绝对路径
+                                                        （白名单：仍是唯一在用的 keyfile 路径、
+                                                          lib/claims.py 与 tools/cleanup_project.py）
+                                                   归档目录被排除：ARCHIVE_EXCLUSION_ALLOW 只放行
+                                                   lib/claims.py 与 tools/cleanup_project.py。
+
+Phase 14 修改 1 个既有测试文件：tests/unit/test_settings.py（docstring 同步：不再有 pipeline.yaml 回退分支）。
+
+Phase 14 新增非测试交付物（不参与 pytest，但属验收证据）：
+  tools/README.md                    工具三分类（A 入口 / B 可复用服务 / C 一次性人工工具）
+  docs/architecture/vnext.md         vNext 架构 + 数据库 mermaid ER + 状态机 stateDiagram-v2
+  docs/operations.md                 运维与故障处置（含成本异常 / 账号 / provider 异常）
+  docs/creative_system.md            CreativeDNA / StorySpec / QA / Repair / Learner 闭环
+  docs/codex/phase14_legacy_retirement.txt  10 段旧事实源退役实测（脚本 logs/_p14_evidence.py）

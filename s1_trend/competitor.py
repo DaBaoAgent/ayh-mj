@@ -2,16 +2,14 @@
 
 用法：
     python s1_trend/competitor.py --sec-uid MS4wLj... --limit 20
-    python s1_trend/competitor.py --from-config   # 从 config/pipeline.yaml 读对标账号
+    python s1_trend/competitor.py --from-config   # 从 config/default.yaml 读对标账号
 """
 from __future__ import annotations
 
 import argparse
 from typing import Any
 
-import yaml
-
-from lib import CONFIG_DIR
+from lib.settings import get_settings
 from s1_trend.browser import ctx
 
 POSTS_JS = """
@@ -64,11 +62,10 @@ def main() -> int:
 
     sec_uids = []
     if args.from_config:
-        config_file = CONFIG_DIR / "pipeline.yaml"
-        config = yaml.safe_load(config_file.read_text(encoding="utf-8"))
-        sec_uids = config.get("trend", {}).get("competitor_accounts", [])
+        sec_uids = list(get_settings().trend.competitor_accounts)
         if not sec_uids:
-            print("配置里没有对标账号，请先在 config/pipeline.yaml 的 trend.competitor_accounts 添加", flush=True)
+            print("配置里没有对标账号，请先在 config/default.yaml 的 trend.competitor_accounts 添加",
+                  flush=True)
             return 1
     elif args.sec_uid:
         sec_uids = [args.sec_uid]

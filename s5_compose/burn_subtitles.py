@@ -62,8 +62,44 @@ SUB_STYLE = (f"FontName={FONT_NAME},FontSize={SUBTITLE_FONT_SIZE},PrimaryColour=
              f"Alignment=2,MarginV={SUBTITLE_MARGIN_V},Bold=0")
 
 # ── 字幕动效（2026-09-25 宝哥令：关键词高亮+弹跳）──
-HIGHLIGHT_WORDS = ["爱优护", "轻便侠", "医疗级", "锂电", "13.8", "单手", "一秒",
-                   "说走就走", "放心睡", "听您的", "屋里充", "没白请"]
+# Phase 14：高亮词不再手写第二份产品事实。品牌/产品名来自 config/default.yaml，
+# 数值口径来自 Claims Registry 的 `subtitle` 渠道（只取 status=verified 的）。
+# 旧版本手写的「医疗级 / 锂电 / 屋里充」在 registry 里是 needs_verification
+# （医疗级锂电池、国家医疗器械认证缺证书），**不许自动对外使用**，因此这里也不再高亮。
+CATCHPHRASES = ["说走就走", "放心睡", "听您的", "没白请"]
+
+
+def _product_short_name() -> str:
+    """产品名里的中文主名（「轻便侠218电动轮椅」-> 「轻便侠」）。"""
+    import re as _re
+    m = _re.match(r"[\u4e00-\u9fff]+", str(_settings.product.name or ""))
+    return m.group(0) if m else ""
+
+
+def highlight_words() -> list[str]:
+    """字幕高亮词 = 品牌/产品名 + 已核验的数值口径 token + 固定口号。"""
+    words: list[str] = []
+    for w in (str(_settings.product.brand or "").strip(), _product_short_name()):
+        if w and w not in words:
+            words.append(w)
+    try:
+        from lib.claims import load as _load_claims
+
+        for claim in _load_claims().usable("subtitle"):
+            for tok in claim.tokens():
+                tok = str(tok).strip()
+                if tok and tok not in words:
+                    words.append(tok)
+    except Exception:
+        # registry 缺失/损坏时退化为"只高亮品牌与口号"，绝不阻断烧字幕
+        pass
+    for w in CATCHPHRASES:
+        if w not in words:
+            words.append(w)
+    return words
+
+
+HIGHLIGHT_WORDS = highlight_words()
 HL_COLOR = r"&H00FFFF&"      # 黄（ASS BGR）
 RESTORE = r"&HFFFFFF&"
 

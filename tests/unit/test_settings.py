@@ -1,7 +1,7 @@
 """统一配置解析回归（Phase 1）。
 
 覆盖：权威源 default.yaml、环境变量覆盖 AYHMJ_<SEC>__<KEY>、路径自解析、
-仓库换目录后仍可用（ROOT 不写死）、legacy pipeline.yaml 只兜底不夺权。
+仓库换目录后仍可用（ROOT 不写死）；Phase 14 起 pipeline.yaml 已删除，唯一来源就是 default.yaml。
 """
 from __future__ import annotations
 

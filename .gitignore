@@ -29,6 +29,9 @@ secrets/
 Thumbs.db
 desktop.ini
 
+# Phase 14：试听缓存目录（内含本机绝对路径的 ffmpeg list），不进仓库
+assets/cast/voice/_audition_tmp/
+
 # 临时文件
 # 可选第三方工具（PostFlow 等）不随仓库分发，见 vendor/README.md 安装步骤；
 # 可通过 AYHMJ_POSTFLOW_DIR / settings.paths.postflow_dir 指向任意目录。

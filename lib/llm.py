@@ -154,14 +154,27 @@ def chat_json(
     raise ValueError(f"chat_json 失败（{retries + 1} 次尝试）: {last_err}")
 
 
+def _product_defaults() -> dict:
+    """产品事实的唯一来源是 config/default.yaml 的 product 段（Phase 14）。
+
+    以前这里写死了第二套默认值（品牌/产品名/卖点），与 settings 漂移时没人会发现。
+    """
+    p = get_settings().product
+    return {"brand": p.brand, "name": p.name, "keywords": list(p.keywords)}
+
+
 def generate_script(topic: str, product_info: dict, style: str = "轻快科普风") -> str:
     """生成软广脚本（简版，完整版见 s2_copy/gen_script.py）"""
+    defaults = _product_defaults()
+    brand = product_info.get('brand') or defaults["brand"]
+    name = product_info.get('name') or defaults["name"]
+    keywords = product_info.get('keywords') or defaults["keywords"]
     system_prompt = f"""你是一个抖音爆款文案专家，擅长写电动轮椅软广视频脚本。
 
 产品信息：
-- 品牌：{product_info.get('brand', '爱优护')}
-- 产品：{product_info.get('name', '轻便侠218电动轮椅')}
-- 卖点：{', '.join(product_info.get('keywords', ['轻便', '折叠', '安全']))}
+- 品牌：{brand}
+- 产品：{name}
+- 卖点：{', '.join(keywords)}
 
 风格要求：{style}
 - 口语化，像朋友聊天

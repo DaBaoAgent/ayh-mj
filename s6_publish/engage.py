@@ -108,7 +108,8 @@ def classify(text: str) -> tuple[str, str]:
 def gen_reply(text: str, context: str = "comment") -> str:
     """生成回复（顾问语气，1-2句）"""
     facts = product_facts()
-    system = f"""你在运营抖音/Instagram上的电动轮椅产品号（品牌：爱优护）。
+    brand = get_settings().product.brand
+    system = f"""你在运营抖音/Instagram上的电动轮椅产品号（品牌：{brand}）。
 
 产品信息（唯一来源：Claims Registry；只能基于这个说，绝不编造参数）：
 {facts}
