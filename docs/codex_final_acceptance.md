@@ -19,10 +19,10 @@
 | 分支 | `codex/ayh-mj-vNext` |
 | 远端 | `origin` → `https://github.com/DaBaoAgent/ayh-mj.git` |
 | 本阶段起点 | `7b6ba14`（phase-14） |
-| Phase 15 提交 | `__PHASE15_SHA__` —— `phase-15: accept autonomous end-to-end pipeline`（含全部验收装置、缺陷修复与本文档） |
-| 最终 tip | 以推送回执 / `git log -1 --format=%H` 为准（见 §12 交付说明） |
+| Phase 15 提交 | `2399c4e12ad4f19afb5eed18dcea8262ab461af3` —— `phase-15: accept autonomous end-to-end pipeline`（含全部验收装置、缺陷修复与本文档） |
+| 最终 tip | `phase-15` 提交之后的文档提交 `docs: record phase-15 acceptance SHA`（SHA 见推送回执 / `git log -1 --format=%H`） |
 
-> 说明：本文档需要记录「包含它自己的提交」的 SHA，属于自引用，无法在文件内硬编码自身；因此此处记录 Phase 15 提交 SHA，tip 以仓库实际状态为准。
+> 说明：本文档需要记录「包含它自己的提交」的 SHA，属于自引用，无法在文件内硬编码自身；因此 §1 记录的是 **Phase 15 提交**（`2399c4e12ad4f19afb5eed18dcea8262ab461af3`，包含全部验收装置、缺陷修复与本文档），本文件随后由一个 docs-only 提交记录该 SHA 并推送，最终 tip 以 `git log -1 --format=%H` 与推送回执为准。
 
 ---
 
@@ -45,7 +45,7 @@
 | 12 | `c10b500` | rebuild web console around canonical jobs and events |
 | 13 | `218ad06` | establish ci and autonomous development guardrails |
 | 14 | `7b6ba14` | retire legacy pipeline and document vnext architecture |
-| 15 | `__PHASE15_SHA__` | accept autonomous end-to-end pipeline |
+| 15 | `2399c4e` | accept autonomous end-to-end pipeline |
 
 ---
 
@@ -230,6 +230,6 @@ Phase 15 分段结果（证据 §⑤/⑧/⑨/⑩/⑪）：`full_chain` 10 · `ro
 ## 12. 交付说明
 
 - 代码与验收装置：Phase 0–15 全部提交在 `codex/ayh-mj-vNext`，最新提交为 `phase-15: accept autonomous end-to-end pipeline`。
-- 最终 tip SHA 见推送回执 / `git log -1 --format=%H`（本文档自引用无法硬编码自身所在提交）。
+- Phase 15 提交：`2399c4e12ad4f19afb5eed18dcea8262ab461af3`；最终 tip 为其后的 docs-only 提交，见推送回执 / `git log -1 --format=%H`（本文档自引用无法硬编码自身所在提交）。
 - 复现验收：`.venv/Scripts/python.exe tools/ci.py`（7 步门禁），或 `.venv/Scripts/python.exe logs/_p15_evidence.py`（需 `logs/` 下脚本，仅本地生成证据，不入库）。
 - 真实链路启用条件：设置 `AYHMJ_RUN_PAID=1` + `RunConfig.budget_cap`，并显式 `real_publish=true`；在此之前系统一律停在 `READY` / 草稿。
