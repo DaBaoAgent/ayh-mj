@@ -178,9 +178,15 @@ class StageContext:
     workspace: Path = field(default_factory=Path)
     root: Path = field(default_factory=Path)
     store: Any = None
+    provider: Any = None          # 供应商适配器（Phase 4；缺省时 stage 自己按需构造）
     handle: Any = None
     log: Callable[[str], None] | None = None
     spawned: list[subprocess.Popen] = field(default_factory=list)
+    # 幂等生成驱动的可调参数（真实运行用默认值；测试注入 0 延时）
+    sleep: Callable[[float], None] = time.sleep
+    poll_interval: float = 20.0
+    max_wait: float = 1800.0
+    download_retries: int = 3
 
     @property
     def dry(self) -> bool:
@@ -193,6 +199,11 @@ class StageContext:
     @property
     def python(self) -> str:
         return sys.executable
+
+    @property
+    def cancel_event(self):
+        """当前 run 的取消信号（无 handle 时为 None）——幂等生成驱动据此安全停止。"""
+        return getattr(self.handle, "cancel", None)
 
     def cancelled(self) -> bool:
         event = getattr(self.handle, "cancel", None)

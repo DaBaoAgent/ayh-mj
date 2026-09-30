@@ -43,9 +43,12 @@ def _post(url: str, payload: dict | None = None, timeout: float = 20.0):
 
 
 @pytest.fixture(scope="module")
-def webui_server():
+def webui_server(tmp_path_factory):
     port = _free_port()
-    env = {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    # 隔离 state 目录：绝不污染真实 state/pipeline.db（Phase 4 修复）
+    state_dir = tmp_path_factory.mktemp("webui_state")
+    env = {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
+           "AYHMJ_STATE_DIR": str(state_dir)}
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "webui.server:app",
          "--host", "127.0.0.1", "--port", str(port), "--lifespan", "off",

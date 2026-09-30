@@ -1,18 +1,173 @@
-"""编排层异常与 error_code（Phase 3；完整 taxonomy 由 Phase 4 扩展）。
+"""编排层异常与 error taxonomy（Phase 3 落地 → Phase 4 补全为完整清单）。
 
 约定
-  · 每个异常都带稳定的 `error_code`（UPPERCASE），落进 `jobs.error_code` /
-    `attempts.error_code`，前端与 RepairEngine 只认这个码，不解析中文；
-  · `retryable` 决定 RepairEngine 是否允许"同阶段重试"；
-  · 任何 stage 失败后下游立即停止，除非 RepairEngine 明确给出可继续动作。
+  · 每个异常都带稳定 `error_code`（UPPERCASE）；落进 `jobs.error_code` /
+    `attempts.error_code` / `provider_tasks`。前端、RepairEngine、审计只认这个码，
+    绝不解析中文 message —— 否则"文案一改，告警就哑"。
+  · `RETRYABLE_CODES` 决定是否允许"同阶段重试"；`TRANSIENT_CODES` 额外要求
+    指数退避（这是网络抖动，不是业务错误）；业务错误永远不允许网络式无限重试。
+  · `REPAIR_MAP` 把 error_code 映射到**白名单动作**；RepairEngine 只在这个表里取
+    动作，表外一律 ABORT（Phase 4 必做任务 8/9）。
 """
 from __future__ import annotations
 
+# ── 完整 error taxonomy（Phase 4：20 个业务码 + 编排内部码）─────────────────
+# 配置 / 凭据
+CONFIG_MISSING = "CONFIG_MISSING"
+AUTH_EXPIRED = "AUTH_EXPIRED"
+# 网络 / 限流
+NETWORK_TRANSIENT = "NETWORK_TRANSIENT"
+RATE_LIMIT = "RATE_LIMIT"
+# 输入
+PROMPT_TOO_LONG = "PROMPT_TOO_LONG"
+ASSET_MISSING = "ASSET_MISSING"
+# 供应商
+PROVIDER_REJECTED = "PROVIDER_REJECTED"
+GENERATION_FAILED = "GENERATION_FAILED"
+GENERATION_TIMEOUT = "GENERATION_TIMEOUT"
+DOWNLOAD_FAILED = "DOWNLOAD_FAILED"
+# 质检
+ASR_MISMATCH = "ASR_MISMATCH"
+SUBTITLE_ALIGN_FAIL = "SUBTITLE_ALIGN_FAIL"
+VISUAL_QA_FAIL = "VISUAL_QA_FAIL"
+PRODUCT_DEFORMED = "PRODUCT_DEFORMED"
+WRONG_SPEAKER = "WRONG_SPEAKER"
+HUMAN_ANATOMY_FAIL = "HUMAN_ANATOMY_FAIL"
+# 合规
+COMPLIANCE_BLOCK = "COMPLIANCE_BLOCK"
+# 发布
+PUBLISH_QUOTA = "PUBLISH_QUOTA"
+PUBLISH_AUTH = "PUBLISH_AUTH"
+# 兜底
+UNKNOWN = "UNKNOWN"
 
+BUSINESS_CODES: tuple[str, ...] = (
+    CONFIG_MISSING, AUTH_EXPIRED, NETWORK_TRANSIENT, RATE_LIMIT, PROMPT_TOO_LONG,
+    ASSET_MISSING, PROVIDER_REJECTED, GENERATION_FAILED, GENERATION_TIMEOUT,
+    DOWNLOAD_FAILED, ASR_MISMATCH, SUBTITLE_ALIGN_FAIL, VISUAL_QA_FAIL,
+    PRODUCT_DEFORMED, WRONG_SPEAKER, HUMAN_ANATOMY_FAIL, COMPLIANCE_BLOCK,
+    PUBLISH_QUOTA, PUBLISH_AUTH, UNKNOWN,
+)
+
+# ── 编排内部码（阶段机/预算/取消，不算"业务失败"）────────────────────────
+ORCHESTRATOR_ERROR = "ORCHESTRATOR_ERROR"
+NO_SPEC = "NO_SPEC"
+MISSING_INPUT = "MISSING_INPUT"
+PREFLIGHT_FAILED = "PREFLIGHT_FAILED"
+QA_FAILED = "QA_FAILED"
+COMPOSE_FAILED = "COMPOSE_FAILED"
+PACKAGE_FAILED = "PACKAGE_FAILED"
+STAGE_TIMEOUT = "STAGE_TIMEOUT"
+STAGE_FAILED = "STAGE_FAILED"
+STAGE_NOT_REGISTERED = "STAGE_NOT_REGISTERED"
+UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
+CANCEL_REQUESTED = "CANCEL_REQUESTED"
+BLOCKED_BUDGET = "BLOCKED_BUDGET"
+CAPABILITY_BLOCKED = "CAPABILITY_BLOCKED"
+UNKNOWN_JOB = "UNKNOWN_JOB"
+JOB_NOT_RESUMABLE = "JOB_NOT_RESUMABLE"
+
+INTERNAL_CODES: tuple[str, ...] = (
+    ORCHESTRATOR_ERROR, NO_SPEC, MISSING_INPUT, PREFLIGHT_FAILED, QA_FAILED,
+    COMPOSE_FAILED, PACKAGE_FAILED, STAGE_TIMEOUT, STAGE_FAILED,
+    STAGE_NOT_REGISTERED, UNEXPECTED_ERROR, CANCEL_REQUESTED, BLOCKED_BUDGET,
+    CAPABILITY_BLOCKED, UNKNOWN_JOB, JOB_NOT_RESUMABLE,
+)
+
+ALL_CODES: tuple[str, ...] = BUSINESS_CODES + INTERNAL_CODES
+
+# ── 可重试 / 瞬时（网络式）──────────────────────────────────────────────
+# 瞬时：允许"同阶段重试 + 指数退避"（网络抖动、限流、下载断线）
+TRANSIENT_CODES: frozenset[str] = frozenset({
+    NETWORK_TRANSIENT, RATE_LIMIT, DOWNLOAD_FAILED,
+})
+# 可重试：重试在语义上安全（不会重复扣费/写坏数据）；未必需要退避
+RETRYABLE_CODES: frozenset[str] = frozenset({
+    NETWORK_TRANSIENT, RATE_LIMIT, DOWNLOAD_FAILED,
+    GENERATION_FAILED, GENERATION_TIMEOUT, STAGE_TIMEOUT, UNEXPECTED_ERROR,
+    ASR_MISMATCH, SUBTITLE_ALIGN_FAIL,
+})
+# 业务错误：绝不允许当网络抖动无限重试
+PERMANENT_CODES: frozenset[str] = frozenset(set(BUSINESS_CODES) - set(RETRYABLE_CODES))
+
+# ── RepairEngine 白名单动作（Phase 4 必做任务 9）─────────────────────────
+RETRY_SAME = "RETRY_SAME"              # 同 workflow、同 prompt 再跑一次
+SWITCH_WORKFLOW = "SWITCH_WORKFLOW"    # 换兼容 workflow 链
+COMPRESS_PROMPT = "COMPRESS_PROMPT"    # 压缩 prompt 后再提交
+REGENERATE_SHOT = "REGENERATE_SHOT"    # 重出成片（画面/人物/产品不合格）
+REBUILD_SUBTITLE = "REBUILD_SUBTITLE"  # 只重建字幕/对齐，不重新生成
+WAIT_AND_RESUME = "WAIT_AND_RESUME"    # 等窗口/配额，不当作生成失败
+REQUIRE_HUMAN = "REQUIRE_HUMAN"        # 交人工（凭据/合规/资产缺失）
+ABORT = "ABORT"                        # 停止（无修复动作）
+
+REPAIR_ACTIONS: tuple[str, ...] = (
+    RETRY_SAME, SWITCH_WORKFLOW, COMPRESS_PROMPT, REGENERATE_SHOT,
+    REBUILD_SUBTITLE, WAIT_AND_RESUME, REQUIRE_HUMAN, ABORT,
+)
+# 允许在同一个 stage 内自动重跑的动作（其余动作会改变 job 走向）
+IN_STAGE_ACTIONS: frozenset[str] = frozenset({
+    RETRY_SAME, SWITCH_WORKFLOW, COMPRESS_PROMPT, REGENERATE_SHOT, REBUILD_SUBTITLE,
+})
+
+REPAIR_MAP: dict[str, str] = {
+    NETWORK_TRANSIENT: RETRY_SAME,
+    RATE_LIMIT: RETRY_SAME,
+    DOWNLOAD_FAILED: RETRY_SAME,
+    GENERATION_FAILED: RETRY_SAME,
+    GENERATION_TIMEOUT: SWITCH_WORKFLOW,
+    PROVIDER_REJECTED: SWITCH_WORKFLOW,
+    PROMPT_TOO_LONG: COMPRESS_PROMPT,
+    VISUAL_QA_FAIL: REGENERATE_SHOT,
+    PRODUCT_DEFORMED: REGENERATE_SHOT,
+    WRONG_SPEAKER: REGENERATE_SHOT,
+    HUMAN_ANATOMY_FAIL: REGENERATE_SHOT,
+    QA_FAILED: REGENERATE_SHOT,
+    ASR_MISMATCH: REBUILD_SUBTITLE,
+    SUBTITLE_ALIGN_FAIL: REBUILD_SUBTITLE,
+    PUBLISH_QUOTA: WAIT_AND_RESUME,
+    COMPLIANCE_BLOCK: REQUIRE_HUMAN,
+    AUTH_EXPIRED: REQUIRE_HUMAN,
+    PUBLISH_AUTH: REQUIRE_HUMAN,
+    CONFIG_MISSING: REQUIRE_HUMAN,
+    ASSET_MISSING: REQUIRE_HUMAN,
+    NO_SPEC: REQUIRE_HUMAN,
+    MISSING_INPUT: REQUIRE_HUMAN,
+    CAPABILITY_BLOCKED: REQUIRE_HUMAN,
+    BLOCKED_BUDGET: REQUIRE_HUMAN,
+    UNKNOWN: ABORT,
+}
+
+# 白名单动作 → 终止/暂停语义
+ACTION_STATE: dict[str, str | None] = {
+    WAIT_AND_RESUME: "PAUSED",
+    REQUIRE_HUMAN: "BLOCKED",
+    ABORT: "FAILED",
+}
+
+
+def repair_action_for(error_code: str | None) -> str:
+    """error_code → 白名单动作（表外一律 ABORT，绝不猜）。"""
+    return REPAIR_MAP.get(error_code or UNKNOWN, ABORT)
+
+
+def is_transient(error_code: str | None) -> bool:
+    return (error_code or "") in TRANSIENT_CODES
+
+
+def is_retryable(error_code: str | None) -> bool:
+    return (error_code or "") in RETRYABLE_CODES
+
+
+def backoff_delay(attempt: int, *, base: float = 2.0, cap: float = 60.0) -> float:
+    """指数退避（第 N 次失败后等多久）；仅在瞬时错误上使用。"""
+    return float(min(cap, base * (2 ** max(0, int(attempt) - 1))))
+
+
+# ── 异常 ───────────────────────────────────────────────────────────────
 class OrchestratorError(Exception):
     """所有编排层异常的基类。"""
 
-    error_code = "ORCHESTRATOR_ERROR"
+    error_code = ORCHESTRATOR_ERROR
     retryable = False
 
     def __init__(self, message: str = "", *, error_code: str | None = None,
@@ -31,44 +186,105 @@ class OrchestratorError(Exception):
 
 
 class UnknownJob(OrchestratorError):
-    error_code = "UNKNOWN_JOB"
+    error_code = UNKNOWN_JOB
 
 
 class JobNotResumable(OrchestratorError):
-    error_code = "JOB_NOT_RESUMABLE"
+    error_code = JOB_NOT_RESUMABLE
 
 
 class StageFailure(OrchestratorError):
     """单个 stage 执行失败（可重试性由具体 error_code 决定）。"""
 
-    error_code = "STAGE_FAILED"
+    error_code = STAGE_FAILED
     retryable = True
 
 
 class CapabilityBlocked(OrchestratorError):
     """环境能力缺失（模型/工具/凭据），不是代码问题。"""
 
-    error_code = "CAPABILITY_BLOCKED"
+    error_code = CAPABILITY_BLOCKED
 
 
 class BudgetExceeded(OrchestratorError):
-    error_code = "BLOCKED_BUDGET"
+    error_code = BLOCKED_BUDGET
 
 
 class Cancelled(OrchestratorError):
-    error_code = "CANCEL_REQUESTED"
+    error_code = CANCEL_REQUESTED
 
 
-# ── 阶段级 error_code（Phase 4 扩展为完整 taxonomy）────────────
-NO_SPEC = "NO_SPEC"
-MISSING_INPUT = "MISSING_INPUT"
-PREFLIGHT_FAILED = "PREFLIGHT_FAILED"
-GENERATION_FAILED = "GENERATION_FAILED"
-QA_FAILED = "QA_FAILED"
-COMPOSE_FAILED = "COMPOSE_FAILED"
-PACKAGE_FAILED = "PACKAGE_FAILED"
-STAGE_TIMEOUT = "STAGE_TIMEOUT"
-UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
+class ProviderError(OrchestratorError):
+    """供应商调用失败（提交/轮询/下载）；子类各自带 taxonomy error_code。"""
 
-# 可以"同阶段重试"的 error_code 白名单（RepairEngine 用）
-RETRYABLE_CODES = frozenset({GENERATION_FAILED, STAGE_TIMEOUT, UNEXPECTED_ERROR})
+    error_code = UNKNOWN
+
+
+class ConfigMissing(ProviderError):
+    error_code = CONFIG_MISSING
+
+
+class AuthExpired(ProviderError):
+    error_code = AUTH_EXPIRED
+
+
+class NetworkTransient(ProviderError):
+    error_code = NETWORK_TRANSIENT
+    retryable = True
+
+
+class RateLimited(ProviderError):
+    error_code = RATE_LIMIT
+    retryable = True
+
+
+class PromptTooLong(ProviderError):
+    error_code = PROMPT_TOO_LONG
+
+
+class AssetMissing(ProviderError):
+    error_code = ASSET_MISSING
+
+
+class ProviderRejected(ProviderError):
+    error_code = PROVIDER_REJECTED
+
+
+class GenerationFailed(ProviderError):
+    error_code = GENERATION_FAILED
+    retryable = True
+
+
+class GenerationTimeout(ProviderError):
+    error_code = GENERATION_TIMEOUT
+    retryable = True
+
+
+class DownloadFailed(ProviderError):
+    error_code = DOWNLOAD_FAILED
+    retryable = True
+
+
+# message 模式 → error_code（供应商把原因写在文案里，但接口没有稳定错误码）
+_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (DOWNLOAD_FAILED, ("下载失败", "download failed", ".part")),
+    (PROMPT_TOO_LONG, ("最大长度", "too long", "超过最大", "prompt 的长度", "max length")),
+    (AUTH_EXPIRED, ("401", "403", "unauthorized", "invalid token", "鉴权失败",
+                    "token 过期", "apikey 未配置", "api_key 未配置", "未配置")),
+    (RATE_LIMIT, ("429", "rate limit", "too many requests", "限流", "频率限制")),
+    (CONFIG_MISSING, ("未配置", "missing config", "not configured")),
+    (NETWORK_TRANSIENT, ("connect", "timeout", "timed out", "10053", "10054",
+                         "网络", "连接错误", "connection reset", "sslerror")),
+    (PROVIDER_REJECTED, ("提交失败", "reject", "invalid", "参数", "400", "不支持")),
+)
+
+
+def classify_exception(exc: BaseException | str) -> str:
+    """把任意供应商异常/消息归一到 taxonomy error_code（不认识 → UNKNOWN）。"""
+    if isinstance(exc, OrchestratorError):
+        return exc.error_code
+    text = str(exc).lower()
+    for code, needles in _PATTERNS:
+        if any(n.lower() in text for n in needles):
+            return code
+    return UNKNOWN

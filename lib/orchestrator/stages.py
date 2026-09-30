@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from pathlib import Path
 
 from .errors import (
@@ -24,6 +25,7 @@ from .errors import (
     PACKAGE_FAILED,
     PREFLIGHT_FAILED,
     QA_FAILED,
+    ProviderError,
 )
 from .models import STAGE_ORDER, StageContext, StageResult, tail_lines
 
@@ -117,27 +119,73 @@ def stage_generate(ctx: StageContext) -> StageResult:
     if ctx.dry:
         return StageResult.ok("generate", metrics={"dry": True, "cost": 0.0},
                               message="演练：不提交生成")
-    if out.is_file() and out.stat().st_size > 0:
+    if out.is_file() and out.stat().st_size > 0 and not ctx.force:
         return StageResult.ok("generate", artifacts=[{"type": "video", "path": out}],
                               metrics={"skipped": True}, message="已有 onetake.mp4，跳过生成")
     if ctx.spec is None:
         return StageResult.fail("generate", NO_SPEC, "缺少 spec，无法提交生成")
+    try:
+        spec = json.loads(Path(ctx.spec).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return StageResult.fail("generate", MISSING_INPUT, f"spec 无法解析：{exc}")
 
-    res = ctx.run_subprocess(
-        [ctx.python, ctx.root / "s4_generate" / "gen_one_take.py", str(ctx.spec)],
-        timeout=GENERATE_TIMEOUT)
-    tail = tail_lines(res.stdout or "")
-    if res.returncode != 0 or not out.is_file() or out.stat().st_size == 0:
-        return StageResult.fail(
-            "generate", GENERATION_FAILED,
-            f"生成失败（returncode={res.returncode}）",
-            metrics={"returncode": res.returncode}, data={"tail": tail})
+    try:
+        outcome = _generator(ctx).generate(
+            uid=ctx.uid, prompt=str(spec.get("prompt") or ""),
+            duration=int(spec.get("duration") or 15),
+            resolution=str(spec.get("resolution") or "768p竖"),
+            workflow=str(spec.get("workflow") or "multi_image_15s"),
+            fallback_workflows=spec.get("fallback_workflows") or [],
+            ref_images=spec.get("ref_images") or [],
+            ref_audios=spec.get("ref_audios") or [],
+            out_path=out)
+    except ProviderError as exc:
+        return StageResult.fail("generate", exc.error_code,
+                                f"生成失败：{exc.message}", data=exc.data)
 
-    metrics = {"bytes": out.stat().st_size, "cost": _generation_cost(ctx)}
+    if not out.is_file() or out.stat().st_size == 0:
+        return StageResult.fail("generate", GENERATION_FAILED, f"生成产物缺失：{out}")
+
+    # 落快照：与 gen_one_take 同口径（onetake_task.json / onetake_result.json）
+    _write_json(ctx.workspace / "onetake_task.json",
+                {"task_id": outcome.task_id, "workflow": outcome.workflow,
+                 "spec": str(ctx.spec), "resumed": outcome.reused})
+    _write_json(ctx.workspace / "onetake_result.json",
+                {"task_id": outcome.task_id, "workflow": outcome.workflow,
+                 "video_path": str(out), "duration": spec.get("duration"),
+                 "cost_est": outcome.cost, "resumed": outcome.reused})
+
+    metrics = {"bytes": out.stat().st_size, "cost": outcome.cost,
+               "task_id": outcome.task_id, "workflow": outcome.workflow,
+               "reused": outcome.reused, "compressed": outcome.compressed,
+               "prompt_chars": outcome.prompt_chars}
     return StageResult.ok("generate", artifacts=[{"type": "video", "path": out}],
                           metrics=metrics,
-                          message=f"H3 生成完成（¥{metrics['cost']:.2f}）",
-                          data={"tail": tail})
+                          message=(("复用已提交任务 " if outcome.reused else "H3 生成完成 ")
+                                   + f"{outcome.workflow}（¥{outcome.cost:.2f}）"),
+                          data={"fingerprint": outcome.fingerprint})
+
+
+def _provider_for(ctx: StageContext):
+    if ctx.provider is not None:
+        return ctx.provider
+    from .providers import AutoDLProvider
+    return AutoDLProvider()
+
+
+def _generator(ctx: StageContext):
+    from .generation import IdempotentGenerator
+    return IdempotentGenerator(ctx.store, _provider_for(ctx), root=ctx.root, log=ctx.say,
+                               sleep=ctx.sleep, poll_interval=ctx.poll_interval,
+                               max_wait=ctx.max_wait,
+                               download_retries=ctx.download_retries,
+                               cancel_event=ctx.cancel_event)
+
+
+def _write_json(path: Path, data: dict) -> None:
+    with suppress(OSError):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def _generation_cost(ctx: StageContext) -> float:

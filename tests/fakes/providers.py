@@ -104,3 +104,57 @@ class FakeEnv:
 
     def payload_json(self, i: int = 0) -> dict:
         return json.loads(json.dumps(self.log.submitted_tasks[i], default=str))
+
+
+class FakeProvider:
+    """实现 `ProviderAdapter` 协议的假供应商（Phase 4 幂等测试用）。
+
+    与 `FakeEnv` 的区别：FakeEnv 打桩的是 `autodl_client` 的函数；FakeProvider 直接
+    替身适配器对象本身，便于精确控制"崩在第几步"。
+    """
+
+    name = "fake"
+
+    def __init__(self, env: FakeEnv | None = None) -> None:
+        from lib.orchestrator.providers import ProviderTask
+        self._Task = ProviderTask
+        self.env = env or FakeEnv()
+        self.submitted: list[dict] = []
+        self.submit_attempts = 0           # 含被拒绝的提交尝试
+        self.crash_on_query = False        # 模拟"提交成功后进程崩溃"
+        self.query_calls = 0
+        self.download_calls = 0
+        self.fail_workflows: set[str] = set()
+        self.download_fail_times = 0
+        self.payload_bytes = b"fake-mp4-bytes"
+
+    @property
+    def submit_count(self) -> int:
+        return len(self.submitted)
+
+    def submit(self, *, payload: dict, workflow: str, meta: dict | None = None):
+        from lib.orchestrator.errors import ProviderRejected
+        self.submit_attempts += 1
+        if workflow in self.fail_workflows:
+            raise ProviderRejected(f"fake provider rejected workflow {workflow}")
+        self.env.task_counter += 1
+        task_id = f"fake_task_{self.env.task_counter}"
+        self.submitted.append({"task_id": task_id, "workflow": workflow, "payload": payload})
+        return self._Task(task_id=task_id, workflow=workflow, status="SUBMITTED")
+
+    def query(self, task_id: str):
+        if self.crash_on_query:
+            raise RuntimeError("simulated crash after submit")   # 非 taxonomy 异常 = 崩溃
+        self.query_calls += 1
+        return self._Task(task_id=task_id, status="SUCCESS",
+                          url=f"fake://{task_id}.mp4")
+
+    def download(self, task, out_path: str) -> str:
+        from lib.orchestrator.errors import DownloadFailed
+        self.download_calls += 1
+        if self.download_calls <= self.download_fail_times:
+            raise DownloadFailed("fake download failure")
+        out = Path(out_path)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(self.payload_bytes)
+        return str(out)

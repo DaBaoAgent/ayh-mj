@@ -31,7 +31,9 @@ from ..jobstore import InvalidTransition, JobState, can_transition, sha256_of
 from ..jobstore import store as default_store
 from . import stages as stages_mod
 from .errors import (
+    REQUIRE_HUMAN,
     UNEXPECTED_ERROR,
+    WAIT_AND_RESUME,
     BudgetExceeded,
     Cancelled,
     OrchestratorError,
@@ -48,6 +50,7 @@ from .models import (
     StageContext,
     StageResult,
 )
+from .policies import policy_for
 from .recovery import RepairEngine, recover_interrupted
 
 QUEUE_DIR = STATE_DIR / "queue_15s"
@@ -133,16 +136,23 @@ class PipelineOrchestrator:
     """唯一执行内核。进程内单例 `orchestrator` 见模块底部。"""
 
     def __init__(self, *, store=None, stages=None, queue_dir=None, root=None,
-                 repair: RepairEngine | None = None) -> None:
+                 repair: RepairEngine | None = None, provider=None,
+                 sleep=None, poll_interval: float = 20.0, max_wait: float = 1800.0,
+                 download_retries: int = 3) -> None:
         self.store = store or default_store
         self.stages = dict(stages) if stages is not None else stages_mod.default_stages()
         self.repair = repair or RepairEngine()
+        self.provider = provider          # 供应商适配器（None = 由 stage 懒加载真实的 AutoDL）
         self.root = Path(root) if root else Path(__file__).resolve().parent.parent.parent
         self.queue_dir = Path(queue_dir) if queue_dir else QUEUE_DIR
         self._handles: dict[str, _RunHandle] = {}
         self._futures: dict[str, Future] = {}
         self._lock = threading.RLock()
         self._pool: ThreadPoolExecutor | None = None
+        self._sleep = sleep or time.sleep
+        self.poll_interval = poll_interval
+        self.max_wait = max_wait
+        self.download_retries = download_retries
         self._pool_size = 0
         self._pending = 0
         self._last_run: dict = {}
@@ -182,6 +192,8 @@ class PipelineOrchestrator:
                     skipped.append(uid)      # 已出过片，不重复生产（要重跑用 retry/resume）
                     continue
                 if existing.get("config_snapshot") != serialized:
+                    # 必须真的落库：resume/retry 只从 job.config_snapshot 还原这次运行
+                    self.store.set_fields(uid, config_snapshot=serialized)
                     self.store.add_event(uid, "config_updated",
                                          "本次运行的配置快照与历史不同（已按新配置执行）")
                 fp = item.get("fingerprint")
@@ -300,8 +312,8 @@ class PipelineOrchestrator:
         for name in stages:
             if handle.cancelled:
                 raise Cancelled("收到取消请求，安全停止")
-            if name == "generate" and not cfg.dry_mode:
-                self._ensure_budget(uid, cfg)
+            if not cfg.dry_mode:
+                self._ensure_budget(uid, cfg, name)
             fn = self.stages.get(name)
             if fn is None:
                 raise StageFailure(f"未注册的 stage：{name}", error_code="STAGE_NOT_REGISTERED")
@@ -321,7 +333,11 @@ class PipelineOrchestrator:
             ctx = StageContext(uid=uid, stage=name, spec=self._spec_path(uid),
                                job=self.store.get_job(uid) or {}, config=cfg,
                                workspace=self._workspace(uid), root=self.root,
-                               store=self.store, handle=handle, log=self._log)
+                               store=self.store, provider=self.provider,
+                               handle=handle, log=self._log, sleep=self._sleep,
+                               poll_interval=self.poll_interval,
+                               max_wait=self.max_wait,
+                               download_retries=self.download_retries)
             attempt_id = self.store.record_attempt(uid, name, attempt_no=attempt)
             t0 = time.time()
             try:
@@ -350,28 +366,49 @@ class PipelineOrchestrator:
                 self._walk_to(uid, STAGE_STATES[name][-1])
                 return result
 
+            policy = policy_for(name)
             decision = self.repair.decide(result, attempts=attempt,
-                                          max_attempts=cfg.max_attempts)
+                                          max_attempts=cfg.max_attempts, stage=name)
             self.store.add_event(
                 uid, "stage_failed", f"✗ {STAGE_LABEL[name]}：{result.message}", stage=name,
                 data={"error_code": result.error_code, "decision": decision.action,
-                      "reason": decision.reason, "metrics": result.metrics,
+                      "reason": decision.reason, "repair": decision.to_dict(),
+                      "metrics": result.metrics,
                       "seconds": seconds, "attempt": attempt, "detail": result.data})
-            if decision.can_continue and decision.action in ("retry", "repair") \
-                    and attempt < cfg.max_attempts:
+            if decision.in_stage and attempt < policy.max_attempts:
+                if decision.delay:
+                    self._log(f"  ⏳ {uid} {name} 瞬时错误（{result.error_code}）"
+                              f"→ 退避 {decision.delay:.0f}s 后重试")
+                    self._sleep(decision.delay)
                 self._log(f"  ↻ {uid} {name} 第 {attempt} 次失败"
                           f"（{result.error_code}）→ {decision.action}")
                 continue
             raise StageFailure(result.message, error_code=result.error_code or "STAGE_FAILED",
-                               data=result.data, next_action=decision.action)
+                               data={**result.data, "repair_action": decision.action,
+                                     "repair_reason": decision.reason},
+                               next_action=decision.action)
 
-    def _ensure_budget(self, uid: str, cfg: RunConfig) -> None:
-        if cfg.budget_cap is None:
+    def _ensure_budget(self, uid: str, cfg: RunConfig, stage: str = "") -> None:
+        """双层预算保护：整条 job 的 budget_cap + 单阶段的 max_cost（预估即拦）。
+
+        必须在**付费前**调用 —— 一旦钱花出去才发现超预算就已经晚了。
+        """
+        job = self.store.get_job(uid) or {}
+        spent = float(job.get("cost_spent") or 0.0)
+        cap = cfg.budget_cap if cfg.budget_cap is not None else job.get("budget_cap")
+        if cap is None:
             return
-        spent = float((self.store.get_job(uid) or {}).get("cost_spent") or 0.0)
-        if spent >= float(cfg.budget_cap):
-            raise BudgetExceeded(f"预算已用尽：已花 ¥{spent:.2f} ≥ 上限 ¥{cfg.budget_cap:.2f}",
-                                 data={"spent": spent, "budget_cap": cfg.budget_cap})
+        cap = float(cap)
+        if spent >= cap:
+            raise BudgetExceeded(f"预算已用尽：已花 ¥{spent:.2f} ≥ 上限 ¥{cap:.2f}",
+                                 data={"spent": spent, "budget_cap": cap, "stage": stage})
+        policy = policy_for(stage) if stage else None
+        reserve = float(policy.max_cost or 0.0) if policy is not None else 0.0
+        if reserve and spent + reserve > cap:
+            raise BudgetExceeded(
+                f"预算不足以支付「{stage}」（已花 ¥{spent:.2f} + 本阶段上限 "
+                f"¥{reserve:.2f} > 总预算 ¥{cap:.2f}）→ 付费前拦停",
+                data={"spent": spent, "reserve": reserve, "budget_cap": cap, "stage": stage})
 
     # ── resume / retry / cancel ────────────────────────────────
     def resume(self, uid: str, *, background: bool = True) -> dict:
@@ -593,8 +630,14 @@ class PipelineOrchestrator:
     def _finalize_failure(self, uid: str, exc: OrchestratorError) -> None:
         code = getattr(exc, "error_code", UNEXPECTED_ERROR)
         job = self.store.get_job(uid) or {}
-        target = JobState.BLOCKED if code in ("BLOCKED_BUDGET", "CAPABILITY_BLOCKED") \
-            else JobState.FAILED
+        action = getattr(exc, "next_action", "") or ""
+        # RepairEngine 的收尾语义：等窗口 → PAUSED；交人工 → BLOCKED；其余 → FAILED
+        if code in ("BLOCKED_BUDGET", "CAPABILITY_BLOCKED") or action == REQUIRE_HUMAN:
+            target = JobState.BLOCKED
+        elif action == WAIT_AND_RESUME:
+            target = JobState.PAUSED
+        else:
+            target = JobState.FAILED
         if job.get("status") not in JobState.TERMINAL:
             self._try_transition(uid, target, message=exc.message, event_type="stage_failed",
                                  error_code=code, data=exc.data)

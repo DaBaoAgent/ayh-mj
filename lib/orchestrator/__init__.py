@@ -7,13 +7,25 @@
   · `RepairEngine` —— 失败恢复决策。
 """
 from .errors import (
+    ALL_CODES,
+    REPAIR_ACTIONS,
     BudgetExceeded,
     Cancelled,
     JobNotResumable,
     OrchestratorError,
     StageFailure,
     UnknownJob,
+    repair_action_for,
 )
+from .generation import (
+    PROMPT_MAX,
+    PROMPT_SAFE,
+    GenerationOutcome,
+    IdempotentGenerator,
+    compress_prompt,
+    ensure_prompt_budget,
+)
+from .idempotency import fingerprint, fingerprint_parts
 from .models import (
     FRONTEND_STAGE,
     STAGE_LABEL,
@@ -23,6 +35,8 @@ from .models import (
     StageContext,
     StageResult,
 )
+from .policies import StagePolicy, policy_for
+from .providers import AutoDLProvider, ProviderTask, build_payload
 from .recovery import RepairDecision, RepairEngine
 from .service import (
     PipelineOrchestrator,
@@ -33,9 +47,12 @@ from .service import (
 )
 
 __all__ = [
-    "BudgetExceeded", "Cancelled", "FRONTEND_STAGE", "JobNotResumable",
-    "OrchestratorError", "PipelineOrchestrator", "RepairDecision", "RepairEngine",
-    "RunConfig", "STAGE_LABEL", "STAGE_ORDER", "STAGE_STATES", "StageContext",
-    "StageFailure", "StageResult", "UnknownJob", "console_state",
-    "kill_process_tree", "orchestrator", "start_production",
+    "ALL_CODES", "AutoDLProvider", "BudgetExceeded", "Cancelled", "FRONTEND_STAGE",
+    "GenerationOutcome", "IdempotentGenerator", "JobNotResumable", "OrchestratorError",
+    "PROMPT_MAX", "PROMPT_SAFE", "PipelineOrchestrator", "ProviderTask",
+    "REPAIR_ACTIONS", "RepairDecision", "RepairEngine", "RunConfig", "STAGE_LABEL",
+    "STAGE_ORDER", "STAGE_STATES", "StageContext", "StageFailure", "StagePolicy",
+    "StageResult", "UnknownJob", "build_payload", "compress_prompt", "console_state",
+    "ensure_prompt_budget", "fingerprint", "fingerprint_parts", "kill_process_tree",
+    "orchestrator", "policy_for", "repair_action_for", "start_production",
 ]

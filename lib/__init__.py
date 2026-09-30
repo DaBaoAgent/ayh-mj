@@ -1,18 +1,22 @@
 """ayh-mj 公共库"""
+import os
 from pathlib import Path
 
 from .console import enable_utf8_console
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_DIR = PROJECT_ROOT / "config"
-STATE_DIR = PROJECT_ROOT / "state"
 OUT_DIR = PROJECT_ROOT / "out"
 LOGS_DIR = PROJECT_ROOT / "logs"
 ASSETS_DIR = PROJECT_ROOT / "assets"
 
+# 运行状态目录可用 AYHMJ_STATE_DIR 覆盖（测试隔离 / 多实例并存）。
+# 默认仍是仓库内的 state/，不改变任何现有行为。
+STATE_DIR = Path(os.environ.get("AYHMJ_STATE_DIR") or (PROJECT_ROOT / "state"))
+
 # 确保目录存在
 for d in [STATE_DIR, OUT_DIR, LOGS_DIR]:
-    d.mkdir(exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True)
 
 # CLI 入口的编码兜底：Windows GBK 控制台打印 ✓/emoji 会崩，这里统一开启 UTF-8。
 enable_utf8_console()

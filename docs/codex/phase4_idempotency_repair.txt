@@ -1,0 +1,99 @@
+[deprecated] config/pipeline.yaml 已废弃，请改用 config/default.yaml；本次仅用它填补缺失键。
+Phase 4 证据：error taxonomy / 幂等 / 重试 / 预算
+临时 state：C:\Users\ADMINI~1\AppData\Local\Temp\p4ev_py60a8or
+
+------------------------------------------------------------------------------
+A. Error taxonomy（计划要求 20 个业务码，全部登记）
+------------------------------------------------------------------------------
+业务 error_code（20）：
+  CONFIG_MISSING  AUTH_EXPIRED  NETWORK_TRANSIENT  RATE_LIMIT  PROMPT_TOO_LONG
+  ASSET_MISSING  PROVIDER_REJECTED  GENERATION_FAILED  GENERATION_TIMEOUT  DOWNLOAD_FAILED
+  ASR_MISMATCH  SUBTITLE_ALIGN_FAIL  VISUAL_QA_FAIL  PRODUCT_DEFORMED  WRONG_SPEAKER
+  HUMAN_ANATOMY_FAIL  COMPLIANCE_BLOCK  PUBLISH_QUOTA  PUBLISH_AUTH  UNKNOWN
+
+ALL_CODES 总数（业务 + 编排内部）：36
+RepairEngine 白名单动作（8）：RETRY_SAME / SWITCH_WORKFLOW / COMPRESS_PROMPT / REGENERATE_SHOT / REBUILD_SUBTITLE / WAIT_AND_RESUME / REQUIRE_HUMAN / ABORT
+
+error_code → 白名单动作：
+  CONFIG_MISSING         → REQUIRE_HUMAN
+  AUTH_EXPIRED           → REQUIRE_HUMAN
+  NETWORK_TRANSIENT      → RETRY_SAME
+  RATE_LIMIT             → RETRY_SAME
+  PROMPT_TOO_LONG        → COMPRESS_PROMPT
+  ASSET_MISSING          → REQUIRE_HUMAN
+  PROVIDER_REJECTED      → SWITCH_WORKFLOW
+  GENERATION_FAILED      → RETRY_SAME
+  GENERATION_TIMEOUT     → SWITCH_WORKFLOW
+  DOWNLOAD_FAILED        → RETRY_SAME
+  ASR_MISMATCH           → REBUILD_SUBTITLE
+  SUBTITLE_ALIGN_FAIL    → REBUILD_SUBTITLE
+  VISUAL_QA_FAIL         → REGENERATE_SHOT
+  PRODUCT_DEFORMED       → REGENERATE_SHOT
+  WRONG_SPEAKER          → REGENERATE_SHOT
+  HUMAN_ANATOMY_FAIL     → REGENERATE_SHOT
+  COMPLIANCE_BLOCK       → REQUIRE_HUMAN
+  PUBLISH_QUOTA          → WAIT_AND_RESUME
+  PUBLISH_AUTH           → REQUIRE_HUMAN
+  UNKNOWN                → ABORT
+
+指数退避（瞬时网络错误）：[2.0, 4.0, 8.0, 16.0, 32.0, 60.0]
+
+------------------------------------------------------------------------------
+B. 验收场景 3：prompt 超 10000 字 → 付费前阻断（AutoDL 提交数 = 0）
+------------------------------------------------------------------------------
+prompt 字符数：26489（H3 上限 10000）
+→ 阻断：prompt 26489 字符 > 上限 10000；压缩后仍超限 → 付费前阻断（未提交、0 元）
+→ create_task 提交数 = 0（必须为 0）
+→ provider_tasks 行数 = 0（必须为 0）
+
+------------------------------------------------------------------------------
+C. 验收场景 1：create_task 成功后进程崩溃 → 重启只 query，不产生第二个提交
+------------------------------------------------------------------------------
+第 1 次运行：模拟进程崩溃（simulated crash after submit）
+崩溃后已落库的 task_id = fake_task_1（提交后、轮询前就落库）
+崩溃时 create_task 提交数 = 1
+「重启」后：reused=True，复用 task_id=fake_task_1
+重启后 create_task 提交数 = 1（必须仍为 1）
+重启后 query 次数 = 1（>0 表示是查询而非重提交）
+
+------------------------------------------------------------------------------
+D. 验收场景 2：provider SUCCESS 但下载失败两次 → 只重下，不重生成
+------------------------------------------------------------------------------
+create_task 提交数 = 1（必须为 1）
+download 次数 = 3（1 次失败 + 2 次重下 = 3）
+download_attempts = 3；产物 = C:\Users\ADMINI~1\AppData\Local\Temp\p4ev_py60a8or\dl.mp4
+  下载第 1 次失败 → 2s 后重下（不重生成）
+  下载第 2 次失败 → 4s 后重下（不重生成）
+
+------------------------------------------------------------------------------
+E. 验收场景 4：连续 3 次 generation failed → FAILED（不无限烧钱）
+------------------------------------------------------------------------------
+  ↻ EV_3X generate 第 1 次失败（GENERATION_FAILED）→ RETRY_SAME
+  ↻ EV_3X generate 第 2 次失败（GENERATION_FAILED）→ RETRY_SAME
+  ✗ EV_3X FAILED（GENERATION_FAILED）：第 3 次生成失败
+generate 执行次数 = 3（上限 3，到顶即停）
+job 终态 = FAILED，error_code = GENERATION_FAILED
+累计成本 = ¥0.0（无付费调用）
+RepairEngine 决策序列 = ['RETRY_SAME', 'RETRY_SAME', 'ABORT']
+
+------------------------------------------------------------------------------
+F. 验收场景 5：publish quota → 等待/调度，不当作生成失败
+------------------------------------------------------------------------------
+  ✗ EV_QUOTA PAUSED（PUBLISH_QUOTA）：今日已达上限（6/6）
+job 终态 = PAUSED（PAUSED = 等窗口，不是 FAILED）
+error_code = PUBLISH_QUOTA
+RepairEngine 动作 = WAIT_AND_RESUME；原因 = PUBLISH_QUOTA：不是生成失败，等待窗口/配额后恢复（不烧钱）
+
+------------------------------------------------------------------------------
+G. 编排层端到端（假供应商，0 付费）：generate 走幂等驱动
+------------------------------------------------------------------------------
+  · 已提交 multi_image_15s：task_id=fake_task_1（prompt 70 字符）
+job 终态 = QA；累计成本 = ¥0.9（预期 0.9）
+create_task 提交数 = 1（必须为 1）
+provider_task：task_id=fake_task_1 workflow=multi_image_15s status=DONE cost=0.9
+attempts：[('plan', 1, 'SUCCESS'), ('generate', 1, 'SUCCESS'), ('qa', 1, 'SUCCESS')]
+
+------------------------------------------------------------------------------
+H. 真实仓库 state/pipeline.db 未被污染检查
+------------------------------------------------------------------------------
+真实库 jobs 总数 = 8（采集全程未写入真实库）

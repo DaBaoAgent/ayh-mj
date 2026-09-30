@@ -250,6 +250,7 @@ class JobStore:
         "trend_id", "script", "script_word_count", "storyboard", "shots", "video_path",
         "duration", "covers", "publish_results", "goal", "priority", "error_code",
         "cost_estimate", "cost_spent", "budget_cap", "fingerprint", "pause_reason",
+        "config_snapshot",
     }
 
     def set_fields(self, uid: str, **kwargs) -> None:
@@ -359,6 +360,93 @@ class JobStore:
             rows = conn.execute(
                 "SELECT * FROM attempts WHERE job_id = ? ORDER BY id ASC", (job_id,)).fetchall()
             return [dict(r) for r in rows]
+
+    # ── provider tasks（幂等：先落 task_id 再轮询，Phase 4）────────
+    def upsert_provider_task(self, uid: str, fingerprint: str, *, stage: str = "generate",
+                             provider: str = "", workflow: str = "",
+                             task_id: str | None = None, status: str = "SUBMITTED",
+                             result_url: str | None = None, output_path: str | None = None,
+                             cost: float | None = None, error_code: str | None = None,
+                             bump_attempts: bool = False) -> int:
+        """登记/更新 provider 任务（job+fingerprint 唯一）。提交拿到 task_id 后**立即**调用。"""
+        now = utc_now()
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            conn.execute(
+                """INSERT INTO provider_tasks
+                   (job_id, fingerprint, stage, provider, workflow, task_id, status,
+                    result_url, output_path, cost, attempts, error_code, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(job_id, fingerprint) DO UPDATE SET
+                     task_id = COALESCE(excluded.task_id, provider_tasks.task_id),
+                     status = excluded.status,
+                     result_url = COALESCE(excluded.result_url, provider_tasks.result_url),
+                     output_path = COALESCE(excluded.output_path, provider_tasks.output_path),
+                     cost = MAX(COALESCE(excluded.cost, 0), COALESCE(provider_tasks.cost, 0)),
+                     workflow = COALESCE(NULLIF(excluded.workflow, ''), provider_tasks.workflow),
+                     error_code = excluded.error_code,
+                     attempts = provider_tasks.attempts + ?,
+                     updated_at = excluded.updated_at""",
+                (job_id, fingerprint, stage, provider, workflow, task_id, status,
+                 result_url, output_path, float(cost or 0.0), 1, error_code, now, now,
+                 1 if bump_attempts else 0))
+            conn.commit()
+            row = conn.execute(
+                "SELECT id FROM provider_tasks WHERE job_id=? AND fingerprint=?",
+                (job_id, fingerprint)).fetchone()
+            return int(row[0]) if row else 0
+
+    def find_provider_task(self, uid: str, fingerprint: str | None = None, *,
+                           task_id: str | None = None, stage: str | None = None) -> dict | None:
+        """按 fingerprint（首选）或 task_id 查已提交任务；命中即"只 query，不重提交"。"""
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            if fingerprint:
+                row = conn.execute(
+                    "SELECT * FROM provider_tasks WHERE job_id=? AND fingerprint=?",
+                    (job_id, fingerprint)).fetchone()
+            elif task_id:
+                row = conn.execute(
+                    "SELECT * FROM provider_tasks WHERE job_id=? AND task_id=? "
+                    "ORDER BY id DESC LIMIT 1", (job_id, task_id)).fetchone()
+            elif stage:
+                row = conn.execute(
+                    "SELECT * FROM provider_tasks WHERE job_id=? AND stage=? "
+                    "ORDER BY id DESC LIMIT 1", (job_id, stage)).fetchone()
+            else:
+                row = None
+            return dict(row) if row else None
+
+    def list_provider_tasks(self, uid: str, stage: str | None = None) -> list[dict]:
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            if stage:
+                rows = conn.execute(
+                    "SELECT * FROM provider_tasks WHERE job_id=? AND stage=? ORDER BY id ASC",
+                    (job_id, stage)).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM provider_tasks WHERE job_id=? ORDER BY id ASC",
+                    (job_id,)).fetchall()
+            return [dict(r) for r in rows]
+
+    def finish_provider_task(self, uid: str, fingerprint: str, *, status: str,
+                             result_url: str | None = None, output_path: str | None = None,
+                             cost: float | None = None,
+                             error_code: str | None = None) -> None:
+        """记录 provider 任务的终态（SUCCEEDED / FAILED / DOWNLOADING / DONE）。"""
+        with self._connect() as conn:
+            job_id = self._job_id(conn, uid)
+            conn.execute(
+                """UPDATE provider_tasks SET
+                     status = ?, result_url = COALESCE(?, result_url),
+                     output_path = COALESCE(?, output_path),
+                     cost = MAX(COALESCE(?, 0), COALESCE(cost, 0)),
+                     error_code = ?, updated_at = ?
+                   WHERE job_id = ? AND fingerprint = ?""",
+                (status, result_url, output_path, cost, error_code, utc_now(),
+                 job_id, fingerprint))
+            conn.commit()
 
     # ── artifacts ──────────────────────────────────────────────
     def add_artifact(self, uid: str, type_: str, path: str | Path | None = None, *,

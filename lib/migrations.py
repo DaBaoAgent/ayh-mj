@@ -192,6 +192,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_publish_records_ext
 CREATE INDEX IF NOT EXISTS idx_perf_job ON performance_metrics(job_id, platform, snapshot_time);
 """
 
+# ── v3：provider task 幂等表（Phase 4）────────────────────────────────
+# 提交供应商前算 fingerprint；先落 task_id 再轮询；崩溃重启后按 fingerprint
+# 查表 → 只 query 原 task，绝不再 create_task（重复扣费）。
+V3_PROVIDER_TASKS_DDL = """
+CREATE TABLE IF NOT EXISTS provider_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id INTEGER NOT NULL REFERENCES jobs(id),
+    fingerprint TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'generate',
+    provider TEXT,
+    workflow TEXT,
+    task_id TEXT,
+    status TEXT NOT NULL DEFAULT 'SUBMITTED',
+    result_url TEXT,
+    output_path TEXT,
+    cost REAL DEFAULT 0,
+    attempts INTEGER DEFAULT 0,
+    error_code TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(job_id, fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_provider_tasks_task ON provider_tasks(task_id);
+CREATE INDEX IF NOT EXISTS idx_provider_tasks_job ON provider_tasks(job_id, stage);
+"""
+
 # 旧 status → canonical 状态（一次性兼容迁移；不删任何历史行）
 LEGACY_STATUS_MAP = {
     "pending": "PLANNING",
@@ -228,9 +254,14 @@ def _v2(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE jobs SET current_stage = LOWER(status) WHERE current_stage IS NULL")
 
 
+def _v3(conn: sqlite3.Connection) -> None:
+    conn.executescript(V3_PROVIDER_TASKS_DDL)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "legacy_baseline", lambda conn: conn.executescript(V1_LEGACY_DDL)),
     Migration(2, "canonical_job_store", _v2),
+    Migration(3, "provider_task_idempotency", _v3),
 )
 
 SCHEMA_VERSION = MIGRATIONS[-1].version

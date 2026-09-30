@@ -1,0 +1,136 @@
+# Phase 4 CLI smoke（AYHMJ_STATE_DIR=C:\Users\ADMINI~1\AppData\Local\Temp\p4cli_5fd0f4cd 隔离运行，不碰真实 state/pipeline.db）
+
+## 1) ruff + pytest（全量）
+I001 [*] Import block is un-sorted or un-formatted
+  --> _tmp_phase4_evidence.py:18:1
+   |
+16 |   state_mod.init_db()
+17 |
+18 | / from lib.jobstore import JobState, store  # noqa: E402
+19 | | from lib.orchestrator import PipelineOrchestrator, RunConfig, StageResult  # noqa: E402
+20 | | from lib.orchestrator.errors import (  # noqa: E402
+21 | |     ALL_CODES, BUSINESS_CODES, REPAIR_MAP, REPAIR_ACTIONS, backoff_delay,
+22 | |     PromptTooLong, PUBLISH_QUOTA, GENERATION_FAILED,
+23 | | )
+24 | | from lib.orchestrator.generation import IdempotentGenerator, cost_for  # noqa: E402
+25 | | from lib.orchestrator.idempotency import fingerprint  # noqa: E402
+26 | | from tests.fakes.providers import FakeProvider  # noqa: E402
+   | |______________________________________________^
+27 |
+28 |   LINE = "-" * 78
+   |
+help: Organize imports
+   |
+20 | from lib.orchestrator.errors import (  # noqa: E402
+   -     ALL_CODES, BUSINESS_CODES, REPAIR_MAP, REPAIR_ACTIONS, backoff_delay,
+   -     PromptTooLong, PUBLISH_QUOTA, GENERATION_FAILED,
+21 +     ALL_CODES,
+22 +     BUSINESS_CODES,
+23 +     GENERATION_FAILED,
+24 +     PUBLISH_QUOTA,
+25 +     REPAIR_ACTIONS,
+26 +     REPAIR_MAP,
+27 +     PromptTooLong,
+28 +     backoff_delay,
+29 | )
+   |
+
+F401 [*] `lib.jobstore.JobState` imported but unused
+  --> _tmp_phase4_evidence.py:18:26
+   |
+16 | state_mod.init_db()
+17 |
+18 | from lib.jobstore import JobState, store  # noqa: E402
+   |                          ^^^^^^^^
+19 | from lib.orchestrator import PipelineOrchestrator, RunConfig, StageResult  # noqa: E402
+20 | from lib.orchestrator.errors import (  # noqa: E402
+   |
+help: Remove unused import: `lib.jobstore.JobState`
+   |
+17 |
+   - from lib.jobstore import JobState, store  # noqa: E402
+18 + from lib.jobstore import store  # noqa: E402
+19 | from lib.orchestrator import PipelineOrchestrator, RunConfig, StageResult  # noqa: E402
+   |
+
+F401 [*] `lib.orchestrator.idempotency.fingerprint` imported but unused
+  --> _tmp_phase4_evidence.py:25:42
+   |
+23 | )
+24 | from lib.orchestrator.generation import IdempotentGenerator, cost_for  # noqa: E402
+25 | from lib.orchestrator.idempotency import fingerprint  # noqa: E402
+   |                                          ^^^^^^^^^^^
+26 | from tests.fakes.providers import FakeProvider  # noqa: E402
+   |
+help: Remove unused import: `lib.orchestrator.idempotency.fingerprint`
+   |
+24 | from lib.orchestrator.generation import IdempotentGenerator, cost_for  # noqa: E402
+   - from lib.orchestrator.idempotency import fingerprint  # noqa: E402
+25 | from tests.fakes.providers import FakeProvider  # noqa: E402
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> _tmp_phase4_evidence.py:169:1
+    |
+167 | section("H. 真实仓库 state/pipeline.db 未被污染检查")
+168 | state_mod.DB_PATH = ROOT / "state" / "pipeline.db"
+169 | from lib.jobstore import JobStore  # noqa: E402
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+170 | real = JobStore()
+171 | c = real.counts()
+    |
+help: Organize imports
+    |
+169 | from lib.jobstore import JobStore  # noqa: E402
+170 +
+171 | real = JobStore()
+    |
+
+Found 4 errors.
+[*] 4 fixable with the `--fix` option.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+141 passed, 1 skipped, 1 warning in 8.18s
+...                                                                      [100%]
+3 passed, 139 deselected in 2.51s
+
+## 2) tools/orchestrate.py start --dry --count 2
+▶ 已启动生产：2 条（演练模式）
+  ✅ job_20260930_Phase4CLIsmoke_20260930_122151_01 → READY 
+  ✅ job_20260930_Phase4CLIsmoke_20260930_122151_02 → READY 
+完成：成功 2 / 失败 0
+
+## 3) tools/orchestrate.py status
+{
+  "orchestrator": {
+    "running": false,
+    "current_stage": null,
+    "stage": null,
+    "progress": 0.0,
+    "message": "就绪",
+    "active": [],
+    "total": 0,
+    "finished": 0,
+    "failed": 0,
+    "cancelled": 0,
+    "run_id": null,
+    "source": null,
+    "dry": false,
+    "source_of_truth": "jobstore",
+    "jobs_by_status": {
+      "READY": 2
+    }
+  },
+  "counts": {
+    "total": 2,
+    "by_status": {
+      "READY": 2
+    }
+  }
+}
+
+## 4) 旧入口 tools/run_all.py（纯 adapter）
+提示：--only 已废弃（现行管线无阶段切分），忽略该参数
+▶ 已启动生产：1 条（演练模式）
+  ✅ job_20260930_auto_20260930_122152_01 → READY 
+完成：成功 1 / 失败 0
