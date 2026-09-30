@@ -8,10 +8,14 @@
 执行方式：写提示词后、花钱前，先跑
 
 ```bash
-node scripts/check-dialogue.mjs sources/*.svml
+node tools/check_dialogue.mjs sources/*.svml
 ```
 
 ERROR 必须改完再 build；WARN 要人工确认。
+
+产线口径（2026-09-30 Phase 7）：`lib/creative/compiler.py` 编译出的 H3 提示词会被
+包成 `duration="N"` 的 payload 再送进这个门禁，所以 **R10/R28 的语速预算是真开着的**；
+只传裸提示词文本（没有 `duration="N"`）时这两条会被跳过。
 
 ---
 
@@ -55,7 +59,7 @@ ERROR 必须改完再 build；WARN 要人工确认。
 | R16 | 画面内的招牌/字幕属于「可见文字」，用英文双引号原样写，**不要**放进 `<d>` | 建议 | 官方区分；放错会被当成台词念出来 |
 | R17 | 明确要**静默的角色**写清楚不说话（如「其余人不说话、不张嘴」） | 建议 | 减少抢话与错口型 |
 | R25 | 提示词里显式要求**画面无平台水印/字幕条/角标/贴纸**（写 `no watermarks, no captions, no logos or stickers from the platform`），但**画面主体自身的品牌字要保留**（写 `keep the product's own branding and logo exactly as in the reference`） | 建议 | 不写时 H3 会在墙面、衣服、画面主体上冒出无关文字；写过头把画面主体 logo 也抹掉同样不行 |
-| R26 | 提示词**体量控制在 400 以内**（中文按字计、英文按 1/3 计） | 建议 | AutoDL 实测：600 字级长提示词两次都没出片，压到 300 字级一次过。**但 400 不是硬线**：2026-09-17 复刻片用到 446 单位仍正常出片（10s/768p，5m43s）——超一点可以试，超 600 要先压 |
+| R26 | 提示词**字符数** ≤ **10000**（安全线 9800）；超 9800 告警，超 10000 直接 ERROR | ERROR | **旧阈值已作废**（2026-09-30 Phase 7）：原「400 单位（中文按字、英文按 1/3 计）」是 2026-09-17 中文短提示词时代的经验值，会对每一条现役英文结构提示词误报。2026-09-26 实测 H3 服务端限制的是**字符数 10000**，故按字符数与 `tools/make_15s.py` / `lib/orchestrator/generation.py` 的 `PROMPT_MAX`/`PROMPT_SAFE` 对齐 |
 | R27 | 在 `.svml` 里写 `<d>` 必须转义成 `&lt;d&gt;…&lt;/d&gt;` | ERROR | 不转义会被 markup 当成 XML 元素，`plan` 直接报 `text:Value accepts text only`（markup 只支持 `&lt; &gt; &amp; &quot; &apos;` 五个实体） |
 
 ## 五、读错高危输入（中文尤其）

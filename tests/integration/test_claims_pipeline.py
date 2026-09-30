@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -47,17 +48,31 @@ def _cfg(**kw) -> RunConfig:
     return RunConfig(**kw)
 
 
+_MIN_PROMPT = ("integrated_multimodal_description: Live-action fun commercial in vertical framing. "
+               "[Shot 1, 0 to 15 seconds] A person demonstrates the product. "
+               "(S1) says: <d>[Chinese] 先看这个。</d> "
+               "overall_soundscape: live location sound. non_diegetic_music: N/A")
+
+
 def _write_spec(tmp_state, uid, payoff, claims=()) -> Path:
     queue = tmp_state / "queue_15s"
     queue.mkdir(parents=True, exist_ok=True)
     spec = {
         "job_uid": uid,
         "title": f"测试片 {uid}",
-        "plan_only": False,          # 假装 prompt 已编译，好走到 Phase 6 合规门
+        # Phase 7：prompt_ready=True 必须真的带 prompt（gate 会校验），
+        # 否则会在合规门之前就被 PROMPT_NOT_COMPILED 拦下，测不到 Phase 6 的规则。
+        "plan_only": False,
         "prompt_ready": True,
+        "prompt": _MIN_PROMPT,
+        "duration": 15,
+        "resolution": "768p竖",
+        "workflow": "multi_image_15s",
+        "fallback_workflows": [],
         "claim_ids": list(claims),
-        "creative": {"dna": {"payoff": payoff}, "claim_ids": list(claims)},
-        "story_spec": {"prompt": "", "shots": []},
+        "creative": {"dna": {"payoff": payoff, "dialogue_mode": "双人对白"},
+                     "claim_ids": list(claims)},
+        "story_spec": {"prompt": "", "shots": [], "lines": []},
     }
     path = queue / f"{uid}.json"
     path.write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -139,12 +154,35 @@ def test_planner_registers_a_claims_artifact_matching_the_spec(tmp_state):
 
 
 def test_blocked_claims_never_reach_the_spec_artifact(tmp_state):
-    """规划阶段就把不可用卖点挡在 payoff 之外（Phase 6 + Phase 5 的接缝）。"""
+    """规划阶段就把不可用卖点挡在 payoff / prompt 之外（Phase 6 → Phase 7 的接缝）。
+
+    Phase 7 起规划期就编译 prompt，spec 不再是 plan_only 空壳；本测试因此
+    改为证明：被挡卖点既不进 payoff，也不进编译后的 prompt，
+    且 prompt 里出现的 [claim:*] 标签必须全部可用。
+    """
     provider = FakeProvider()
     orch = _orch(tmp_state, provider, _stages(plan=stages_mod.stage_plan))
     result = orch.start(_cfg(), background=False)
     uid = result["jobs"][0]
     arts = {a["type"]: a["path"] for a in store.list_artifacts(uid)}
     spec_doc = _spec_doc(tmp_state, uid, arts.get("spec"))
-    assert spec_doc["plan_only"] is True
-    assert not spec_doc["prompt"], "prompt 未编译前必须是空串（Phase 7 才填）"
+
+    # Phase 7：规划期已编译 prompt，spec 不再是空壳
+    assert spec_doc["prompt_ready"] is True
+    assert spec_doc["plan_only"] is False
+    prompt = spec_doc["prompt"]
+    assert prompt, "Phase 7 起 prompt 必须在规划期编译完成"
+
+    reg = claims_mod.load()
+    blocked = reg.needs_verification() + reg.forbidden()
+    assert blocked, "claim 注册表应存在需核验/禁用条目，否则本测试失去意义"
+
+    blob = prompt + " " + json.dumps(spec_doc.get("creative", {}), ensure_ascii=False)
+    for claim in blocked:
+        for text in (claim.spoken_text, claim.display_text):
+            if text:
+                assert text not in blob, f"被挡卖点泄漏进 spec：{text}"
+
+    usable_ids = {c.claim_id for c in reg.usable()}
+    for cid in re.findall(r"\[claim:([A-Za-z0-9_.\-]+)\]", prompt):
+        assert cid in usable_ids, f"prompt 引用了不可用 claim：{cid}"

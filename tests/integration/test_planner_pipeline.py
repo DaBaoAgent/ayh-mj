@@ -1,4 +1,11 @@
-"""Phase 5 端到端 —— 空队列自主规划 → CreativeDNA → 付费前收口。"""
+"""Phase 5 端到端 —— 空队列自主规划 → CreativeDNA → 付费前收口。
+
+Phase 7 起，规划阶段会**顺带编译 H3 提示词并路由工作流**，所以 Phase 5 时代
+"`plan_only=True` 停在 `PROMPT_NOT_COMPILED`"的边界不再适用于自己规划出来的 spec：
+它已经带 prompt（`prompt_ready=True`），拦住付费的是**预筛门**（高风险新构图）或
+**台词缺失**。`PROMPT_NOT_COMPILED` 仍然是"没编译的 spec 不许付费"的那道闸，
+见 `test_uncompiled_spec_is_blocked_before_paid_generation`。
+"""
 from __future__ import annotations
 
 import json
@@ -9,7 +16,7 @@ import pytest
 from lib.jobstore import JobState, store
 from lib.orchestrator import PipelineOrchestrator, RunConfig, StageResult
 from lib.orchestrator import stages as stages_mod
-from lib.orchestrator.errors import PLAN_FAILED, PROMPT_NOT_COMPILED
+from lib.orchestrator.errors import MISSING_INPUT, PLAN_FAILED, PRESCREEN_REQUIRED, PROMPT_NOT_COMPILED
 from lib.orchestrator.models import STAGE_ORDER
 from tests.fakes.providers import FakeProvider
 
@@ -54,16 +61,21 @@ def test_autonomous_start_produces_job_and_creative_dna(tmp_state):
 
     events = store.list_events(uid)
     plan_end = [e for e in events if e["type"] == "stage_end" and e["stage"] == "plan"]
-    assert plan_end and plan_end[-1]["data"]["metrics"]["plan_only"] is True
-    assert plan_end[-1]["data"]["metrics"]["hook_type"] == dna["hook_type"]
+    metrics = plan_end[-1]["data"]["metrics"]
+    # Phase 7：规划阶段就编译好了 prompt（plan_only=False）并选好了工作流链
+    assert metrics["prompt_ready"] is True and metrics["plan_only"] is False
+    assert metrics["prompt_chars"] > 1000
+    assert metrics["workflow"] and metrics["workflow_source"] == "router"
+    assert metrics["shot_count"] >= 3
+    assert metrics["hook_type"] == dna["hook_type"]
 
     # 规划阶段一分钱都没花
     assert provider.submit_count == 0
     assert float(store.get_job(uid)["cost_spent"] or 0) == 0.0
 
 
-def test_plan_only_spec_is_blocked_before_paid_generation(tmp_state):
-    """Phase 5 边界：StorySpec 就绪但 H3 prompt 未编译 → 停在 BLOCKED，绝不进付费生成。"""
+def test_high_risk_spec_stops_at_prescreen_before_paid_generation(tmp_state):
+    """Phase 7 边界：自己规划出来的 spec 已编译，但高风险新构图必须**先过预筛**。"""
     provider = FakeProvider()
     orch = _orch(tmp_state, provider,
                  _stages(plan=stages_mod.stage_plan, preflight=stages_mod.stage_preflight))
@@ -71,11 +83,35 @@ def test_plan_only_spec_is_blocked_before_paid_generation(tmp_state):
 
     job = store.get_job(uid)
     assert job["status"] == JobState.BLOCKED, job
-    assert job["error_code"] == PROMPT_NOT_COMPILED
-    assert provider.submit_count == 0, "未编译 prompt 的 StorySpec 绝不能触发付费提交"
+    assert job["error_code"] in (PRESCREEN_REQUIRED, MISSING_INPUT), job
+    assert provider.submit_count == 0, "没过预筛的 StorySpec 绝不能触发付费提交"
     stages_run = [a["stage"] for a in store.list_attempts(uid)]
     assert stages_run == ["plan", "preflight"], stages_run
     assert not (tmp_state / "out" / f"gen_{uid}").exists()
+
+
+def test_uncompiled_spec_is_blocked_before_paid_generation(tmp_state):
+    """Phase 5 的闸门仍然有效：没有 prompt 的 spec（plan_only）一步都不许往前走。"""
+    queue = tmp_state / "queue_15s"
+    queue.mkdir(parents=True, exist_ok=True)
+    path = queue / "UNCOMPILED1.json"
+    path.write_text(json.dumps({
+        "job_uid": "UNCOMPILED1", "title": "没编译的 spec", "plan_only": True,
+        "prompt_ready": False, "prompt": "", "duration": 15,
+        "creative": {"dna": {"dialogue_mode": "双人对白", "hook_type": "冲突质问"}},
+        "story_spec": {"prompt": "", "shots": [], "lines": []},
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
+
+    provider = FakeProvider()
+    orch = _orch(tmp_state, provider,
+                 _stages(plan=stages_mod.stage_plan, preflight=stages_mod.stage_preflight))
+    orch.start(_cfg(), specs=[path], background=False)
+
+    job = store.get_job("UNCOMPILED1")
+    assert job["status"] == JobState.BLOCKED, job
+    assert job["error_code"] == PROMPT_NOT_COMPILED
+    assert provider.submit_count == 0, "未编译 prompt 的 StorySpec 绝不能触发付费提交"
+    assert [a["stage"] for a in store.list_attempts("UNCOMPILED1")] == ["plan", "preflight"]
 
 
 def test_planner_failure_creates_no_job_and_no_submission(tmp_state, monkeypatch):

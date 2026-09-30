@@ -114,7 +114,14 @@ def test_research_and_scoring_are_traceable_artifacts(tmp_state):
     spec = json.loads(job.spec_path.read_text(encoding="utf-8"))
     assert spec["creative"]["artifacts"]["dna"] == str(job.dna_path)
     assert spec["creative"]["rationale"]["rule"] == dna_doc["rationale"]["rule"]
-    assert spec["plan_only"] is True and spec["prompt"] == ""
+    # Phase 7: 规划期就编译 prompt，spec 不再是 plan_only 空壳
+    assert spec["prompt_ready"] is True
+    assert spec["plan_only"] is False
+    assert spec["prompt"], "prompt 应在规划期编译完成"
+    assert spec["workflow_source"] == "router"
+    assert spec["story_spec"]["prompt_ready"] is True
+    assert spec["story_spec"]["prompt"]
+    assert spec["prompt_meta"]["compiler_version"]
 
 
 # ── 幂等：同一 uid 不重复记使用、不重复打分 ────────────────────

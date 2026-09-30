@@ -20,6 +20,8 @@ DEFAULT_DURATION = 15
 DEFAULT_RESOLUTION = "768p竖"
 DEFAULT_WORKFLOW = "multi_image_15s"
 FALLBACK_WORKFLOWS = ("multi_image_15s", "single_image_15s")
+# Phase 7：spec 结构版本（写进 artifact，配合 compiler 版本保证可复现）
+SPEC_VERSION = "storyspec/1.0"
 
 
 @dataclass
@@ -40,8 +42,14 @@ class StorySpec:
     ref_images: list = field(default_factory=list)
     ref_audios: list = field(default_factory=list)
     shots: list = field(default_factory=list)
+    lines: list = field(default_factory=list)   # Phase 7：[{shot, speaker, text}]，句数随骨架变
     prompt: str = ""
     prompt_ready: bool = False
+    prompt_meta: dict = field(default_factory=dict)
+    spec_version: str = SPEC_VERSION
+    workflow_source: str = "static"    # 谁选的链：static / router
+    first_last: bool = False
+    text_only: bool = False
     rationale: dict = field(default_factory=dict)
     creative_paths: dict = field(default_factory=dict)
     claim_ids: list = field(default_factory=list)   # Phase 6：本条视频实际引用的产品 claim
@@ -58,6 +66,10 @@ class StorySpec:
             "ref_images": list(self.ref_images), "ref_audios": list(self.ref_audios),
             "shots": [dict(s) for s in self.shots], "prompt": self.prompt,
             "prompt_ready": self.prompt_ready,
+            "lines": [dict(x) if isinstance(x, dict) else x for x in self.lines],
+            "prompt_meta": dict(self.prompt_meta), "spec_version": self.spec_version,
+            "workflow_source": self.workflow_source,
+            "first_last": self.first_last, "text_only": self.text_only,
             "claim_ids": list(self.claim_ids),
         }
 
@@ -74,6 +86,11 @@ class StorySpec:
             "prompt": self.prompt,
             "prompt_ready": self.prompt_ready,
             "plan_only": not self.prompt_ready,
+            "prompt_meta": dict(self.prompt_meta),
+            "spec_version": self.spec_version,
+            "workflow_source": self.workflow_source,
+            "first_last": self.first_last,
+            "text_only": self.text_only,
             "claim_ids": list(self.claim_ids),
             "ref_images": list(self.ref_images),
             "ref_audios": list(self.ref_audios),
@@ -117,14 +134,20 @@ def build_story_spec(*, uid: str, structure: dict, dna: CreativeDNA, hotspot: di
                      claim_ids: list | None = None,
                      duration: int = DEFAULT_DURATION,
                      resolution: str = DEFAULT_RESOLUTION,
-                     workflow: str = DEFAULT_WORKFLOW) -> StorySpec:
+                     workflow: str = DEFAULT_WORKFLOW,
+                     lines: list | None = None,
+                     first_last: bool = False,
+                     text_only: bool = False) -> StorySpec:
     """装配 StorySpec（唯一定稿入口，Planner 与 CLI 共用）。"""
     return StorySpec(
         uid=uid, structure_id=structure["id"], structure_name=structure["name"],
         dna=dna, hotspot=dict(hotspot or {}), research_refs=dict(research_refs or {}),
         title=title, duration=duration, resolution=resolution, workflow=workflow,
         fallback_workflows=[w for w in FALLBACK_WORKFLOWS if w != workflow],
-        shots=build_shots(structure, dna), rationale=dict(rationale or {}),
+        shots=build_shots(structure, dna),
+        lines=[dict(x) if isinstance(x, dict) else x for x in (lines or [])],
+        rationale=dict(rationale or {}), first_last=bool(first_last),
+        text_only=bool(text_only),
         creative_paths=dict(creative_paths or {}),
         claim_ids=list(claim_ids or []),
     )

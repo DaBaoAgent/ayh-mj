@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import re
 from contextlib import suppress
 from pathlib import Path
 
@@ -28,8 +29,11 @@ from .errors import (
     PACKAGE_FAILED,
     PLAN_FAILED,
     PREFLIGHT_FAILED,
+    PRESCREEN_REQUIRED,
+    PROMPT_BUDGET_EXCEEDED,
     PROMPT_NOT_COMPILED,
     QA_FAILED,
+    WORKFLOW_INCOMPATIBLE,
     ProviderError,
 )
 from .models import STAGE_ORDER, StageContext, StageResult, tail_lines
@@ -72,10 +76,27 @@ def _creative_artifacts(spec_path: Path) -> list[dict]:
     paths = (_spec_doc(spec_path).get("creative") or {}).get("artifacts") or {}
     out: list[dict] = []
     for type_, key in (("research", "research"), ("creative_dna", "dna"),
-                       ("creative_scores", "scores"), ("claims", "claims")):
+                       ("creative_scores", "scores"), ("claims", "claims"),
+                       ("dialogue_check", "gate")):
         path = paths.get(key)
         if path and Path(path).is_file():
             out.append({"type": type_, "path": path})
+    return out
+
+
+_D_RE = re.compile(r"<d>\[([A-Za-z]+)\]\s*(.*?)\s*</d>", re.S)
+_CAPTION_RE = re.compile(r'on-screen Chinese caption reads "([^"]*)"')
+
+
+def _spoken_copy(prompt: str) -> list[str]:
+    """从编译产物里只抽出**会给观众看到/听到**的中文：台词块 + 画面字幕。
+
+    为什么不能整段扫：编译后的 prompt 是英文制作说明（`85mm 镜头`、`f/2`、
+    `17k+5 帧`…），整段扫会把摄影参数当成产品参数报出来（Phase 7 集成实测的
+    "85m 无法映射"就是 `85mm lens` 被截出来的）。合规门要扫的是**对外文案**。
+    """
+    out = [m.group(2) for m in _D_RE.finditer(prompt or "")]
+    out += [m.group(1) for m in _CAPTION_RE.finditer(prompt or "")]
     return out
 
 
@@ -87,7 +108,10 @@ def _spec_claim_text(doc: dict) -> str:
     chunks = [str(doc.get("title") or "")]
     for key in ("payoff", "ending", "CTA", "hook_type"):
         chunks.append(str(dna.get(key) or ""))
-    chunks.append(str(story.get("prompt") or ""))
+    chunks.extend(_spoken_copy(str(story.get("prompt") or "")))
+    for line in (story.get("lines") or []):
+        if isinstance(line, dict):
+            chunks.append(str(line.get("text") or ""))
     for shot in (story.get("shots") or []):
         if isinstance(shot, dict):
             for key in ("line", "dialogue", "text", "beat"):
@@ -135,6 +159,29 @@ def _plan_for(ctx: StageContext):
     return planner.plan_for(ctx.uid, goal=ctx.config.goal)
 
 
+def _spec_metrics(doc: dict) -> dict:
+    """Phase 7：plan 阶段必须把"编译 + 路由"的结果报出来（可追溯、可断言）。"""
+    story = doc.get("story_spec") or {}
+    prompt = str(doc.get("prompt") or "")
+    meta = doc.get("prompt_meta") or {}
+    route = meta.get("route") or {}
+    risk = meta.get("risk") or {}
+    return {"plan_only": not bool(doc.get("prompt_ready")),
+            "prompt_ready": bool(doc.get("prompt_ready")),
+            "prompt_chars": len(prompt),
+            "spec_version": str(doc.get("spec_version") or story.get("spec_version") or ""),
+            "compiler_version": str(meta.get("compiler_version") or ""),
+            "shot_count": len(story.get("shots") or []),
+            "line_count": len(story.get("lines") or []),
+            "workflow": str(doc.get("workflow") or ""),
+            "workflow_source": str(doc.get("workflow_source") or ""),
+            "fallback_workflows": list(doc.get("fallback_workflows") or []),
+            "ref_images": len(doc.get("ref_images") or []),
+            "ref_audios": len(doc.get("ref_audios") or []),
+            "risk_level": str(risk.get("level") or ""),
+            "route_reasons": len(route.get("reasons") or [])}
+
+
 def stage_plan(ctx: StageContext) -> StageResult:
     spec_path = Path(ctx.spec) if ctx.spec else None
     if spec_path is not None and spec_path.is_file():
@@ -148,7 +195,7 @@ def stage_plan(ctx: StageContext) -> StageResult:
                      "genre": dna.get("genre", ""), "hook_type": dna.get("hook_type", ""),
                      "shot_pattern": dna.get("shot_pattern", ""),
                      "sales_point": dna.get("sales_point", ""),
-                     "plan_only": bool(doc.get("plan_only"))},
+                     **_spec_metrics(doc)},
             message=f"spec 就绪：{spec_path.name}",
             data={"dna": dna, "hotspot": creative.get("hotspot") or {}})
     if ctx.dry:
@@ -171,13 +218,110 @@ def stage_plan(ctx: StageContext) -> StageResult:
                  "sales_point": planned.dna.sales_point,
                  "score_total": float(planned.scores.get("total") or 0.0),
                  "candidates": int((planned.decision or {}).get("candidate_count") or 0),
-                 "plan_only": True},
+                 **_spec_metrics(_spec_doc(planned.spec_path) if planned.spec_path else {})},
         message=f"自主规划完成：{planned.message}",
         data={"dna": planned.dna.to_dict(), "hotspot": planned.hotspot,
               "shortlist": planned.shortlist, "decision": planned.decision.get("rule", "")})
 
 
 # ── 2. preflight ───────────────────────────────────────────────
+def _static_dialogue_gate(ctx: StageContext, uid: str, doc: dict) -> tuple[bool, str, dict]:
+    """静态对白门禁（tools/check_dialogue.mjs）——编译产物也要过同一道闸。
+
+    Phase 7 起这不是"只有人工稿才跑"的可选项：编译出的 prompt 会被包上
+    `duration="N"` 再送进门禁，于是 R10/R28 的语速预算对**任何镜数/句数**都真的生效
+    （旧路径里 payload 不带 duration，这两条一直被跳过）。
+    R26 的阈值也同步改成 H3 服务端实测的 10000 字符。
+    """
+    import subprocess
+
+    prompt = str(doc.get("prompt") or "")
+    metrics: dict = {"dialogue_gate_ok": None}
+    if not prompt:
+        return True, "", metrics
+    gate = ctx.workspace / f"gate_{uid}.txt"
+    try:
+        from ..creative.compiler import gate_text
+        gate.parent.mkdir(parents=True, exist_ok=True)
+        gate.write_text(gate_text(prompt, duration=int(doc.get("duration") or 15),
+                                  resolution=str(doc.get("resolution") or "768p竖")),
+                        encoding="utf-8")
+    except Exception as exc:      # noqa: BLE001 —— 写不出检查文件不该拦出片
+        metrics["dialogue_gate_ok"] = None
+        return True, f"静态门禁 payload 写入失败（跳过）：{exc}", metrics
+
+    script = Path(__file__).resolve().parents[2] / "tools" / "check_dialogue.mjs"
+    if not script.is_file():
+        return True, "未找到 tools/check_dialogue.mjs（跳过静态门禁）", metrics
+    try:
+        proc = subprocess.run(["node", str(script), str(gate)], capture_output=True,
+                              text=True, errors="replace", timeout=120)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return True, f"node 不可用（跳过静态门禁）：{exc}", metrics
+    out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    ok = "0 ERROR" in out
+    metrics["dialogue_gate_ok"] = bool(ok)
+    metrics["dialogue_gate_iterations"] = 1
+    return ok, out.replace("\n", " | "), metrics
+
+
+def _spec_lines(doc: dict) -> list[dict]:
+    rows = (doc.get("story_spec") or {}).get("lines") or doc.get("lines") or []
+    return [r for r in rows if isinstance(r, dict) and str(r.get("text") or "").strip()]
+
+
+def _workflow_gate(doc: dict) -> tuple[str, str, dict]:
+    """链条能力校验：router 选的链必须真的装得下这条 spec（任务 9）。"""
+    from ..creative.workflow import WorkflowIncompatible, requirements_from_spec, validate_chain
+
+    chain = [str(doc.get("workflow") or "")] + [str(w) for w in (doc.get("fallback_workflows") or [])]
+    chain = [w for w in chain if w]
+    if not chain:
+        return WORKFLOW_INCOMPATIBLE, "spec 没有指定任何工作流 → 拒绝提交", {"workflow_gate": "empty"}
+    req = requirements_from_spec(doc)
+    if req.audio and not doc.get("ref_audios"):
+        # 有台词的片没有音色参考 = 每次生成换一把声音，先拦住
+        return (MISSING_INPUT, "有对白却没有 ref_audios（音色锁定缺失）→ 拒绝付费提交",
+                {"workflow_gate": "no_voice"})
+    bad = validate_chain(chain, req)
+    metrics = {"workflow_gate": "pass" if not bad else "block",
+               "workflow": chain[0], "fallbacks": chain[1:],
+               "requirement": req.to_dict()}
+    if not bad:
+        return "", "", metrics
+    try:      # 交给 router 复核：是真的一条都装不下，还是只是这条链写错了
+        from ..creative.workflow import choose
+        choose(req)
+    except WorkflowIncompatible as exc:
+        return (WORKFLOW_INCOMPATIBLE,
+                f"没有工作流能保住全部关键能力（时长/参考图/音频）：{exc.message}", metrics)
+    except Exception:      # noqa: BLE001 —— router 复核不了就按链本身的结论走
+        pass
+    return (WORKFLOW_INCOMPATIBLE,
+            "工作流链含不兼容项（会静默丢掉音频/参考图/时长）："
+            + "；".join(f"{b['workflow']}: {b['reason']}" for b in bad), metrics)
+
+
+def _prescreen_gate(ctx: StageContext, uid: str, doc: dict) -> tuple[str, str, dict]:
+    """高风险新构图必须先过 5s 预筛（任务 11/12）；低风险直接放行。"""
+    from ..creative.prescreen import PRESCREEN_SECONDS, needs_prescreen, prescreen_passed, risk_of
+
+    risk = risk_of(doc)
+    metrics = {"risk_level": risk["level"], "risk_score": risk["score"],
+               "risk_reasons": len(risk["reasons"]), "prescreen": None}
+    if not needs_prescreen(doc):
+        metrics["prescreen"] = "not_required"
+        return "", "", metrics
+    metrics["prescreen_seconds"] = PRESCREEN_SECONDS
+    if prescreen_passed(ctx.store, uid):
+        metrics["prescreen"] = "passed"
+        return "", "", metrics
+    metrics["prescreen"] = "required"
+    return (PRESCREEN_REQUIRED,
+            f"高风险新构图（{metrics['risk_level']} {metrics['risk_score']}）："
+            f"先跑 {PRESCREEN_SECONDS}s 预筛并留下 passed 结论，才允许跑 15s 正式片", metrics)
+
+
 def stage_preflight(ctx: StageContext) -> StageResult:
     if ctx.dry:
         return StageResult.ok("preflight", metrics={"dry": True}, message="演练：跳过门禁")
@@ -185,15 +329,15 @@ def stage_preflight(ctx: StageContext) -> StageResult:
     metrics: dict = {}
     problems: list[str] = []
 
-    # Phase 5 边界：StorySpec 就绪但 H3 提示词还没编译（Phase 7 PromptCompiler）时，
-    # 绝不放行到付费生成 —— 宁可把任务停在 BLOCKED 等编译，也不烧钱出一条空 prompt 的片。
     if ctx.spec is not None and Path(ctx.spec).is_file():
         doc = _spec_doc(Path(ctx.spec))
-        if doc.get("plan_only"):
+        # Phase 7 边界：StorySpec 就绪但没编译出 prompt 时绝不放行到付费生成
+        # （编译成功后 plan_only=False，这道闸自动解开）。
+        if not doc.get("prompt_ready") or not str(doc.get("prompt") or "").strip():
             return StageResult.fail(
                 "preflight", PROMPT_NOT_COMPILED,
-                "StorySpec 已就绪，但 H3 提示词尚未编译（Phase 7 PromptCompiler）——"
-                "为不浪费付费额度，本次不进入生成。可先人工审阅 StorySpec 与 CreativeDNA。",
+                "StorySpec 已就绪，但 H3 提示词尚未编译（PromptCompiler 未产出 prompt）——"
+                "为不浪费付费额度，本次不进入生成。",
                 metrics={"plan_only": True, "prompt_ready": bool(doc.get("prompt_ready"))})
         # Phase 6 合规门：文案里的产品承诺必须映射到可用 claim，否则绝不放行到付费生成
         code, claim_msg, claim_metrics = _claims_gate(Path(ctx.spec))
@@ -201,6 +345,59 @@ def stage_preflight(ctx: StageContext) -> StageResult:
             return StageResult.fail("preflight", code, claim_msg, metrics=claim_metrics)
         metrics.update(claim_metrics)
 
+        # Phase 7 ①：prompt 预算（编译期已算过，这里用服务端口径复核一遍）
+        n_prompt = len(str(doc.get("prompt") or ""))
+        metrics["prompt_chars"] = n_prompt
+        if n_prompt > PROMPT_MAX:
+            return StageResult.fail("preflight", PROMPT_BUDGET_EXCEEDED,
+                                    f"prompt {n_prompt} 字符 > H3 上限 {PROMPT_MAX} → 付费前阻断",
+                                    metrics=metrics)
+        if n_prompt > PROMPT_SAFE:
+            problems.append(f"prompt {n_prompt}/{PROMPT_MAX} 字符超安全线 → 先压缩再出片")
+
+        # Phase 7 ②：工作流链必须保住音频/参考图/时长（不兼容就拒绝提交）
+        code, wf_msg, wf_metrics = _workflow_gate(doc)
+        metrics.update(wf_metrics)
+        if code:
+            return StageResult.fail("preflight", code, wf_msg, metrics=metrics)
+
+        # Phase 7 ③：高风险新构图先预筛（低风险直接过）
+        code, ps_msg, ps_metrics = _prescreen_gate(ctx, _spec_uid(ctx), doc)
+        metrics.update(ps_metrics)
+        if code:
+            return StageResult.fail("preflight", code, ps_msg, metrics=metrics)
+
+        # Phase 7 ④：静态对白门禁（同一条闸，任何镜数/句数都适用）
+        ok_gate, gate_msg, gate_metrics = _static_dialogue_gate(ctx, _spec_uid(ctx), doc)
+        metrics.update(gate_metrics)
+        if not ok_gate:
+            return StageResult.fail("preflight", PREFLIGHT_FAILED,
+                                    f"静态对白门禁未过（要求 0 ERROR）：{gate_msg}",
+                                    metrics=metrics)
+
+        # Phase 7 ⑤：要说话的片必须有词 —— spec.lines 或旧口径台词文件二选一
+        from ..creative.compiler import needs_dialogue
+        mode = str((doc.get("creative") or {}).get("dna", {}).get("dialogue_mode") or "")
+        has_lines = bool(_spec_lines(doc))
+        legacy_lines = (ctx.root / "docs" / f"onetake_lines_{_spec_uid(ctx)}.txt").is_file()
+        metrics["dialogue_authored"] = bool(has_lines or legacy_lines)
+        if needs_dialogue(mode) and not (has_lines or legacy_lines):
+            return StageResult.fail(
+                "preflight", MISSING_INPUT,
+                f"台词模式「{mode}」必须有成句台词：spec.story_spec.lines 为空且没有 "
+                f"docs/onetake_lines_{_spec_uid(ctx)}.txt → 拒绝付费出一条没词的片",
+                metrics=metrics)
+
+        if not problems:
+            return StageResult.ok("preflight", metrics=metrics,
+                                  message=f"门禁通过：{metrics}")
+        message = " ｜ ".join(problems)
+        if ctx.force:
+            return StageResult.ok("preflight", metrics={**metrics, "forced": True},
+                                  message=f"预检未过但 --force 强制继续：{message}")
+        return StageResult.fail("preflight", PREFLIGHT_FAILED, message, metrics=metrics)
+
+    # ── 旧口径兜底（没有 spec 文件：只看台词文件）───────────────
     uid = _spec_uid(ctx)
     try:
         lines_ok, lines_msg = _make_15s().assert_lines(uid)
@@ -211,30 +408,8 @@ def stage_preflight(ctx: StageContext) -> StageResult:
     metrics["lines_ok"] = bool(lines_ok)
     if not lines_ok:
         problems.append(lines_msg)
-
-    if ctx.spec is not None:
-        try:
-            spec = json.loads(Path(ctx.spec).read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            return StageResult.fail("preflight", MISSING_INPUT, f"spec 无法解析：{exc}")
-        n_prompt = len(str(spec.get("prompt", "")))
-        metrics["prompt_chars"] = n_prompt
-        if n_prompt > PROMPT_SAFE:
-            problems.append(f"prompt {n_prompt}/{PROMPT_MAX} 字符超安全线 → 先压缩再出片"
-                            "（H3 会拒收，白等）")
-
-        check_file = ctx.root / "docs" / f"onetake_check_{uid}.txt"
-        if check_file.is_file():
-            ok_gate, gate_msg = _make_15s().check_dialogue(Path(ctx.spec))
-            metrics["dialogue_gate_ok"] = bool(ok_gate)
-            if not ok_gate:
-                problems.append(f"对白门禁未过（要求 0 ERROR）：{gate_msg}")
-        else:
-            metrics["dialogue_gate_ok"] = None
-
     if not problems:
-        return StageResult.ok("preflight", metrics=metrics,
-                              message="门禁通过" + (f"：{metrics}" if metrics else ""))
+        return StageResult.ok("preflight", metrics=metrics, message="门禁通过（旧口径：台词文件）")
     message = " ｜ ".join(problems)
     if ctx.force:
         return StageResult.ok("preflight", metrics={**metrics, "forced": True},

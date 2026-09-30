@@ -1,0 +1,9 @@
+Phase 7 证据 —— Prompt Budgeter（付费前阻断/压缩）
+
+① 去重: dropped_sentences=1  出现次数=1  字符 104
+② 压缩: 原始 9852 → 9851  compressed=True（safe=9800, limit=10000）
+③ 超硬上限: 抛出 PromptBudgetExceeded chars=10005 limit=10000 error_code=PROMPT_TOO_LONG
+
+服务端复核口径（lib/orchestrator/stages.py::stage_preflight）：
+  prompt > 10000  → PROMPT_BUDGET_EXCEEDED（付费前阻断，0 提交）
+  prompt > 9800   → 记 WARN「先压缩再出片」

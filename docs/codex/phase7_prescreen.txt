@@ -1,0 +1,26 @@
+Phase 7 证据 —— 高风险预筛（prescreen）
+
+structure              level   score  people reasons
+S_duo_conflict         medium  0.55   2      特殊交互调度（坡道爬升）：人与产品的接触点容易崩; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_duo_conflict）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_solo_vlog            medium  0.65   1      危险形变动作（折叠收放）：结构容易软掉/穿模; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_solo_vlog）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_street_interview     medium  0.5    2      街访问答：路人插话 + 同时反应，交互复杂; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_street_interview）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_suspense_reveal      medium  0.5    2      特殊道具/光效（雨夜灯光）; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_suspense_reveal）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_magic_loop           medium  0.65   1      危险形变动作（折叠收放）：结构容易软掉/穿模; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_magic_loop）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_product_test         medium  0.55   2      特殊交互调度（坡道爬升）：人与产品的接触点容易崩; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_product_test）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_pov_first            high    0.95   1      危险形变动作（遥控轨迹）：结构容易软掉/穿模; 身体状态设定：模型容易删腿/画成悬空; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_pov_first）：构图/调度没有历史成功率
+                       needs_prescreen=True
+S_silent_slapstick     medium  0.35   2      有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_silent_slapstick）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_emotional_story      medium  0.5    2      特殊道具/光效（老照片对比）; 有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_emotional_story）：构图/调度没有历史成功率
+                       needs_prescreen=False
+S_comment_reply        medium  0.35   2      有品牌字/收口句：画面文字与品牌字必须有正确字形; 没拍过的骨架（S_comment_reply）：构图/调度没有历史成功率
+                       needs_prescreen=False
+
+预筛 spec 改写: job_uid P7_S_pov_first → P7_S_pov_first_shot2  duration=5  shot=2
+  改写后的镜头头:  Camera: diagonal field of view 70 degrees, camera at the su

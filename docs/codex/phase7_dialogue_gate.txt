@@ -1,0 +1,14 @@
+Phase 7 证据 —— 编译产物过静态对白门禁 tools/check_dialogue.mjs
+
+S_duo_conflict         (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 28 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_solo_vlog            (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 34 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_street_interview     (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 25 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_suspense_reveal      (gate.txt)  0 ERROR / 0 WARN |  | 合计 0 ERROR / 0 WARN（规则见 docs/rules-dialogue.md）
+S_magic_loop           (gate.txt)  0 ERROR / 0 WARN |  | 合计 0 ERROR / 0 WARN（规则见 docs/rules-dialogue.md）
+S_product_test         (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 31 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_pov_first            (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 31 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_silent_slapstick     (gate.txt)  0 ERROR / 0 WARN |  | 合计 0 ERROR / 0 WARN（规则见 docs/rules-dialogue.md）
+S_emotional_story      (gate.txt)  0 ERROR / 1 WARN |   • R28  台词量 28 字 < 15 秒档下限 65 字（4.5 字/秒口径）——2026-09-22 老板定的硬口径：口播要按正常语速 4.5–5 字/秒**铺满整条时长**。实测机制：字数不够时模型不会拖慢，而是照常（甚至偏快
+S_comment_reply        (gate.txt)  0 ERROR / 0 WARN |  | 合计 0 ERROR / 0 WARN（规则见 docs/rules-dialogue.md）
+
+阈值口径（本轮同步）：R26 旧「400 单位」作废，改为 H3 实测硬上限 10000 字符 / 安全线 9800。

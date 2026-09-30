@@ -8,7 +8,7 @@ one engine: he is the only man in the room with no powers, and everything he doe
 that fact; being called ordinary is the one thing that reaches him. Vocal profile: a low, gravelly voice
 pushed from the chest, short sentences bitten off at the end, deliberately slowed — the angrier he gets,
 the quieter and flatter he becomes, never louder. Key physical habits and tics: shifts his jaw once to one
-side before he speaks (his decision tic); when he is being dismissed he goes completely still and lets the
+side before he commits (his decision tic); when he is being dismissed he goes completely still and lets the
 blink rate drop, using the silence as pressure; his default face is a closed, unreadable mask — only the
 jaw and mouth are visible under the cowl, so the whole performance lives in the jaw, the mouth and the
 eyes. Eye life: narrow, watchful eyes under the cowl, fast small saccades tracking the other man's hands

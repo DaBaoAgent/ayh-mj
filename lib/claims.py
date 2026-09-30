@@ -61,7 +61,8 @@ CN_NUM = "零一二三四五六七八九十百千万两〇"
 _NUM = rf"(?:\d+(?:\.\d+)?|[{CN_NUM}]+(?:点[{CN_NUM}]+)?)"
 UNITS = ("kg", "公斤", "千克", "km/h", "km", "公里", "千米", "cm", "公分", "厘米",
          "米", "m", "度", "°", "股", "项", "年", "天", "分钟", "A", "安", "W", "瓦", "%")
-_NUMERIC_RE = re.compile(rf"{_NUM}\s*(?:{'|'.join(re.escape(u) for u in UNITS)})")
+# 单位后面不许再跟字母/数字：否则 `85mm 镜头`（摄影参数，不是产品参数）会被读成 "85m"。
+_NUMERIC_RE = re.compile(rf"{_NUM}\s*(?:{'|'.join(re.escape(u) for u in UNITS)})(?![A-Za-z0-9])")
 
 # 关键词组 → 对应 claim.kind；命中后必须在同 kind 的 claim 里找到唯一归属
 GROUP_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
@@ -70,8 +71,11 @@ GROUP_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
     (KIND_WARRANTY, re.compile(r"质保|保修|售后|终身")),
     (KIND_MEDICAL, re.compile(r"治疗|治愈|疗效|康复|医用|药效|包治|能不能治|病人能用")),
     (KIND_SUPERLATIVE, re.compile(
-        r"最好|最佳|最强|最快|最轻|最安全|最便宜|最省|第一|唯一|绝对|100\s*%|顶级|"
-        r"永不|全能|销量王")),
+        r"最好|最佳|最强|最快|最轻|最安全|最便宜|最省|唯一|绝对|100\s*%|顶级|"
+        r"永不|全能|销量王|"
+        # "第一" 只有在**不是**序数/机位/时间语时才算广告法绝对化用语：
+        # "POV 第一人称"是镜头语言，报出来是误伤（Phase 7 集成实测）。
+        r"第一(?!人称|视角|次|天|时间|步|现场|次见面)")),
 )
 
 _WS_RE = re.compile(r"\s+")

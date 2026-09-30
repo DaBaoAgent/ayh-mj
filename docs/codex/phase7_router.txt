@@ -1,0 +1,28 @@
+Phase 7 证据 —— 能力感知工作流路由
+
+能力真源: s4_generate/workflow_router.WORKFLOW_SPECS（15 个型号）
+
+简名归一: multi_image_15s -> minimax_h3_lightx2v_v5_15s ; multi_image -> minimax_h3_lightx2v_v5
+
+structure              dur   img audio  首选(primary)                            兼容 fallback 链
+S_duo_conflict            15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_solo_vlog               15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_street_interview        15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_suspense_reveal         15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_magic_loop              15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_product_test            15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_pov_first               15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_silent_slapstick        15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_emotional_story         15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+S_comment_reply           15   2 False  minimax_h3_lightx2v_v5_15s             (无)  chain_ok=True
+
+10s 需求（能力表里不止一个型号满足）→ fallback 链:
+  chain=['minimax_h3_lightx2v_v5', 'minimax_h3_lightx2v_v5_15s', 'minimax_h3_lightx2v', 'minimax_h3_z0902']  cost=¥0.600
+
+不兼容拒绝（绝不静默降级偷换能力）:
+  minimax_h3_lightx2v_v5             ok=False minimax_h3_lightx2v_v5 时长 1-10s，装不下 15s
+  minimax_h3_lightx2v_v5_15s         ok=False minimax_h3_lightx2v_v5_15s 不支持音频参考（音色锁定会丢）
+  minimax_h3_zm_u24                  ok=False minimax_h3_zm_u24 以音频输入为前提（kind=multi_image_audio），无音频时不出片
+  minimax_h3_z0902                   ok=False minimax_h3_z0902 最多 6 张参考图，本条要 9 张
+  minimax_h3_z0901                   ok=False minimax_h3_z0901 最多 0 张参考图，本条要 2 张
+  15s 纯文生 → WorkflowIncompatible：没有工作流能满足这条 spec 的硬需求：{'duration': 15, 'n_images': 0, 'audio': False, 'first_last': False, 

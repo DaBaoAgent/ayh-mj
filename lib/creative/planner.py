@@ -36,12 +36,14 @@ from .. import ideas as ideas_mod
 from .. import products as products_mod
 from ..creative_research import build_research_brief
 from . import cast_groups
+from .compiler import PromptBudgetExceeded, compile_spec, gate_text, lines_from_file
 from .director import CreativeDirector
 from .dna import AUDIENCES, CLAIM_BLOCKED_FLAG, CLAIM_RISK_FLAG, GOALS, VISUAL_MOTIFS, CreativeDNA
 from .hotspot import normalize_hotspot
 from .scoring import NUMERIC_CLAIM_POINTS, STRUCTURE_AUDIENCES
-from .storiespec import build_story_spec, summarize_research
+from .storiespec import SPEC_VERSION, build_story_spec, summarize_research
 from .structures import STORY_STRUCTURES
+from .workflow import route_for_spec
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DAY_FMT = "%Y-%m-%d"
@@ -49,6 +51,10 @@ CANDIDATE_MIN, CANDIDATE_MAX = 10, 20
 MAX_ATTEMPTS = 800
 EVERGREEN_RISK = "热点为常青素材，时效性弱"
 SILENT_RISK = "无对白需字幕/音效兜底"
+
+# Phase 7：产品单元素材（与 tools/make_15s.py 的 REFS_TAIL 同口径）
+PRODUCT_REFS: tuple[str, ...] = ("折叠-无阴影.png", "正侧-3-无阴影.png", "45度-加水杯-无阴影.png")
+MAX_REF_IMAGES = 9          # H3 多图参考上限（实际按工作流能力再校验）
 
 CTA_LINES: tuple[str, ...] = (
     "评论区扣 1，帮你算算家里老人用不用得上",
@@ -85,6 +91,7 @@ class PlannedJob:
     dna_path: Path | None = None
     scores_path: Path | None = None
     claims_path: Path | None = None
+    gate_path: Path | None = None
     message: str = ""
 
     def artifacts(self) -> list[dict]:
@@ -93,7 +100,8 @@ class PlannedJob:
         for type_, path in (("research", self.research_path),
                             ("creative_dna", self.dna_path),
                             ("creative_scores", self.scores_path),
-                            ("claims", self.claims_path)):
+                            ("claims", self.claims_path),
+                            ("dialogue_check", self.gate_path)):
             if path:
                 out.append({"type": type_, "path": str(path)})
         return out
@@ -107,6 +115,7 @@ class PlannedJob:
             "spec_path": str(self.spec_path or ""), "research_path": str(self.research_path or ""),
             "dna_path": str(self.dna_path or ""), "scores_path": str(self.scores_path or ""),
             "claims_path": str(self.claims_path or ""),
+            "gate_path": str(self.gate_path or ""),
             "message": self.message,
         }
 
@@ -309,6 +318,15 @@ class CreativePlanner:
         spec = build_story_spec(uid=uid, structure=structure, dna=dna, hotspot=hotspot.to_dict(),
                                 research_refs=summarize_research(brief), rationale=rationale,
                                 title=title, claim_ids=claim_ids)
+        # Phase 7：① 补参考素材（角色槽位 → 定妆图/音色 + 产品单元素材）
+        #          ② 编译 H3 提示词（PromptCompiler，唯一实现）
+        #          ③ 能力感知路由（不再人工固定空 fallback，任务 8/9）
+        self._attach_lines(spec)
+        self._attach_assets(spec)
+        compile_meta = self._compile_prompt(spec)
+        route_meta = self._route_prompt(spec)
+        rationale["compile"] = compile_meta
+        rationale["route"] = route_meta
         paths = self._paths(uid)
         self._write_json(paths["research"], {"uid": uid, "day": day, "brief": brief})
         self._write_json(paths["dna"], {"uid": uid, "day": day, "structure": structure["id"],
@@ -318,6 +336,11 @@ class CreativePlanner:
                                         "scores": dict(chosen.scores), "rationale": rationale,
                                         "claim_ids": claim_ids})
         self._write_json(paths["claims"], claim_facts)
+        # 静态对白门禁 payload（duration="N" 一定带上，R10/R28 语速预算才是真开着的）
+        paths["gate"].parent.mkdir(parents=True, exist_ok=True)
+        paths["gate"].write_text(
+            gate_text(spec.prompt, duration=spec.duration, resolution=spec.resolution),
+            encoding="utf-8")
         self._write_json(paths["scores"], {
             "uid": uid, "day": day, "dimensions": decision["dimensions"], "rule": decision["rule"],
             "candidates": [s.to_dict() for s in ranked],
@@ -338,8 +361,10 @@ class CreativePlanner:
             hotspot=hotspot.to_dict(), research=brief, scores=dict(chosen.scores),
             shortlist=decision["shortlist"], decision=decision, spec_path=paths["spec"],
             research_path=paths["research"], dna_path=paths["dna"], scores_path=paths["scores"],
-            claims_path=paths["claims"],
-            message=f"{structure['name']}｜{dna.hook_type}｜{dna.shot_pattern}（综合分 {chosen.total:.3f}）",
+            claims_path=paths["claims"], gate_path=paths["gate"],
+            message=(f"{structure['name']}｜{dna.hook_type}｜{dna.shot_pattern}"
+                     f"（综合分 {chosen.total:.3f}；{spec.duration}s/{len(spec.shots)} 镜/"
+                     f"{len(spec.lines)} 句；{spec.workflow}）"),
         )
 
     def plan_batch(self, count: int, *, goal: str = "", day: str | None = None) -> list[PlannedJob]:
@@ -377,7 +402,7 @@ class CreativePlanner:
             scores=dict(dna_doc.get("scores") or {}), shortlist=list(scores_doc.get("shortlist") or []),
             decision=dict((scores_doc.get("decision") if isinstance(scores_doc, dict) else {}) or {}),
             spec_path=paths["spec"], research_path=paths["research"], dna_path=paths["dna"],
-            scores_path=paths["scores"],
+            scores_path=paths["scores"], claims_path=paths["claims"], gate_path=paths["gate"],
             message=f"复用已规划方案：{dna_doc.get('structure_name', '')}",
         )
 
@@ -389,7 +414,118 @@ class CreativePlanner:
             "dna": self.creative_dir / f"dna_{uid}.json",
             "scores": self.creative_dir / f"scores_{uid}.json",
             "claims": self.creative_dir / f"claims_{uid}.json",
+            "gate": self.creative_dir / f"gate_{uid}.txt",
         }
+
+    # ── Phase 7：素材 / 编译 / 路由 ────────────────────────────
+    def _attach_lines(self, spec) -> None:
+        """把已写好的台词稿（docs/onetake_lines_<uid>.txt）装进 spec.lines。
+
+        稿子由人工/后续阶段的写作步骤产出；这里只做**搬运 + 与编译器完全一致的分镜**
+        （同一个 `lines_from_file`）。没有稿子就保持空 —— 编译仍然成功（逐镜给动作指令），
+        但 preflight 会因为"要说话的片却没有台词"把任务停住，绝不付费出一条没词的片。
+        """
+        if spec.lines:
+            return
+        slots = [s for s in str(spec.dna.cast_pattern or "").split("+") if s.strip()]
+        spec.lines = lines_from_file(spec.uid, max(1, len(spec.shots)),
+                                     spec.dna.dialogue_mode, slots)
+
+    def _attach_assets(self, spec) -> None:
+        """把 StorySpec 的 `@槽位` 解析成真实参考素材（图 + 音色）。
+
+        与 tools/make_15s.py 的人工 spec 同口径：人物定妆图在前、产品单元素材在后。
+        解析不了的槽位**只记警告不抛错** —— 宁可让 preflight 用 CAPABILITY/ASSET 门拦，
+        也不要在规划期把整条任务炸掉（规划本身不花钱，可反复重试）。
+        """
+        from .. import cast as cast_mod
+
+        warnings: list[str] = []
+        images: list[str] = []
+        audios: list[str] = []
+        picked: dict[str, str] = {}
+
+        def _add(paths, bucket: list[str]) -> None:
+            for raw in paths:
+                p = Path(raw)
+                if p.is_file() and str(p) not in bucket:
+                    bucket.append(str(p))
+
+        for shot in spec.shots:
+            ref = str((shot or {}).get("cast_ref") or "")
+            if not ref:
+                continue
+            role = ref
+            try:
+                if ref.startswith("@"):
+                    role = picked.setdefault(ref, cast_mod._pick_from_slot(ref, spec.uid))
+                _add(cast_mod.resolve_refs([role]), images)
+            except Exception as exc:      # noqa: BLE001 —— 缺图不该炸规划
+                warnings.append(f"{ref}: {type(exc).__name__}: {exc}")
+
+        # 产品单元素材（有就带上：产品保真的唯一依据是同一条产品参考图）
+        product_dir = ROOT / "assets" / "products"
+        _add([product_dir / name for name in PRODUCT_REFS
+              if (product_dir / name).is_file()], images)
+
+        # 音色：按说话人解析（槽位 → 具体角色 → voice/<id>.mp3）
+        for line in spec.lines:
+            if not isinstance(line, dict):
+                continue
+            speaker = str(line.get("speaker") or "")
+            role = picked.get(speaker, speaker)
+            if not speaker:
+                continue
+            try:
+                voice = cast_mod.resolve_voice(role)
+            except Exception as exc:      # noqa: BLE001
+                warnings.append(f"voice {speaker}: {type(exc).__name__}: {exc}")
+                voice = None
+            if voice and Path(voice).is_file() and str(voice) not in audios:
+                audios.append(str(voice))
+
+        spec.ref_images = images[:MAX_REF_IMAGES]
+        spec.ref_audios = audios
+        if warnings:
+            spec.prompt_meta.setdefault("asset_warnings", warnings)
+        spec.prompt_meta["assets"] = {"ref_images": len(spec.ref_images),
+                                      "ref_audios": len(spec.ref_audios),
+                                      "cast_slots": sorted(picked)}
+
+    def _compile_prompt(self, spec) -> dict:
+        """PromptCompiler：唯一编译入口。失败**不抛**，改标 plan_only 让 preflight 拦。"""
+        keep = dict(spec.prompt_meta)
+        spec.spec_version = SPEC_VERSION
+        try:
+            compiled = compile_spec(spec)
+        except PromptBudgetExceeded as exc:
+            spec.prompt, spec.prompt_ready = "", False
+            spec.prompt_meta = {**keep, "compiler_version": "prompt-compiler/1.0",
+                                "error": "PROMPT_BUDGET_EXCEEDED", "detail": str(exc)}
+            return {"ok": False, "error": "PROMPT_BUDGET_EXCEEDED", "detail": str(exc)}
+        spec.prompt = compiled.prompt
+        spec.prompt_ready = True
+        spec.prompt_meta = {**keep, **compiled.to_dict(), "chars": len(compiled.prompt)}
+        return {"ok": True, **compiled.to_dict()}
+
+    def _route_prompt(self, spec) -> dict:
+        """能力感知路由：一次算清首选 + 兼容 fallback（任务 8/9）。"""
+        from .prescreen import risk_of
+
+        risk = risk_of(spec)
+        try:
+            plan = route_for_spec(spec, risk=risk["level"])
+        except Exception as exc:      # noqa: BLE001 —— 路由失败不炸规划，留给 preflight
+            spec.prompt_meta["route_error"] = f"{type(exc).__name__}: {exc}"
+            return {"ok": False, "error": type(exc).__name__, "detail": str(exc),
+                    "risk": risk}
+        spec.workflow = plan.workflow
+        spec.fallback_workflows = list(plan.fallbacks)
+        spec.workflow_source = "router"
+        spec.resolution = plan.resolution
+        spec.prompt_meta["route"] = plan.to_dict()
+        spec.prompt_meta["risk"] = risk
+        return {"ok": True, **plan.to_dict(), "risk": risk}
 
     @staticmethod
     def _write_json(path: Path, data) -> None:

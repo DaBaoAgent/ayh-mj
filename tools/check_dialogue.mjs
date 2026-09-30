@@ -2,11 +2,19 @@
 /**
  * H3 对白检查器 —— 规则见 docs/rules-dialogue.md
  *
- *   node scripts/check-dialogue.mjs sources/*.svml
- *   node scripts/check-dialogue.mjs prompt.txt          # 纯提示词文本也可以
+ *   node tools/check_dialogue.mjs sources/*.svml
+ *   node tools/check_dialogue.mjs prompt.txt            # 纯提示词文本也可以
+ *   node tools/check_dialogue.mjs check_payload.txt     # 带 duration="N" 的产线 payload
  *
  * 规则分两级：ERROR 必须改完再 build（花钱前拦截），WARN 需人工确认。
  * 只做「花钱前」能静态判定的检查；生成后的听感/画面必须人工或 ASR 复核（规则 R22-R24）。
+ *
+ * Phase 7（2026-09-30）：阈值与 15 秒 one-take 产线**实测口径**对齐 ——
+ *   · R10/R28 的语速预算只在 payload 里带 duration="N" 时才生效；产线 payload
+ *     （lib/creative/compiler.py::gate_text）一定会带，所以新片的字数门禁是真开着的；
+ *   · R26 的旧阈值「400 单位（中文按字、英文按 1/3 计）」已**作废**：那是 2026-09-17
+ *     中文短提示词时代的经验值，而 2026-09-26 实测 H3 服务端硬上限是 **10000 字符**，
+ *     现役英文结构提示词稳定在 5.5k-6.5k 字符 —— 旧阈值会对**每一条**在产 prompt 报警。
  */
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
@@ -20,7 +28,11 @@ const SPEECH_HINTS = ["台词", "口播", "旁白", "画外", "说：", "说道"
 const CHARS_PER_SECOND = 4.5; // 中文正常播报速度**下限**（低于它 = 口播没铺满整条）
 const CHARS_PER_SECOND_MAX = 5.0; // 正常播报速度**上限**（高于它 = 最后一句念不完会被截断）
 const LEAD_IN_SECONDS = 0.6; // 起句留白
-const MAX_PROMPT_CHARS = 400; // AutoDL 实测：600 字级长提示词两次不出片
+// H3 服务端 prompt 硬上限 / 安全线（2026-09-26 实测；与 tools/make_15s.py、
+// lib/orchestrator/generation.py 的 PROMPT_MAX / PROMPT_SAFE 同一口径）
+const PROMPT_MAX = 10000;
+const PROMPT_SAFE = 9800;
+const MAX_PROMPT_CHARS = PROMPT_SAFE; // 兼容旧名：R26 的告警线
 
 /** H3 的时长会吸附到 24fps 下 17k+5 帧的网格（官方指南） */
 function nativeSeconds(requested) {
@@ -42,11 +54,14 @@ function speechUnits(value) {
   return cjk + latinWords + digits;
 }
 
-/** 提示词「体量」：中文按字计，英文按 1/3 计（贴近分词后的实际负担） */
+/** 提示词「体量」= 字符数（服务端口径）。
+ *
+ * 旧实现是「中文按字计、英文按 1/3 计」的加权估算 —— 那是 2026-09-17 中文短提示词
+ * 时代的经验值。2026-09-26 实测 H3 服务端限制的是**字符数**（10000），按字符数算
+ * 才和真实限制一致，也让阈值不再随语种漂移。
+ */
 function promptWeight(value) {
-  const cjk = (value.match(/[\u3400-\u9fff]/g) ?? []).length;
-  const latin = (value.match(/[A-Za-z]/g) ?? []).length / 3;
-  return Math.round(cjk + latin);
+  return value.length;
 }
 
 function extractPrompts(text) {
@@ -200,8 +215,10 @@ function checkFile(path) {
       add("WARN", "R25", "没有显式要求「画面无平台水印/字幕条/角标」——同时要写「保留画面主体自身的品牌字」");
     }
     const weight = promptWeight(body);
-    if (weight > MAX_PROMPT_CHARS) {
-      add("WARN", "R26", `提示词体量约 ${weight}（中文按字、英文按 1/3 计），超过本项目经验上限 ${MAX_PROMPT_CHARS}（AutoDL 实测长提示词容易出片失败）`);
+    if (weight > PROMPT_MAX) {
+      add("ERROR", "R26", `提示词 ${weight} 字符 > H3 服务端硬上限 ${PROMPT_MAX}（2026-09-26 实测）→ 必被拒收，先压缩再提交`);
+    } else if (weight > MAX_PROMPT_CHARS) {
+      add("WARN", "R26", `提示词 ${weight} 字符已超安全线 ${MAX_PROMPT_CHARS}（硬上限 ${PROMPT_MAX}）→ 建议先压缩，贴上限提交容易白等`);
     }
   }
 
