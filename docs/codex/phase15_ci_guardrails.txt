@@ -1,0 +1,80 @@
+====================================================================
+ayh-mj CI 门禁（非 live / 非 paid，live 与 paid 环境变量已强制清除）
+====================================================================
+
+>>> lint
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m ruff check lib tests tools webui s6_publish s7_learn
+All checks passed!
+    (0.1s, exit=0)
+
+>>> typecheck
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m compileall -q lib s1_trend s4_generate s5_compose s6_publish s7_learn tools webui tests
+    (0.1s, exit=0)
+
+>>> unit
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m pytest tests/unit -q --timeout=900
+........................................................................ [ 11%]
+........................................................................ [ 22%]
+........................................................................ [ 34%]
+........................................................................ [ 45%]
+........................................................................ [ 57%]
+........................................................................ [ 68%]
+........................................................................ [ 80%]
+........................................................................ [ 91%]
+....................................................                     [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+628 passed, 1 warning in 19.85s
+    (20.3s, exit=0)
+    ok tests/unit: 全部用例都带 unit marker
+    ok tests/contract: 全部用例都带 contract marker
+    ok tests/integration: 全部用例都带 integration marker
+    ok tests/frontend: 全部用例都带 frontend marker
+
+>>> contract
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m pytest tests/contract -q --timeout=900
+..................................................                       [100%]
+50 passed in 0.23s
+    (0.5s, exit=0)
+
+>>> integration
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m pytest tests/integration -q --timeout=900
+........................................................................ [ 63%]
+.........................................                                [100%]
+============================== warnings summary ===============================
+tests/integration/test_p15_cost_idempotency.py::test_costs_are_reported_separately_for_job_and_repairs
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+113 passed, 1 warning in 329.12s (0:05:29)
+    (329.5s, exit=0)
+
+>>> frontend
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m pytest tests/frontend -q --timeout=900
+.........                                                                [100%]
+9 passed in 12.52s
+    (12.8s, exit=0)
+
+>>> migration
+    $ D:\@kaifa\ayh-mj\.venv\Scripts\python.exe -m pytest tests/unit/test_migrations.py -q --timeout=900
+.....                                                                    [100%]
+5 passed in 0.29s
+    (0.6s, exit=0)
+
+====================================================================
+汇总
+====================================================================
+  PASS  lint            0.1s
+  PASS  typecheck       0.1s
+  PASS  unit           22.0s
+  PASS  contract        0.5s
+  PASS  integration   329.5s
+  PASS  frontend       12.8s
+  PASS  migration       0.6s
+
+全部门禁通过（总耗时 365.6s）

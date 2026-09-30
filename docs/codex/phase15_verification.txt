@@ -1,0 +1,377 @@
+ayh-mj Phase 15 验收证据（0 付费 / 0 真实发布）
+生成命令: .venv/Scripts/python.exe logs/_p15_evidence.py
+采集对象: 本次 phase-15 提交的工作区代码（采集时 HEAD 见 ①，即上一阶段提交）
+
+==============================================================================
+① 环境与基线（分支 / HEAD / 各 Phase commit / DB schema）
+==============================================================================
+分支          : codex/ayh-mj-vNext
+HEAD          : 7b6ba14 phase-14: retire legacy pipeline and document vnext architecture
+core.autocrlf : true
+python        : Python 3.12.9
+uvicorn/fastapi: fastapi 0.142.1 starlette 1.7.0
+
+各 Phase commit：
+6e8acc5 phase-0: freeze baseline and add regression safety net
+745ccef phase-1: unify settings dependencies and capability discovery
+7239092 phase-2: introduce canonical job store and state machine
+e30e9a7 phase-3: centralize execution in pipeline orchestrator
+289b2f2 phase-4: add resumability idempotency and repair policies
+4d953ff phase-5: add autonomous planner and structured creative dna
+aa4a27e phase-6: centralize product claims and compliance facts
+4d72c8a phase-7: compile structured stories and route generation intelligently
+58528f5 phase-8: add automated qa critic and bounded self repair
+f4ec01b phase-9: unify post production and make audio story aware
+b912bb7 phase-10: connect packaging publishing safety and ai compliance
+7f76dfa phase-11: add closed loop creative performance learning
+c10b500 phase-12: rebuild web console around canonical jobs and events
+218ad06 phase-13: establish ci and autonomous development guardrails
+7b6ba14 phase-14: retire legacy pipeline and document vnext architecture
+
+DB schema：
+DB_PATH        : D:\@kaifa\ayh-mj\state\pipeline.db
+SCHEMA_VERSION : 4
+applied        : [1, 2, 3, 4]
+
+==============================================================================
+② lint（ruff）与 typecheck（compileall）
+==============================================================================
+All checks passed!
+(compileall: 0 error)
+
+==============================================================================
+③ 全量测试（非 live / 非 paid）
+==============================================================================
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 27%]
+........................................................................ [ 36%]
+........................................................................ [ 45%]
+........................................................................ [ 54%]
+........................................................................ [ 63%]
+........................................................................ [ 72%]
+........................................................................ [ 81%]
+........................................................................ [ 90%]
+........................................................................ [ 99%]
+........                                                                 [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+800 passed, 1 deselected, 1 warning in 359.50s (0:05:59)
+
+==============================================================================
+④ 用例分类纪律（marker）与收集数
+==============================================================================
+tests/unit           marker=unit         ok   tests/unit/test_repair_policies.py::test_business_error_is_not_retried_forever
+tests/contract       marker=contract     ok   tests/contract/test_providers.py::test_broken_fixture_fails_is_valid_too[broken/autodl_submit.error_code.json]
+tests/integration    marker=integration  ok   tests/integration/test_p15_recovery.py::test_hard_sqlite_error_stops_before_paying_and_stays_recoverable
+tests/frontend       marker=frontend     ok   9 tests collected in 0.04s
+
+==============================================================================
+⑤ Phase 15 全部验收用例（逐条）
+==============================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+rootdir: D:\@kaifa\ayh-mj
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 900.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 113 items / 54 deselected / 59 selected
+
+tests/integration/test_p15_cost_idempotency.py::test_repeat_generation_reuses_the_submitted_task PASSED [  1%]
+tests/integration/test_p15_cost_idempotency.py::test_download_failure_only_costs_extra_download_attempts PASSED [  3%]
+tests/integration/test_p15_cost_idempotency.py::test_business_rejection_is_bounded_not_retried_as_network PASSED [  5%]
+tests/integration/test_p15_cost_idempotency.py::test_budget_cap_blocks_before_any_paid_submission PASSED [  6%]
+tests/integration/test_p15_cost_idempotency.py::test_costs_are_reported_separately_for_job_and_repairs PASSED [  8%]
+tests/integration/test_p15_cost_idempotency.py::test_prescreen_outcome_never_mixes_into_generation_cost PASSED [ 10%]
+tests/integration/test_p15_diversity.py::test_ten_autonomous_specs_clear_the_diversity_bar PASSED [ 11%]
+tests/integration/test_p15_diversity.py::test_second_ten_on_the_same_day_replans_instead_of_reusing_history PASSED [ 13%]
+tests/integration/test_p15_full_chain.py::test_autonomous_chain_plans_five_jobs_without_manual_specs PASSED [ 15%]
+tests/integration/test_p15_full_chain.py::test_every_job_reaches_an_expected_state PASSED [ 16%]
+tests/integration/test_p15_full_chain.py::test_batch_submits_each_paid_task_exactly_once PASSED [ 18%]
+tests/integration/test_p15_full_chain.py::test_batch_leaves_no_orphan_handle_or_uncaught_failure PASSED [ 20%]
+tests/integration/test_p15_full_chain.py::test_creative_artifacts_and_compiled_prompt_are_queryable PASSED [ 22%]
+tests/integration/test_p15_full_chain.py::test_planned_dimensions_are_structurally_varied PASSED [ 23%]
+tests/integration/test_p15_full_chain.py::test_claims_gate_blocks_injected_fabrication_before_paid_generation PASSED [ 25%]
+tests/integration/test_p15_full_chain.py::test_post_stage_keeps_exactly_one_canonical_transcript PASSED [ 27%]
+tests/integration/test_p15_full_chain.py::test_every_ready_job_carries_complete_packaging PASSED [ 28%]
+tests/integration/test_p15_full_chain.py::test_webui_reports_the_same_truth_as_jobstore PASSED [ 30%]
+tests/integration/test_p15_learning_reflow.py::test_same_candidates_are_scored_differently_after_reflow PASSED [ 32%]
+tests/integration/test_p15_learning_reflow.py::test_next_planned_job_carries_the_reflowed_history PASSED [ 33%]
+tests/integration/test_p15_publish_safety.py::test_dry_paths_never_reach_the_adapter PASSED [ 35%]
+tests/integration/test_p15_publish_safety.py::test_dry_run_still_reports_gate_failure_without_publishing PASSED [ 37%]
+tests/integration/test_p15_publish_safety.py::test_missing_artifact_blocks_before_any_publish PASSED [ 38%]
+tests/integration/test_p15_publish_safety.py::test_ai_disclosure_without_draft_channel_requires_human PASSED [ 40%]
+tests/integration/test_p15_publish_safety.py::test_unmapped_claim_in_publish_copy_is_blocked PASSED [ 42%]
+tests/integration/test_p15_publish_safety.py::test_quota_block_stops_before_the_adapter PASSED [ 44%]
+tests/integration/test_p15_publish_safety.py::test_gate_pass_publishes_once_with_ai_disclosure_recorded PASSED [ 45%]
+tests/integration/test_p15_publish_safety.py::test_auth_expired_pauses_the_platform_and_never_loops PASSED [ 47%]
+tests/integration/test_p15_publish_safety.py::test_platform_risk_control_is_recorded_as_require_human PASSED [ 49%]
+tests/integration/test_p15_publish_safety.py::test_real_adapter_risk_signal_end_to_end_requires_human PASSED [ 50%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[\u53d1\u5e03\u5931\u8d25\uff1a\u8bf7\u6c42\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u5b8c\u6210\u9a8c\u8bc1\u7801\u540e\u91cd\u8bd5] PASSED [ 52%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[\u8d26\u53f7\u5f02\u5e38\uff0c\u5e73\u53f0\u8981\u6c42\u4eba\u5de5\u9a8c\u8bc1] PASSED [ 54%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[unusual activity detected, please complete human verification] PASSED [ 55%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[risk control triggered] PASSED [ 57%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_keeps_plain_failure_and_auth_failure_distinct PASSED [ 59%]
+tests/integration/test_p15_publish_safety.py::test_failed_platforms_do_not_erase_successful_ones PASSED [ 61%]
+tests/integration/test_p15_publish_safety.py::test_same_external_id_is_never_posted_twice PASSED [ 62%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u8fd9\u4e2a\u591a\u5c11\u94b1\uff0c\u6709\u4f18\u60e0\u5417-price] PASSED [ 64%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u6211\u5976\u5976\u504f\u762b\u80fd\u7528\u8fd9\u4e2a\u5eb7\u590d\u6cbb\u7597\u5417-medical] PASSED [ 66%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u4e70\u4e86\u5c31\u574f\uff0c\u6211\u8981\u6295\u8bc9\u9000\u6b3e-complaint] PASSED [ 67%]
+tests/integration/test_p15_publish_safety.py::test_spam_comment_is_skipped_and_clean_comment_is_replied PASSED [ 69%]
+tests/integration/test_p15_qa_repair.py::test_each_defect_class_is_detected_and_repaired_in_place[\u9519\u5634] PASSED [ 71%]
+tests/integration/test_p15_qa_repair.py::test_each_defect_class_is_detected_and_repaired_in_place[\u4ea7\u54c1\u5f62\u53d8] PASSED [ 72%]
+tests/integration/test_p15_qa_repair.py::test_each_defect_class_is_detected_and_repaired_in_place[ASR\u6f0f\u8bcd] PASSED [ 74%]
+tests/integration/test_p15_qa_repair.py::test_each_defect_class_is_detected_and_repaired_in_place[\u5b57\u5e55\u5931\u8d25] PASSED [ 76%]
+tests/integration/test_p15_qa_repair.py::test_repair_engine_dispatches_every_error_code_to_its_own_action PASSED [ 77%]
+tests/integration/test_p15_qa_repair.py::test_repair_limit_blocks_instead_of_looping_forever PASSED [ 79%]
+tests/integration/test_p15_recovery.py::test_panel_restart_reads_the_db_and_leaves_no_running_handles PASSED [ 81%]
+tests/integration/test_p15_recovery.py::test_exit_right_after_submit_resumes_with_query_only PASSED [ 83%]
+tests/integration/test_p15_recovery.py::test_transient_query_timeout_retries_instead_of_resubmitting PASSED [ 84%]
+tests/integration/test_p15_recovery.py::test_download_failure_after_success_only_retries_download PASSED [ 86%]
+tests/integration/test_p15_recovery.py::test_short_sqlite_lock_is_waited_out_not_lost PASSED [ 88%]
+tests/integration/test_p15_recovery.py::test_hard_sqlite_error_stops_before_paying_and_stays_recoverable PASSED [ 89%]
+tests/integration/test_p15_recovery.py::test_disk_full_stops_downstream_without_fake_artifact PASSED [ 91%]
+tests/integration/test_p15_recovery.py::test_missing_capabilities_report_status_and_a_fix_without_crashing PASSED [ 93%]
+tests/integration/test_p15_recovery.py::test_capability_blocked_stops_downstream_and_explains_the_fix PASSED [ 94%]
+tests/integration/test_p15_router_prescreen.py::test_low_risk_spec_passes_preflight_without_prescreen PASSED [ 96%]
+tests/integration/test_p15_router_prescreen.py::test_high_risk_spec_needs_a_real_prescreen_before_paid_generation PASSED [ 98%]
+tests/integration/test_p15_router_prescreen.py::test_rejected_preferred_workflow_falls_back_without_double_charging PASSED [100%]
+
+============================== warnings summary ===============================
+tests/integration/test_p15_cost_idempotency.py::test_costs_are_reported_separately_for_job_and_repairs
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================ 59 passed, 54 deselected, 1 warning in 36.70s ================
+
+==============================================================================
+⑥ §15.1 十五条 → 验收用例对照
+==============================================================================
+  1 空 queue/daily_target=5 自动建 5 job → test_p15_full_chain.py::test_autonomous_chain_plans_five_jobs_without_manual_specs
+  2 5 个 job 达到预期终态                   → test_p15_full_chain.py::test_every_job_reaches_an_expected_state
+  3 genre/hook/shot_pattern 结构差异     → test_p15_full_chain.py::test_planned_dimensions_are_structurally_varied
+  4 Research/DNA/StorySpec/prompt 可查 → test_p15_full_chain.py::test_creative_artifacts_and_compiled_prompt_are_queryable
+  5 Claims Gate 拦注入的虚假参数             → test_p15_full_chain.py::test_claims_gate_blocks_injected_fabrication_before_paid_generation
+  6 Prescreen 只对高风险触发                → test_p15_router_prescreen.py::test_high_risk_spec_needs_a_real_prescreen_before_paid_generation（+ test_low_risk_spec_passes_preflight_without_prescreen）
+  7 Router 首选失败 → fallback 不重复付费     → test_p15_router_prescreen.py::test_rejected_preferred_workflow_falls_back_without_double_charging
+  8 QA 识别错嘴/产品形变/ASR 漏词/字幕失败         → test_p15_qa_repair.py::test_each_defect_class_is_detected_and_repaired_in_place[4 个参数]
+  9 RepairEngine 按 error_code 分派动作   → test_p15_qa_repair.py::test_repair_engine_dispatches_every_error_code_to_its_own_action
+  10 修复到上限 → BLOCKED 不循环             → test_p15_qa_repair.py::test_repair_limit_blocks_instead_of_looping_forever
+  11 后期只用一份 canonical transcript     → test_p15_full_chain.py::test_post_stage_keeps_exactly_one_canonical_transcript
+  12 Packaging 出标题/描述/claim/声明       → test_p15_full_chain.py::test_every_ready_job_carries_complete_packaging
+  13 Publish fake 幂等（external_id）    → test_p15_publish_safety.py::test_same_external_id_is_never_posted_twice（+ test_gate_pass_publishes_once_with_ai_disclosure_recorded）
+  14 表现回流 → 下一轮评分变化                  → test_p15_learning_reflow.py::test_next_planned_job_carries_the_reflowed_history（+ test_same_candidates_are_scored_differently_after_reflow）
+  15 WebUI 与 JobStore 状态一致           → test_p15_full_chain.py::test_webui_reports_the_same_truth_as_jobstore
+  + 无 orphan/未捕获异常/无重复 submit        → test_p15_full_chain.py::test_batch_leaves_no_orphan_handle_or_uncaught_failure（+ test_batch_submits_each_paid_task_exactly_once）
+
+（上表每条的实际 PASS/FAIL 见 ⑤ 的原始输出）
+
+==============================================================================
+⑦ 成片多样性（真实 Planner 连续规划 10 + 同日第二批 10）
+==============================================================================
+批次一 uid: ['job_20260930_Phase15多样性_20260930_174325_01', 'job_20260930_Phase15多样性_20260930_174325_02', 'job_20260930_Phase15多样性_20260930_174325_03', 'job_20260930_Phase15多样性_20260930_174325_04', 'job_20260930_Phase15多样性_20260930_174325_05', 'job_20260930_Phase15多样性_20260930_174325_06', 'job_20260930_Phase15多样性_20260930_174325_07', 'job_20260930_Phase15多样性_20260930_174325_08', 'job_20260930_Phase15多样性_20260930_174325_09', 'job_20260930_Phase15多样性_20260930_174325_10']
+批次二 uid: ['job_20260930_Phase15多样性_20260930_174325_01_2', 'job_20260930_Phase15多样性_20260930_174325_02_2', 'job_20260930_Phase15多样性_20260930_174325_03_2', 'job_20260930_Phase15多样性_20260930_174325_04_2', 'job_20260930_Phase15多样性_20260930_174325_05_2', 'job_20260930_Phase15多样性_20260930_174325_06_2', 'job_20260930_Phase15多样性_20260930_174325_07_2', 'job_20260930_Phase15多样性_20260930_174325_08_2', 'job_20260930_Phase15多样性_20260930_174325_09_2', 'job_20260930_Phase15多样性_20260930_174325_10_2']
+共规划 20 条 StorySpec
+
+  # genre  hook_type  shot_pattern   dialogue_mode cast                   angle
+  1 G6     身份代入       POV主观视角        单人口播       @mid_female            B15
+  2 G1     冲突质问       四镜双人对撞         双人对白       @elder_male+@mid_male  B1
+  3 G8     反差打脸       实验对比双线         单人口播       @mid_male+@young_male  B28
+  4 G4     悬念设问       悬念三段式          字幕驱动       @mid_female+@elder_female B13
+  5 G3     痛点共鸣       五镜生活流          画外音旁白      @elder_male            B25
+  6 G4     视觉奇观       无对白肢体三段        无对白        @elder_male+@young_male B19
+  7 G4     神秘物件       评论区回应式         字幕驱动       @elder_male+@young_female B21
+  8 G9     夸张数字       三镜魔性循环         无对白        @elder_male            B16
+  9 G5     悬念设问       手持街访           街访问答       @neighbor_any+@mid_male B12
+ 10 G10    冲突质问       四镜双人对撞         双人对白       @elder_male+@mid_male  B10
+ 11 G7     反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B30
+ 12 G1     反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B31
+ 13 G10    反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B32
+ 14 G3     反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B33
+ 15 G5     反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B34
+ 16 G6     反差打脸       四镜双人对撞         双人对白       @elder_male+@mid_male  B35
+ 17 G4     冲突质问       评论区回应式         字幕驱动       @elder_male+@young_female B26
+ 18 G2     冲突质问       四镜双人对撞         双人对白       @elder_male+@mid_male  B11
+ 19 G6     痛点共鸣       五镜情感递进         双人对白       @elder_female+@mid_male B27
+ 20 G5     视觉奇观       无对白肢体三段        无对白        @elder_male+@young_male B24
+
+维度去重计数（计划 §15.4 硬指标：genre≥5 / hook≥5 / shot_pattern≥4）：
+  genre          10 种  ['G1', 'G10', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9']
+  hook_type       8 种  ['冲突质问', '反差打脸', '夸张数字', '悬念设问', '痛点共鸣', '神秘物件', '视觉奇观', '身份代入']
+  shot_pattern   10 种  ['POV主观视角', '三镜魔性循环', '五镜情感递进', '五镜生活流', '四镜双人对撞', '实验对比双线', '悬念三段式', '手持街访', '无对白肢体三段', '评论区回应式']
+  dialogue_mode   6 种  ['单人口播', '双人对白', '字幕驱动', '无对白', '画外音旁白', '街访问答']
+  cast_pattern    9 种  ['@elder_female+@mid_male', '@elder_male', '@elder_male+@mid_male', '@elder_male+@young_female', '@elder_male+@young_male', '@mid_female', '@mid_female+@elder_female', '@mid_male+@young_male', '@neighbor_any+@mid_male']
+  angle          20 种  ['B1', 'B10', 'B11', 'B12', 'B13', 'B15', 'B16', 'B19', 'B21', 'B24', 'B25', 'B26', 'B27', 'B28', 'B30', 'B31', 'B32', 'B33', 'B34', 'B35']
+
+  双人对白      10/20（不得 20/20）
+  低对白/无对白 7/20（≥1）
+  骨架签名唯一  20/20
+  选题(热点)唯一 20/20
+  两批零重叠    True
+  相邻组合重复  []
+  需预筛(高风险) 1/20
+  Vlog/生活流         命中 1 条 [11]
+  悬念               命中 1 条 [8]
+  实验/对比            命中 2 条 [10, 13]
+  喜剧/魔性 或 POV      命中 3 条 [3, 5, 14]
+
+  台词模式分布     : {'单人口播': 2, '双人对白': 10, '字幕驱动': 3, '画外音旁白': 1, '无对白': 3, '街访问答': 1}
+  （台词稿属「写作步骤」产出 docs/onetake_lines_<uid>.txt；本脚本只验收规划多样性，全链验收里由 fixture 提供）
+
+==============================================================================
+⑧ §15.3 成本与幂等（原始输出）
+==============================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+rootdir: D:\@kaifa\ayh-mj
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 900.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 6 items
+
+tests/integration/test_p15_cost_idempotency.py::test_repeat_generation_reuses_the_submitted_task PASSED [ 16%]
+tests/integration/test_p15_cost_idempotency.py::test_download_failure_only_costs_extra_download_attempts PASSED [ 33%]
+tests/integration/test_p15_cost_idempotency.py::test_business_rejection_is_bounded_not_retried_as_network PASSED [ 50%]
+tests/integration/test_p15_cost_idempotency.py::test_budget_cap_blocks_before_any_paid_submission PASSED [ 66%]
+tests/integration/test_p15_cost_idempotency.py::test_costs_are_reported_separately_for_job_and_repairs PASSED [ 83%]
+tests/integration/test_p15_cost_idempotency.py::test_prescreen_outcome_never_mixes_into_generation_cost PASSED [100%]
+
+============================== warnings summary ===============================
+tests/integration/test_p15_cost_idempotency.py::test_costs_are_reported_separately_for_job_and_repairs
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 6 passed, 1 warning in 8.60s =========================
+
+==============================================================================
+⑨ §15.2 故障恢复（原始输出）
+==============================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+rootdir: D:\@kaifa\ayh-mj
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 900.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 9 items
+
+tests/integration/test_p15_recovery.py::test_panel_restart_reads_the_db_and_leaves_no_running_handles PASSED [ 11%]
+tests/integration/test_p15_recovery.py::test_exit_right_after_submit_resumes_with_query_only PASSED [ 22%]
+tests/integration/test_p15_recovery.py::test_transient_query_timeout_retries_instead_of_resubmitting PASSED [ 33%]
+tests/integration/test_p15_recovery.py::test_download_failure_after_success_only_retries_download PASSED [ 44%]
+tests/integration/test_p15_recovery.py::test_short_sqlite_lock_is_waited_out_not_lost PASSED [ 55%]
+tests/integration/test_p15_recovery.py::test_hard_sqlite_error_stops_before_paying_and_stays_recoverable PASSED [ 66%]
+tests/integration/test_p15_recovery.py::test_disk_full_stops_downstream_without_fake_artifact PASSED [ 77%]
+tests/integration/test_p15_recovery.py::test_missing_capabilities_report_status_and_a_fix_without_crashing PASSED [ 88%]
+tests/integration/test_p15_recovery.py::test_capability_blocked_stops_downstream_and_explains_the_fix PASSED [100%]
+
+============================== warnings summary ===============================
+tests/integration/test_p15_recovery.py::test_panel_restart_reads_the_db_and_leaves_no_running_handles
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 9 passed, 1 warning in 8.16s =========================
+
+==============================================================================
+⑩ §15.6 发布安全（原始输出）
+==============================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+rootdir: D:\@kaifa\ayh-mj
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 900.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 21 items
+
+tests/integration/test_p15_publish_safety.py::test_dry_paths_never_reach_the_adapter PASSED [  4%]
+tests/integration/test_p15_publish_safety.py::test_dry_run_still_reports_gate_failure_without_publishing PASSED [  9%]
+tests/integration/test_p15_publish_safety.py::test_missing_artifact_blocks_before_any_publish PASSED [ 14%]
+tests/integration/test_p15_publish_safety.py::test_ai_disclosure_without_draft_channel_requires_human PASSED [ 19%]
+tests/integration/test_p15_publish_safety.py::test_unmapped_claim_in_publish_copy_is_blocked PASSED [ 23%]
+tests/integration/test_p15_publish_safety.py::test_quota_block_stops_before_the_adapter PASSED [ 28%]
+tests/integration/test_p15_publish_safety.py::test_gate_pass_publishes_once_with_ai_disclosure_recorded PASSED [ 33%]
+tests/integration/test_p15_publish_safety.py::test_auth_expired_pauses_the_platform_and_never_loops PASSED [ 38%]
+tests/integration/test_p15_publish_safety.py::test_platform_risk_control_is_recorded_as_require_human PASSED [ 42%]
+tests/integration/test_p15_publish_safety.py::test_real_adapter_risk_signal_end_to_end_requires_human PASSED [ 47%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[\u53d1\u5e03\u5931\u8d25\uff1a\u8bf7\u6c42\u8fc7\u4e8e\u9891\u7e41\uff0c\u8bf7\u5b8c\u6210\u9a8c\u8bc1\u7801\u540e\u91cd\u8bd5] PASSED [ 52%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[\u8d26\u53f7\u5f02\u5e38\uff0c\u5e73\u53f0\u8981\u6c42\u4eba\u5de5\u9a8c\u8bc1] PASSED [ 57%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[unusual activity detected, please complete human verification] PASSED [ 61%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_classifies_platform_risk_as_require_human[risk control triggered] PASSED [ 66%]
+tests/integration/test_p15_publish_safety.py::test_cli_adapter_keeps_plain_failure_and_auth_failure_distinct PASSED [ 71%]
+tests/integration/test_p15_publish_safety.py::test_failed_platforms_do_not_erase_successful_ones PASSED [ 76%]
+tests/integration/test_p15_publish_safety.py::test_same_external_id_is_never_posted_twice PASSED [ 80%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u8fd9\u4e2a\u591a\u5c11\u94b1\uff0c\u6709\u4f18\u60e0\u5417-price] PASSED [ 85%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u6211\u5976\u5976\u504f\u762b\u80fd\u7528\u8fd9\u4e2a\u5eb7\u590d\u6cbb\u7597\u5417-medical] PASSED [ 90%]
+tests/integration/test_p15_publish_safety.py::test_red_line_comments_go_to_human_and_are_never_answered[\u4e70\u4e86\u5c31\u574f\uff0c\u6211\u8981\u6295\u8bc9\u9000\u6b3e-complaint] PASSED [ 95%]
+tests/integration/test_p15_publish_safety.py::test_spam_comment_is_skipped_and_clean_comment_is_replied PASSED [100%]
+
+============================= 21 passed in 1.17s ==============================
+
+==============================================================================
+⑪ §15.1/§15.4 全链 · 学习回流 · WebUI 一致性（原始输出）
+==============================================================================
+============================= test session starts =============================
+platform win32 -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0 -- D:\@kaifa\ayh-mj\.venv\Scripts\python.exe
+rootdir: D:\@kaifa\ayh-mj
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+timeout: 900.0s
+timeout method: thread
+timeout func_only: False
+collecting ... collected 14 items
+
+tests/integration/test_p15_full_chain.py::test_autonomous_chain_plans_five_jobs_without_manual_specs PASSED [  7%]
+tests/integration/test_p15_full_chain.py::test_every_job_reaches_an_expected_state PASSED [ 14%]
+tests/integration/test_p15_full_chain.py::test_batch_submits_each_paid_task_exactly_once PASSED [ 21%]
+tests/integration/test_p15_full_chain.py::test_batch_leaves_no_orphan_handle_or_uncaught_failure PASSED [ 28%]
+tests/integration/test_p15_full_chain.py::test_creative_artifacts_and_compiled_prompt_are_queryable PASSED [ 35%]
+tests/integration/test_p15_full_chain.py::test_planned_dimensions_are_structurally_varied PASSED [ 42%]
+tests/integration/test_p15_full_chain.py::test_claims_gate_blocks_injected_fabrication_before_paid_generation PASSED [ 50%]
+tests/integration/test_p15_full_chain.py::test_post_stage_keeps_exactly_one_canonical_transcript PASSED [ 57%]
+tests/integration/test_p15_full_chain.py::test_every_ready_job_carries_complete_packaging PASSED [ 64%]
+tests/integration/test_p15_full_chain.py::test_webui_reports_the_same_truth_as_jobstore PASSED [ 71%]
+tests/integration/test_p15_learning_reflow.py::test_same_candidates_are_scored_differently_after_reflow PASSED [ 78%]
+tests/integration/test_p15_learning_reflow.py::test_next_planned_job_carries_the_reflowed_history PASSED [ 85%]
+tests/integration/test_p15_diversity.py::test_ten_autonomous_specs_clear_the_diversity_bar PASSED [ 92%]
+tests/integration/test_p15_diversity.py::test_second_ten_on_the_same_day_replans_instead_of_reusing_history PASSED [100%]
+
+============================== warnings summary ===============================
+tests/integration/test_p15_full_chain.py::test_webui_reports_the_same_truth_as_jobstore
+  D:\@kaifa\ayh-mj\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 14 passed, 1 warning in 6.96s ========================
+
+==============================================================================
+⑫ §15.5 真实生成验收（受预算保护）—— 未执行
+==============================================================================
+状态        : NOT EXECUTED（用户未显式开启付费验收）
+原因        : 计划 §15.5 要求「无付费测试全绿后才允许执行」，且必须显式配置 cost cap；
+              本轮为自动迭代，未获得付费授权，也未显式开启 real_publish。
+门禁        : 自动测试里任何 create_task 都会被 monkeypatch 成 AssertionError
+              （tests/p15_support.py::no_real_autodl），付费路径不可能被误触发。
+如需执行    : 设置 AYHMJ_RUN_PAID=1 后运行 tests/integration 里的 paid 用例，
+              并在 RunConfig.budget_cap 上显式给出上限（默认 BLOCKED_BUDGET 保护生效）。
+最终交付    : 停在 READY / 草稿；未真发任何社媒（real_publish 默认 false）。
+
+（本文由 logs/_p15_evidence.py 直接采集；未人工改写任何输出）

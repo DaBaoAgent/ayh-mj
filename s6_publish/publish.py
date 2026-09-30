@@ -31,11 +31,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib import STATE_DIR, packaging
-from lib.contracts import POSTFLOW_AUTH_MARKERS, postflow_is_auth_error
+from lib.contracts import (
+    POSTFLOW_AUTH_MARKERS,
+    postflow_is_auth_error,
+    postflow_needs_human,
+)
 from lib.orchestrator.errors import AUTH_EXPIRED
 from lib.orchestrator.publishing import (
     DRAFT,
     FAILED,
+    NEEDS_HUMAN,
     SUCCESS,
     PublishService,
 )
@@ -151,6 +156,22 @@ def _is_auth_error(text: str) -> bool:
     return postflow_is_auth_error(text)
 
 
+def _needs_human(text: str) -> bool:
+    """平台风控/验证码/账号异常 → 交人工（计划 §15.6，绝不自动绕过）。"""
+    return postflow_needs_human(text)
+
+
+def _failure_status(text: str) -> str:
+    """失败输出 → publish_records.status。
+
+    风控信号优先于凭据信号：一条"请重新登录并完成验证码"的提示既是凭据问题又是风控问题，
+    此时正确的动作是**停下来交人工**，而不是判成 AUTH_EXPIRED 后继续用别的路径重试。
+    """
+    if _needs_human(text):
+        return NEEDS_HUMAN
+    return AUTH_EXPIRED if _is_auth_error(text) else FAILED
+
+
 def _run_cli(cmd: list[str], timeout: float = 900.0) -> subprocess.CompletedProcess:
     return subprocess.run(  # noqa: S603
         [str(c) for c in cmd], capture_output=True, text=True, errors="replace",
@@ -204,9 +225,8 @@ class CliPublishAdapter:
         except Exception as exc:
             return {"status": FAILED, "error": f"{type(exc).__name__}: {exc}"}
         text = (result.stdout or "") + "\n" + (result.stderr or "")
-        if result.returncode != 0 or _is_auth_error(text):
-            status = AUTH_EXPIRED if _is_auth_error(text) else FAILED
-            return {"status": status, "error": text.strip()[-300:]}
+        if result.returncode != 0 or _is_auth_error(text) or _needs_human(text):
+            return {"status": _failure_status(text), "error": text.strip()[-300:]}
         return {"status": DRAFT if mode == "draft" else SUCCESS,
                 "detail": text.strip()[-300:]}
 
@@ -227,7 +247,7 @@ class CliPublishAdapter:
             final = uploadpost.wait_upload(request_id, timeout_s=900) if request_id else result
         except Exception as exc:
             msg = f"{type(exc).__name__}: {exc}"
-            return {"status": AUTH_EXPIRED if _is_auth_error(msg) else FAILED, "error": msg}
+            return {"status": _failure_status(msg), "error": msg}
         return {"status": DRAFT if mode == "draft" else SUCCESS,
                 "post_id": (final or {}).get("post_id"),
                 "post_url": (final or {}).get("post_url"),

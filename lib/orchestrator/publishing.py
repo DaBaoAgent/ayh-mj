@@ -12,6 +12,8 @@
   · **幂等**：external_id = `<uid>:<platform>` + `publish_records` 唯一索引；重入不会重复发帖；
   · **按平台独立记录**：一个平台失败不抹掉另一个平台的成功；
   · **AUTH_EXPIRED 立即暂停该平台**（写 `state/publish_paused.json`），不循环登录、不反复发布；
+  · **平台风控/验证码/账号异常 → REQUIRE_HUMAN**：同样暂停该平台并交人工，绝不换路子绕过；
+  · **一条都没真发出去不许记 DONE**：平台暂停重入时停在 PAUSED（否则是伪成功）；
   · **real_publish=false 时只出计划，不改状态、不落记录** —— 幂等与安全都靠这条兜底。
 """
 from __future__ import annotations
@@ -25,6 +27,7 @@ from .. import packaging
 from ..jobstore import JobState
 from .errors import (
     NOT_READY,
+    PLATFORM_PAUSED,
     PUBLISH_AUTH,
     PUBLISH_QUOTA,
     REQUIRE_HUMAN_PUBLISH,
@@ -40,9 +43,13 @@ QUOTA_BLOCKED = "QUOTA_BLOCKED"
 PAUSED_STATUS = "PLATFORM_PAUSED"
 SKIPPED = "SKIPPED_IDEMPOTENT"
 DRY_RUN = "DRY_RUN"
+# 平台风控 / 验证码 / 账号异常（计划 §15.6）：不是"再试一次"能解决的失败，
+# 只能暂停该平台并交人工 —— 与 AUTH_EXPIRED 同一处理（pause_platform），
+# 但错误码是 REQUIRE_HUMAN_PUBLISH，语义是"人工确认"，不是"去重新登录"。
+NEEDS_HUMAN = "REQUIRE_HUMAN"
 
 OK_STATUSES = (SUCCESS, DRAFT)
-BAD_STATUSES = (FAILED, AUTH_EXPIRED, QUOTA_BLOCKED)
+BAD_STATUSES = (FAILED, AUTH_EXPIRED, QUOTA_BLOCKED, NEEDS_HUMAN)
 NEUTRAL_STATUSES = (SKIPPED, PAUSED_STATUS)
 
 AI_DISCLOSURE_LABEL = "AI 生成内容（本视频画面/配音由 AI 生成）"
@@ -187,6 +194,9 @@ class PublishService:
 
     @staticmethod
     def _mode_of(brief: dict | None, platform: str) -> str:
+        """演练路径要能如实报告"物料缺失"，绝不能因为 brief=None 直接崩。"""
+        if not isinstance(brief, dict):
+            return ""
         try:
             return str(packaging.materialize(brief, platform).get("mode") or "")
         except (KeyError, TypeError):
@@ -248,9 +258,12 @@ class PublishService:
         status = str(res.get("status") or FAILED)
         if status in OK_STATUSES:
             self.mark_published(platform)
-        elif status == AUTH_EXPIRED:
+        elif status in (AUTH_EXPIRED, NEEDS_HUMAN):
+            # 凭据失效 / 平台风控都要立刻熔断该平台：不许循环登录，也不许"换条路再试"。
+            default = ("凭据失效（AUTH_EXPIRED）" if status == AUTH_EXPIRED
+                       else "平台风控/验证码（REQUIRE_HUMAN）")
             packaging.pause_platform(self.root, platform,
-                                     res.get("error") or "凭据失效（AUTH_EXPIRED）")
+                                     res.get("error") or default)
 
         self.store.record_publish(
             uid, platform, post_id=res.get("post_id"), post_url=res.get("post_url"),
@@ -285,6 +298,16 @@ class PublishService:
                                   message=f"部分平台成功，其余待重试（{counts}）")
             return PublishOutcome(uid, True, JobState.PAUSED, results, "",
                                   f"部分平台成功，其余待重试：{counts}")
+        if counts.get(PAUSED_STATUS):
+            # 平台被熔断暂停（AUTH_EXPIRED / 风控 / 声明无法确认）后重入：一条都没真发出去
+            # 的时候**绝不能记成 DONE** —— 那是伪成功，会让 WebUI 与统计以为已发布过。
+            # 停在 PAUSED，等人工解除暂停后再续发。
+            code = "" if good else PLATFORM_PAUSED
+            message = (f"部分平台处于暂停状态，未发布全部目标（{counts}）" if good
+                       else f"平台处于暂停状态，未发布任何内容（{counts}）")
+            self.store.transition(uid, JobState.PAUSED, stage="publish",
+                                  message=message, error_code=code or None)
+            return PublishOutcome(uid, good > 0, JobState.PAUSED, results, code, message)
         # 全绿（含草稿）→ 进学习层（Phase 11 会在这里落表现数据），再到 DONE
         self.store.transition(uid, JobState.LEARNING, stage="publish",
                               message=f"发布完成（{counts}），进入学习层")
@@ -297,6 +320,8 @@ class PublishService:
             status = r["status"]
             if status == AUTH_EXPIRED:
                 return PUBLISH_AUTH
+            if status == NEEDS_HUMAN:
+                return REQUIRE_HUMAN_PUBLISH
             if status == QUOTA_BLOCKED:
                 return PUBLISH_QUOTA
         return REQUIRE_HUMAN_PUBLISH if not results else FAILED
@@ -313,7 +338,7 @@ def outcome_of(result: dict) -> PublishOutcome:
 
 __all__ = [
     "AUTH_EXPIRED", "AI_DISCLOSURE_LABEL", "BAD_STATUSES", "DRAFT", "DRY_RUN", "FAILED",
-    "NEUTRAL_STATUSES", "OK_STATUSES", "PAUSED_STATUS", "PublishAdapter",
+    "NEEDS_HUMAN", "NEUTRAL_STATUSES", "OK_STATUSES", "PAUSED_STATUS", "PublishAdapter",
     "PublishOutcome", "PublishService", "QUOTA_BLOCKED", "SKIPPED", "SUCCESS",
     "outcome_of",
 ]

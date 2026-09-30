@@ -170,6 +170,22 @@ POSTFLOW_AUTH_MARKERS: tuple[str, ...] = (
 )
 
 
+# 平台风控 / 验证码 / 账号异常信号：出现这些词说明**平台在质疑这个账号**，
+# 不是"发失败了重试一次"的场景。计划 §15.6：一律 REQUIRE_HUMAN —— 暂停该平台 + 交人工，
+# 绝不自动重试、绝不变换路径绕过。
+POSTFLOW_HUMAN_MARKERS: tuple[str, ...] = (
+    "验证码", "风控", "账号异常", "异常操作", "操作频繁", "频繁操作", "环境异常",
+    "captcha", "risk control", "unusual activity", "account suspended",
+    "suspicious activity", "human verification",
+)
+
+
+def postflow_needs_human(text: str) -> bool:
+    """平台风控/验证码/账号异常信号（大小写不敏感）→ 必须转人工。"""
+    low = (text or "").lower()
+    return any(marker.lower() in low for marker in POSTFLOW_HUMAN_MARKERS)
+
+
 # ── 契约表 ────────────────────────────────────────────────────────────
 
 CONTRACTS: dict[str, Contract] = {}
