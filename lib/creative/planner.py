@@ -30,13 +30,14 @@ from pathlib import Path
 
 from .. import STATE_DIR
 from .. import angles as angles_mod
+from .. import claims as claims_mod
 from .. import genres as genres_mod
 from .. import ideas as ideas_mod
 from .. import products as products_mod
 from ..creative_research import build_research_brief
 from . import cast_groups
 from .director import CreativeDirector
-from .dna import AUDIENCES, CLAIM_RISK_FLAG, GOALS, VISUAL_MOTIFS, CreativeDNA
+from .dna import AUDIENCES, CLAIM_BLOCKED_FLAG, CLAIM_RISK_FLAG, GOALS, VISUAL_MOTIFS, CreativeDNA
 from .hotspot import normalize_hotspot
 from .scoring import NUMERIC_CLAIM_POINTS, STRUCTURE_AUDIENCES
 from .storiespec import build_story_spec, summarize_research
@@ -83,6 +84,7 @@ class PlannedJob:
     research_path: Path | None = None
     dna_path: Path | None = None
     scores_path: Path | None = None
+    claims_path: Path | None = None
     message: str = ""
 
     def artifacts(self) -> list[dict]:
@@ -90,7 +92,8 @@ class PlannedJob:
         out = [{"type": "spec", "path": str(self.spec_path)}] if self.spec_path else []
         for type_, path in (("research", self.research_path),
                             ("creative_dna", self.dna_path),
-                            ("creative_scores", self.scores_path)):
+                            ("creative_scores", self.scores_path),
+                            ("claims", self.claims_path)):
             if path:
                 out.append({"type": type_, "path": str(path)})
         return out
@@ -103,6 +106,7 @@ class PlannedJob:
             "shortlist": list(self.shortlist), "decision": dict(self.decision),
             "spec_path": str(self.spec_path or ""), "research_path": str(self.research_path or ""),
             "dna_path": str(self.dna_path or ""), "scores_path": str(self.scores_path or ""),
+            "claims_path": str(self.claims_path or ""),
             "message": self.message,
         }
 
@@ -170,8 +174,11 @@ class CreativePlanner:
         angles_ordered.sort(key=lambda a: (int(used["angle"].get(a["id"], 0)), a["id"]))
         if not angles_ordered:
             raise PlannerError("叙事角度池已耗尽：请先扩充 lib/angles.py 的 ANGLES 再规划")
+        # 口径可用的卖点优先（Phase 6：needs_verification / forbidden 的卖点排到最后，
+        # 避免把未核验参数写进 StorySpec 的 payoff）
         points_ordered = sorted(products_mod.SALES_POINTS,
-                                key=lambda p: (int(used["point"].get(p["id"], 0)), p["id"]))
+                                key=lambda p: (not p.get("usable"),
+                                               int(used["point"].get(p["id"], 0)), p["id"]))
         groups_ordered = sorted(cast_groups.GROUP_DEFS,
                                 key=lambda g: (int(used["role_group"].get(g["name"], 0)), g["name"]))
 
@@ -220,8 +227,11 @@ class CreativePlanner:
         motif = (structure.get("visual_motif") if index % 2 == 0
                  else VISUAL_MOTIFS[(index + layer) % len(VISUAL_MOTIFS)])
         risks: list[str] = []
+        usable = bool(point.get("usable"))
         if point["id"] in NUMERIC_CLAIM_POINTS:
             risks.append(CLAIM_RISK_FLAG)
+        if not usable:                       # 口径待核验/禁止使用：文案里不许出现该口径
+            risks.append(CLAIM_BLOCKED_FLAG)
         if trend.get("source_type") != "live":
             risks.append(EVERGREEN_RISK)
         if structure.get("dialogue_mode") == "无对白":
@@ -234,7 +244,8 @@ class CreativePlanner:
             conflict_type=structure["conflict_type"], visual_motif=motif,
             camera_language=structure["camera_language"], dialogue_mode=structure["dialogue_mode"],
             audio_mode=structure["audio_mode"],
-            payoff=f"{point['hook']}｜{structure['name']}把它收在{point['name']}上",
+            payoff=(f"{point['hook']}｜{structure['name']}把它收在{point['name']}上" if usable
+                    else f"{structure['name']}用它把故事收住（卖点口径待核验，暂不出参数）"),
             ending=f"{structure['narrative_arc']}收尾，停在{audience}最在意的那一下",
             CTA=CTA_LINES[(layer + index) % len(CTA_LINES)],
             risk_flags=risks,
@@ -286,22 +297,27 @@ class CreativePlanner:
         structure = chosen.structure
 
         title = self._title(dna, structure, hotspot)
+        claim_ids = products_mod.claim_ids_for(dna.sales_point)
+        claim_facts = _claim_artifact(claim_ids)
         rationale = {
             "rule": decision["rule"], "note": decision["note"],
             "totals": {s.to_dict()["structure"]: s.total for s in ranked[:5]},
             "reasons": dict(decision.get("reasons") or {}),
             "candidate_count": len(ranked),
+            "claim_ids": claim_ids,
         }
         spec = build_story_spec(uid=uid, structure=structure, dna=dna, hotspot=hotspot.to_dict(),
                                 research_refs=summarize_research(brief), rationale=rationale,
-                                title=title)
+                                title=title, claim_ids=claim_ids)
         paths = self._paths(uid)
         self._write_json(paths["research"], {"uid": uid, "day": day, "brief": brief})
         self._write_json(paths["dna"], {"uid": uid, "day": day, "structure": structure["id"],
                                         "structure_name": structure["name"],
                                         "role_group": structure.get("_role_group", ""),
                                         "dna": dna.to_dict(), "hotspot": hotspot.to_dict(),
-                                        "scores": dict(chosen.scores), "rationale": rationale})
+                                        "scores": dict(chosen.scores), "rationale": rationale,
+                                        "claim_ids": claim_ids})
+        self._write_json(paths["claims"], claim_facts)
         self._write_json(paths["scores"], {
             "uid": uid, "day": day, "dimensions": decision["dimensions"], "rule": decision["rule"],
             "candidates": [s.to_dict() for s in ranked],
@@ -322,6 +338,7 @@ class CreativePlanner:
             hotspot=hotspot.to_dict(), research=brief, scores=dict(chosen.scores),
             shortlist=decision["shortlist"], decision=decision, spec_path=paths["spec"],
             research_path=paths["research"], dna_path=paths["dna"], scores_path=paths["scores"],
+            claims_path=paths["claims"],
             message=f"{structure['name']}｜{dna.hook_type}｜{dna.shot_pattern}（综合分 {chosen.total:.3f}）",
         )
 
@@ -371,6 +388,7 @@ class CreativePlanner:
             "research": self.creative_dir / f"research_{uid}.json",
             "dna": self.creative_dir / f"dna_{uid}.json",
             "scores": self.creative_dir / f"scores_{uid}.json",
+            "claims": self.creative_dir / f"claims_{uid}.json",
         }
 
     @staticmethod
@@ -496,3 +514,22 @@ def plan_missing(*, store, daily_target: int, queue_dir=None, state_dir=None,
     if need <= 0:
         return []
     return planner.plan_batch(need, goal=goal)
+
+
+def _claim_artifact(claim_ids: list[str], channel: str = "script") -> dict:
+    """本条视频实际引用的 claim 快照（Phase 6 任务 7：发布 artifact 的 claim_id 列表）。"""
+    try:
+        reg = claims_mod.load()
+    except Exception as exc:
+        return {"claim_ids": list(claim_ids), "error": f"{type(exc).__name__}: {exc}",
+                "claims": [], "usable": {}, "gate": {"ok": False}}
+    rows, usable = [], {}
+    for cid in claim_ids:
+        claim = reg.get(cid)
+        usable[cid] = bool(claim is not None and claim.usable(channel))
+        rows.append(claim.to_dict() if claim else {"claim_id": cid, "status": "missing"})
+    return {"claim_ids": list(claim_ids), "channel": channel, "usable": usable,
+            "claims": rows,
+            "status_counts": reg.status_counts(),
+            "digest": reg.digest()[:16],
+            "gate": {"ok": all(usable.values()) if usable else True}}

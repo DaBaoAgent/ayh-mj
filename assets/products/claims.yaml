@@ -1,0 +1,515 @@
+# 爱优护·轻便侠218 —— 产品 Claims Registry（唯一权威机器可读事实源）
+#
+# 目的：彻底消除产品参数在 products.py / engage.py / prompt / 标题 / 卖点 md 中
+#       各写一套的问题（Phase 6 目标）。Script / Packaging / Engage 一律**只能**
+#       通过 lib/claims.py（Claims Service）读取本文件，不得内置第二套参数。
+#
+# status 三态：
+#   verified           —— 有单一权威证据，可自动对外使用
+#   needs_verification —— 存在互相冲突/口径不清/缺证明材料的口径，禁止自动对外使用，
+#                         必须人工核对后改回 verified（Phase 6 必做任务 2）
+#   forbidden          —— 法规/合规原因禁止自动生成（绝对化广告词、价格政策、未证实认证）
+#
+# 注意：本文件**不允许** Codex 猜测冲突参数的正确值。冲突一律标 needs_verification 并
+#       在 notes 里写清冲突来源，等人工定夺。
+version: 1
+sku: ainsnbot_x218
+product: 爱优护·轻便侠218 电动轮椅
+updated_at: "2026-09-30"
+evidence_doc: assets/products/轻便侠218_卖点.md
+
+claims:
+  - claim_id: light_13.8
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "13.8kg 单手可提"
+    spoken_text: "十三点八公斤，一只手就拎起来"
+    value: 13.8
+    unit: kg
+    evidence: "assets/products/轻便侠218_卖点.md#更轻便（核心记忆点）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["13.8", "十三点八", "13.8kg", "13.8公斤"]
+    forbidden_rewrites: ["约20kg", "20公斤", "20kg", "十五公斤"]
+    notes: "s6_publish/engage.py 旧内置 PRODUCT_POINTS 写的是「约20kg」，与本口径直接冲突，已删除该内置文案。"
+
+  - claim_id: fold_1s
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "1秒折叠"
+    spoken_text: "一按一压，一秒折好"
+    value: 1
+    unit: 秒
+    evidence: "assets/products/轻便侠218_卖点.md#更轻便（核心记忆点）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["1秒", "一秒", "1 秒"]
+    forbidden_rewrites: ["3秒折叠", "5秒折叠"]
+    notes: ""
+
+  - claim_id: small_boot
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "折叠后比行李箱还小（31.5cm 宽）"
+    spoken_text: "比行李箱还小，后备箱随便放"
+    value: 31.5
+    unit: cm
+    evidence: "assets/products/轻便侠218_卖点.md#核心参数表（折叠后 31.5×83.5cm）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["31.5", "31.5cm", "三十一点五"]
+    forbidden_rewrites: ["比手提箱还小", "可放进背包"]
+    notes: "折叠后尺寸 31.5×83.5cm；只引用 31.5 宽度时不得省略「宽」。"
+
+  - claim_id: plane_ok
+    sku: ainsnbot_x218
+    kind: certification
+    display_text: "可上飞机/高铁，免费托运"
+    spoken_text: "能上飞机，能上高铁，推着就能上电梯"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更轻便（核心记忆点）"
+    certificate: "CNAS 认证 + UN38.3 航空运输鉴别报告"
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: medium
+    status: verified
+    numeric_tokens: ["UN38.3", "CNAS"]
+    forbidden_rewrites: ["100% 免费托运", "所有航司都免费", "无条件托运"]
+    keywords: ["CNAS认证", "免费托运", "上飞机", "高铁"]
+    notes: "「100% 免费托运」是绝对化表述，禁止使用；只能说「可免费托运（以航司为准）」。"
+
+  - claim_id: auto_stop
+    sku: ainsnbot_x218
+    kind: feature
+    display_text: "松手即停（智能电磁刹车）"
+    spoken_text: "松手就停，坡上也不溜"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更安全"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: []
+    forbidden_rewrites: ["永不溜车", "绝对不溜"]
+    notes: ""
+
+  - claim_id: anti_flip
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "3.0 防翻系统（防前翻/侧翻/后翻）"
+    spoken_text: "3.0 防翻系统，30 度陡坡不后翻"
+    value: 30
+    unit: 度
+    evidence: "assets/products/轻便侠218_卖点.md#更安全"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: medium
+    status: verified
+    numeric_tokens: ["3.0", "30度", "三十度", "30°"]
+    forbidden_rewrites: ["永不翻车", "绝对安全", "任何坡度都不翻"]
+    notes: "「30度陡坡不后翻」是能力表述，不得升级为「永不翻车」。"
+
+  - claim_id: remote_15m
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "15 米手机智能遥控"
+    spoken_text: "手机遥控，不用弯腰推"
+    value: 15
+    unit: 米
+    evidence: "assets/products/轻便侠218_卖点.md#更智能"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["15米", "十五米", "15m"]
+    forbidden_rewrites: ["无限距离遥控", "百米遥控"]
+    notes: ""
+
+  - claim_id: recline_145
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "105-145° 多角度后躺"
+    spoken_text: "能躺到一百四十五度，午睡都行"
+    value: 145
+    unit: 度
+    evidence: "assets/products/轻便侠218_卖点.md#更舒适"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["145", "145度", "一百四十五度", "105-145", "145°"]
+    forbidden_rewrites: ["180度平躺", "完全平躺", "躺平睡整晚"]
+    notes: "区间是 105-145°；单说「145 度」时不得说成「180 度平躺」。"
+
+  - claim_id: shock_18
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "减震系统（股数口径待核）"
+    spoken_text: "汽车级减震，过坎不颠"
+    value: ""
+    unit: 股
+    evidence: "assets/products/轻便侠218_卖点.md#更舒适"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: needs_verification
+    numeric_tokens: ["18股", "十二股", "12股", "十八股", "18 股"]
+    forbidden_rewrites: ["18股护脊减震", "12股护脊减震"]
+    keywords: ["减震", "护脊"]
+    notes: "口径冲突：卖点 md 写「18 股弹簧减震（12 股护脊：7 股座下 + 5 股靠背）」，而 lib/products.py 与历史脚本写「18 股护脊减震」。18 是总数还是护脊数无法判定，Codex 不猜正确值——人工核对后再恢复 verified 并填写 value/display_text。"
+
+  - claim_id: brake_light
+    sku: ainsnbot_x218
+    kind: feature
+    display_text: "刹车自动亮警示灯"
+    spoken_text: "刹车灯自动亮，跟车的人一眼就看见"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更安全"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: []
+    forbidden_rewrites: ["永不追尾", "防追尾神器"]
+    notes: ""
+
+  - claim_id: range_39
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "续航 39km（22A 电池）"
+    spoken_text: "二十二安电池，充一次跑三十九公里"
+    value: 39
+    unit: km
+    evidence: "assets/products/轻便侠218_卖点.md#核心参数表（续航里程 16 / 25 / 39 km）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: needs_verification
+    numeric_tokens: ["39", "39km", "39公里", "三十九公里", "16km", "25km"]
+    forbidden_rewrites: ["充一次跑39公里", "续航39公里"]
+    notes: "口径冲突：卖点 md 的续航随电池容量变化（10A→16km / 15A→25km / 22A→39km），脱开电池容量单说「续航 39 公里」属于误导。人工确认允许的表述（例如必须带「22A 电池」限定）后再恢复 verified。"
+
+  - claim_id: cushion_comfy
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "4cm/7cm 加厚坐垫（海绵+透气网布）"
+    spoken_text: "四公分到七公分加厚坐垫，久坐不闷不硌"
+    value: 7
+    unit: cm
+    evidence: "assets/products/轻便侠218_卖点.md#更舒适"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["4cm", "7cm", "4公分", "7公分"]
+    forbidden_rewrites: ["十公分坐垫", "医疗级坐垫"]
+    notes: "坐垫厚度为两档 4cm / 7cm，不得合并成单一数字。"
+
+  - claim_id: tire_puncture
+    sku: ainsnbot_x218
+    kind: feature
+    display_text: "镁合金轮毂防爆实心胎（0 维护）"
+    spoken_text: "实心胎，不用打气，不爆胎"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更安全"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: []
+    forbidden_rewrites: ["永不磨损", "终身不用换胎"]
+    notes: ""
+
+  - claim_id: lithium_safe
+    sku: ainsnbot_x218
+    kind: certification
+    display_text: "医疗级锂电池（可室内充电）"
+    spoken_text: "锂电可以室内充电，安全"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更安全"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: needs_verification
+    numeric_tokens: []
+    forbidden_rewrites: ["绝对不起火", "永不爆炸", "医疗级安全认证"]
+    keywords: ["医疗级"]
+    notes: "「医疗级」是等级/认证类表述，但库内没有对应证书编号。补证书（如 GB 31241 / UN38.3 电池报告）后再恢复 verified；在此之前禁止自动对外使用。"
+
+  - claim_id: voice_ai
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "AI 语音播报（1 分钟学会）"
+    spoken_text: "语音提示一分钟学会，老人上手零门槛"
+    value: 1
+    unit: 分钟
+    evidence: "assets/products/轻便侠218_卖点.md#更智能"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["1分钟", "一分钟"]
+    forbidden_rewrites: ["零学习成本", "教会所有人"]
+    notes: ""
+
+  - claim_id: joystick_360
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "360° 转向操纵杆"
+    spoken_text: "三六零度操纵杆，窄处也能轻松调头"
+    value: 360
+    unit: 度
+    evidence: "assets/products/轻便侠218_卖点.md#更智能"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["360", "360°", "三六零度"]
+    forbidden_rewrites: ["原地三百六十度旋转", "任何窄道都能掉头"]
+    notes: ""
+
+  - claim_id: lcd_screen
+    sku: ainsnbot_x218
+    kind: feature
+    display_text: "液晶屏显示速度/电量（日光下可见）"
+    spoken_text: "速度电量一目了然"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#更智能"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: []
+    forbidden_rewrites: ["触摸大屏", "智能平板"]
+    notes: ""
+
+  - claim_id: speed_6
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "2-6km/h 调速"
+    spoken_text: "两到六公里调速，慢档更安心"
+    value: 6
+    unit: km/h
+    evidence: "assets/products/轻便侠218_卖点.md#核心参数表（行驶速度 2-6 km/h）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["2-6km/h", "六公里", "6km/h"]
+    forbidden_rewrites: ["最高时速", "十五码"]
+    notes: ""
+
+  - claim_id: load_100
+    sku: ainsnbot_x218
+    kind: number
+    display_text: "承重 100kg"
+    spoken_text: "承重一百公斤，全家人都能用"
+    value: 100
+    unit: kg
+    evidence: "assets/products/轻便侠218_卖点.md#核心参数表（承重 100 kg）"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: ["100kg", "承重100", "一百公斤", "100公斤"]
+    forbidden_rewrites: ["200斤", "承重一百五十公斤", "承重无限"]
+    notes: ""
+
+  - claim_id: warranty_frame_life
+    sku: ainsnbot_x218
+    kind: warranty
+    display_text: "车架终身售后"
+    spoken_text: "车架终身售后"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage]
+    risk_level: medium
+    status: verified
+    numeric_tokens: ["终身售后", "终身质保"]
+    forbidden_rewrites: ["整车终身质保", "终身包换新"]
+    keywords: ["车架终身", "终身售后"]
+    notes: "「终身」只覆盖车架，不得扩大到整车；不得说「包换新」。"
+
+  - claim_id: warranty_motor_2y
+    sku: ainsnbot_x218
+    kind: warranty
+    display_text: "控制器与电机 2 年质保"
+    spoken_text: "控制器和电机两年质保"
+    value: 2
+    unit: 年
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage]
+    risk_level: medium
+    status: verified
+    numeric_tokens: ["2年质保", "两年质保", "2年保修"]
+    forbidden_rewrites: ["整车两年质保", "五年质保"]
+    keywords: ["质保", "保修"]
+    notes: "质保范围是控制器与电机，不含车架（车架为终身售后）。"
+
+  - claim_id: cert_medical_device
+    sku: ainsnbot_x218
+    kind: certification
+    display_text: "国家医疗器械认证"
+    spoken_text: ""
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: needs_verification
+    numeric_tokens: []
+    forbidden_rewrites: ["国家级认证", "医疗器械注册证已备案"]
+    keywords: ["医疗器械认证", "医疗器械"]
+    notes: "库内只有一句「国家医疗器械认证」，没有注册证编号/有效期。认证类表述无可证实材料，Phase 6 任务 5 明令禁止自动生成——人工补注册证号后再恢复 verified。"
+
+  - claim_id: patent_27
+    sku: ainsnbot_x218
+    kind: certification
+    display_text: "27 项研发专利"
+    spoken_text: ""
+    value: 27
+    unit: 项
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: needs_verification
+    numeric_tokens: ["27项", "27 项", "二十七项"]
+    forbidden_rewrites: ["专利技术领先", "独家专利"]
+    keywords: ["专利", "研发专利"]
+    notes: "无专利号清单，无法证实。人工补专利清单后再恢复 verified。"
+
+  - claim_id: sales_rank_1
+    sku: ainsnbot_x218
+    kind: superlative
+    display_text: "高端轮椅销量第一 · 累计销量 86280 台"
+    spoken_text: ""
+    value: 86280
+    unit: 台
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: forbidden
+    numeric_tokens: ["86280", "销量第一", "第一品牌", "26国", "258家"]
+    forbidden_rewrites: ["销量第一", "行业第一", "全国第一"]
+    keywords: ["销量第一", "第一"]
+    notes: "「第一」属广告法绝对化用语；销量数字也无第三方佐证。禁止自动用于任何对外文案。"
+
+  - claim_id: guobu_15
+    sku: ainsnbot_x218
+    kind: policy
+    display_text: "国补 15%"
+    spoken_text: ""
+    value: 15
+    unit: "%"
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: []
+    risk_level: high
+    status: forbidden
+    numeric_tokens: ["国补", "15%"]
+    forbidden_rewrites: ["直降15%", "补贴后立减"]
+    keywords: ["国补", "补贴"]
+    notes: "价格/政策类表述，且时效性强；engage 红线①同样禁止自动回复价格与优惠。禁止自动对外使用。"
+
+  - claim_id: brand_cta
+    sku: ainsnbot_x218
+    kind: positioning
+    display_text: "爱优护·轻便侠218（品牌报法：只报品牌，不报型号数字）"
+    spoken_text: "爱优护轻便侠"
+    value: ""
+    unit: ""
+    evidence: "assets/products/轻便侠218_卖点.md#一句话定位"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [script, packaging, engage, cover]
+    risk_level: low
+    status: verified
+    numeric_tokens: []
+    forbidden_rewrites: ["爱优护二一八", "轻便侠二代"]
+    notes: "型号 218 读「二幺八」；对外报品牌不报型号数字。"
+
+  - claim_id: aftersales_service
+    sku: ainsnbot_x218
+    kind: service
+    display_text: "15 天免费试用 · 送货上门 · 送运费险"
+    spoken_text: ""
+    value: 15
+    unit: 天
+    evidence: "assets/products/轻便侠218_卖点.md#品牌与售后"
+    certificate: ""
+    valid_from: "2026-09-23"
+    valid_to: ""
+    allowed_channels: [packaging, engage]
+    risk_level: medium
+    status: verified
+    numeric_tokens: ["15天", "十五天", "七天无理由"]
+    forbidden_rewrites: ["终身免费退换", "30天无理由"]
+    notes: "试用期是 15 天；不得说成「30 天无理由」。"

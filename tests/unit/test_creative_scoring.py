@@ -7,6 +7,7 @@ from lib.creative import SCORE_DIMENSIONS, CreativeDirector, score_dna
 from lib.creative.dna import CLAIM_RISK_FLAG
 from lib.creative.scoring import DIMENSION_WEIGHTS, NUMERIC_CLAIM_POINTS
 from lib.creative.structures import STORY_STRUCTURES, structure_by_id
+from lib.products import POINT_IDS
 from tests.unit.test_creative_dna import good_dna
 
 pytestmark = pytest.mark.unit
@@ -69,13 +70,32 @@ def test_numeric_claim_lowers_claim_risk_score():
     numeric_point = next(iter(sorted(NUMERIC_CLAIM_POINTS)))
     risky = score_dna(good_dna(sales_point=numeric_point), structure=structure_by_id("S_duo_conflict"),
                       context={"trend": EVERGREEN_TREND})
-    safe = score_dna(good_dna(sales_point="cushion_comfy"), structure=structure_by_id("S_duo_conflict"),
+    # 纯 feature 卖点（Phase 6 起该名单由 Claims Registry 决定，不再是硬编码常量）
+    feature_points = [p for p in POINT_IDS if p not in NUMERIC_CLAIM_POINTS]
+    assert feature_points, "Claims Registry 里应当至少有一条无参数承诺的卖点"
+    safe = score_dna(good_dna(sales_point=feature_points[0]),
+                     structure=structure_by_id("S_duo_conflict"),
                      context={"trend": EVERGREEN_TREND})
     assert risky["ClaimRisk"] < safe["ClaimRisk"]
     reason = score_dna(good_dna(sales_point=numeric_point, risk_flags=[CLAIM_RISK_FLAG]),
                        structure=structure_by_id("S_duo_conflict"),
                        context={"trend": EVERGREEN_TREND})["reasons"]["ClaimRisk"]
     assert "Claims Registry" in reason, reason
+
+
+def test_numeric_claim_points_come_from_claims_registry():
+    """Phase 6：该名单必须由 Claims Registry 派生（参数只有一个权威来源）。"""
+    from lib import claims as claims_mod
+    from lib import products as products_mod
+
+    reg = claims_mod.load()
+    for point_id in NUMERIC_CLAIM_POINTS:
+        claims = [reg.get(cid) for cid in products_mod.claim_ids_for(point_id)]
+        assert claims and all(c is not None for c in claims)
+        assert any(c.kind != claims_mod.KIND_FEATURE or c.value not in ("", None)
+                   or c.status != claims_mod.VERIFIED for c in claims), point_id
+    # 无参数承诺的纯 feature 卖点不得出现在名单里
+    assert "auto_stop" not in NUMERIC_CLAIM_POINTS
 
 
 def test_estimated_cost_score_inverts_structure_cost():

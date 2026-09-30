@@ -61,6 +61,7 @@ VOCAB: dict[str, tuple[str, ...]] = {
 
 # 数值/认证类卖点在 Phase 6 Claims Registry 落地前一律打标，禁止当"事实"直接念
 CLAIM_RISK_FLAG = "数值承诺待核验"
+CLAIM_BLOCKED_FLAG = "卖点口径待核验/禁止对外使用"
 MIN_TEXT = 4          # payoff / ending / CTA 至少写清楚，不能是占位空串
 
 

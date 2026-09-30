@@ -1,47 +1,81 @@
-"""产品卖点库 — 从归档的卖点文档提供文案素材 + 卖点轮换（每条视频换卖点）"""
+"""产品卖点库 — 卖点池 + 卖点轮换（每条视频换主打）。
+
+Phase 6：本文件**不再持有任何参数口径**。每个卖点的对外文案（`hook`）都实时来自
+`assets/products/claims.yaml`（经 Claims Service）。参数只在 Claims Registry 里存在一份，
+这里只保留"池成员 + 轮换状态 + 模板适配"这三件不属于事实层的事。
+"""
 import json
 from pathlib import Path
 
 from . import STATE_DIR
+from . import claims as claims_mod
 
 ROOT = Path(__file__).resolve().parent.parent
 POINTS_DIR = ROOT / "assets" / "products"
 STATE = STATE_DIR / "sales_points_used.json"
 
 # ── 卖点池（每条视频轮换主打——宝哥规则 2026-09-23）──
-SALES_POINTS = [
-    {"id": "auto_stop", "name": "松手即停", "hook": "电磁刹车，松手即停、坡停不溜"},
-    {"id": "anti_flip", "name": "3.0防翻系统", "hook": "防前翻侧翻后翻，30度陡坡不后翻"},
-    {"id": "fold_1s", "name": "1秒折叠", "hook": "镁铝合金车架，一按一压一秒折好"},
-    {"id": "small_boot", "name": "比行李箱还小", "hook": "折叠后31.5cm宽，后备箱随便放"},
-    {"id": "plane_ok", "name": "能上飞机高铁", "hook": "CNAS认证，上飞机免费托运"},
-    {"id": "remote_15m", "name": "15米手机遥控", "hook": "手机遥控，不用弯腰推"},
-    {"id": "recline_145", "name": "145度后躺", "hook": "久坐能躺平，午睡都行"},
-    {"id": "shock_18", "name": "18股护脊减震", "hook": "汽车级减震，过坎不颠"},
-    {"id": "brake_light", "name": "刹车自动亮灯", "hook": "高亮尾灯自动亮，防追尾"},
-    {"id": "range_39", "name": "续航39公里", "hook": "充一次跑39公里"},
-    {"id": "light_13.8", "name": "13.8公斤", "hook": "单手可提"},
-    # ── 扩充 9 个（2026-09-25 宝哥令：卖点池→20） ──
-    {"id": "cushion_comfy", "name": "加厚坐垫", "hook": "4cm/7cm海绵加透气网布，久坐不闷不硌"},
-    {"id": "tire_puncture", "name": "防扎防爆胎", "hook": "镁合金轮毂实心胎，0维护不爆胎"},
-    {"id": "lithium_safe", "name": "医疗级锂电", "hook": "可室内放心充电，安全可靠"},
-    {"id": "voice_ai", "name": "AI语音播报", "hook": "语音提示1分钟学会，老人上手零门槛"},
-    {"id": "joystick_360", "name": "360°操纵杆", "hook": "转向灵活，窄处也能轻松调头"},
-    {"id": "lcd_screen", "name": "液晶屏显示", "hook": "速度电量一目了然，日光下可见"},
-    {"id": "speed_6", "name": "2-6km/h调速", "hook": "快慢随心，慢档更安心"},
-    {"id": "load_100", "name": "承重100kg", "hook": "结实能扛，全家人都能用"},
-    {"id": "warranty_life", "name": "终身售后", "hook": "车架终身售后，2年电机质保"},
+# (point_id, 展示名, 对应的 claim_id 列表)。文案一律从 registry 取，本表不写参数。
+_POINT_NAMES: list[tuple[str, str]] = [
+    ("auto_stop", "松手即停"),
+    ("anti_flip", "防翻系统"),
+    ("fold_1s", "一键折叠"),
+    ("small_boot", "折叠小巧"),
+    ("plane_ok", "能上飞机高铁"),
+    ("remote_15m", "手机遥控"),
+    ("recline_145", "可后躺"),
+    ("shock_18", "减震系统"),
+    ("brake_light", "刹车自动亮灯"),
+    ("range_39", "长续航"),
+    ("light_13.8", "轻便可提"),
+    ("cushion_comfy", "加厚坐垫"),
+    ("tire_puncture", "防扎防爆胎"),
+    ("lithium_safe", "锂电充电安全"),
+    ("voice_ai", "AI语音播报"),
+    ("joystick_360", "灵活操纵杆"),
+    ("lcd_screen", "液晶屏显示"),
+    ("speed_6", "多档调速"),
+    ("load_100", "大承重"),
+    ("warranty_life", "售后保障"),
 ]
 
+# 卖点 id → 支撑它的 claim（一个卖点可以由多条 claim 组成，如质保=车架 + 电机）
+POINT_CLAIMS: dict[str, tuple[str, ...]] = {
+    "warranty_life": ("warranty_frame_life", "warranty_motor_2y"),
+    "small_boot": ("small_boot",),
+    "plane_ok": ("plane_ok",),
+}
 
-def _used() -> dict:
-    if STATE.exists():
-        try:
-            return json.loads(STATE.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
 
+def _claim_ids(point_id: str) -> tuple[str, ...]:
+    pid = str(point_id or "").strip()
+    if not pid:
+        return ()
+    return POINT_CLAIMS.get(pid, (pid,))
+
+
+def _build_points() -> list[dict]:
+    """从 Claims Registry 物化卖点池；registry 不可用时只保留 id/name 且标记不可用。"""
+    try:
+        reg = claims_mod.load()
+        broken = ""
+    except Exception as exc:                       # 注册表缺失/损坏 → 一律按"不可用"
+        reg, broken = None, f"{type(exc).__name__}: {exc}"
+    out: list[dict] = []
+    for pid, name in _POINT_NAMES:
+        ids = _claim_ids(pid)
+        points = [reg.get(cid) for cid in ids] if reg else []
+        usable = bool(reg) and all(p is not None and p.usable("script") for p in points)
+        primary = points[0] if points and points[0] is not None else None
+        out.append({"id": pid, "name": name,
+                    "hook": (primary.display_text if usable and primary else ""),
+                    "claim_ids": list(ids), "usable": usable,
+                    "blocked": "" if usable else (broken or "claim 待核验/禁止使用")})
+    return out
+
+
+SALES_POINTS: list[dict] = _build_points()
+POINT_IDS: tuple[str, ...] = tuple(p["id"] for p in SALES_POINTS)
 
 # ── 模板-卖点适配（防止"折叠场景讲刹车"这类画面/台词违和——宝哥规则延伸）──
 TEMPLATE_FIT = {
@@ -58,6 +92,45 @@ TEMPLATE_FIT = {
 }
 
 
+def _used() -> dict:
+    if STATE.exists():
+        try:
+            return json.loads(STATE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+
+def claim_ids_for(point_id: str) -> list[str]:
+    """该卖点对应的 claim_id 列表（供 artifact/发布记录，Phase 6 任务 7）。"""
+    return list(_claim_ids(str(point_id or "")))
+
+
+def is_usable(point_id: str, channel: str = "script") -> bool:
+    """该卖点能不能自动对外使用（口径已验证 + 渠道允许）。"""
+    try:
+        reg = claims_mod.load()
+    except Exception:
+        return False
+    points = [reg.get(cid) for cid in _claim_ids(str(point_id or ""))]
+    return bool(points) and all(p is not None and p.usable(channel) for p in points)
+
+
+def point_facts(point_id: str, channel: str = "script") -> str:
+    """该卖点的对外文案（唯一来源 = registry 的 display/spoken_text）。"""
+    try:
+        reg = claims_mod.load()
+    except Exception:
+        return ""
+    chunks: list[str] = []
+    for cid in _claim_ids(str(point_id or "")):
+        c = reg.get(cid)
+        if c is None or not c.usable(channel):
+            continue
+        chunks.append(c.spoken_text or c.display_text)
+    return "；".join(chunks)
+
+
 def use_counts() -> dict:
     """每个卖点的使用次数 {point_id: n}（供 Planner 当 novelty 特征，只读不改）。"""
     used = _used()
@@ -65,11 +138,12 @@ def use_counts() -> dict:
 
 
 def next_point(template_id: str = "") -> dict:
-    """选本期主打卖点：优先与模板动作匹配 + 使用次数最少"""
+    """选本期主打卖点：优先与模板动作匹配 + 使用次数最少（且口径可用）"""
     used = _used()
     fit = TEMPLATE_FIT.get(template_id)
     pool = [p for p in SALES_POINTS if (not fit or p["id"] in fit)] or SALES_POINTS
-    return min(pool, key=lambda p: len(used.get(p["id"], [])))
+    usable = [p for p in pool if p.get("usable")] or pool
+    return min(usable, key=lambda p: len(used.get(p["id"], [])))
 
 
 def record_point(point_id: str, tag: str) -> None:
@@ -94,12 +168,14 @@ def points_block() -> str:
 
 
 def sales_points_brief(max_chars: int = 900) -> str:
-    """读卖点库 → 摘要（供 LLM 文案/提示词引用真实卖点参数）"""
-    p = POINTS_DIR / "轻便侠218_卖点.md"
-    if not p.exists():
-        return ""
-    text = p.read_text(encoding="utf-8")
-    # 截取正文（跳标题行）
+    """读 Claims Registry → 可用事实摘要（供 LLM 文案/提示词引用真实参数）。
+
+    Phase 6：不再直接读 markdown 正文——markdown 只是 claim 的 evidence 出处。
+    """
+    try:
+        text = claims_mod.load().facts_block("script")
+    except Exception as exc:
+        return f"（产品事项目前不可用：{type(exc).__name__}: {exc}）"
     return text[:max_chars]
 
 
@@ -107,3 +183,4 @@ if __name__ == "__main__":
     print(sales_points_brief(400))
     print("\n下次主打:", next_point())
     print("已用:", points_block())
+    print("\n口径不可用的卖点:", [p["id"] for p in SALES_POINTS if not p["usable"]])

@@ -10,6 +10,8 @@
 """
 from __future__ import annotations
 
+from .. import claims as claims_mod
+from .. import products as products_mod
 from .dna import CLAIM_RISK_FLAG, CreativeDNA
 
 SCORE_DIMENSIONS: tuple[str, ...] = (
@@ -39,11 +41,31 @@ STRUCTURE_AUDIENCES: dict[str, tuple[str, ...]] = {
     "S_comment_reply": ("图文比价人群", "社区邻里围观者"),
 }
 
-# PDF 上的"数值承诺"卖点（Phase 6 Claims Registry 接管前的保守名单）
-NUMERIC_CLAIM_POINTS: frozenset[str] = frozenset({
-    "range_39", "light_13.8", "load_100", "small_boot", "shock_18", "speed_6",
-    "plane_ok", "warranty_life", "lithium_safe", "recline_145", "remote_15m",
-})
+def _numeric_claim_points() -> frozenset[str]:
+    """需要"数值/认证/质保/政策"核验的卖点 —— 由 Claims Registry 决定，不再硬编码。
+
+    判据：卖点背后只要有一条 claim 不是「纯 feature 且已验证」，就算带承诺口径，
+    ClaimRisk 需要扣分（Phase 5 的 CLAIM_RISK_FLAG 逻辑不变，只是名单改为注册表驱动）。
+    注册表不可用时**保守**地把全部卖点视为待核验，绝不因为取不到数据就放松门禁。
+    """
+    try:
+        reg = claims_mod.load()
+    except Exception:
+        return frozenset(products_mod.POINT_IDS)
+    risky: set[str] = set()
+    for point_id in products_mod.POINT_IDS:
+        for claim_id in products_mod.claim_ids_for(point_id):
+            claim = reg.get(claim_id)
+            if (claim is None or claim.status != claims_mod.VERIFIED
+                    or claim.kind != claims_mod.KIND_FEATURE
+                    or claim.value not in ("", None)):
+                risky.add(point_id)
+                break
+    return frozenset(risky)
+
+
+# 数值承诺卖点清单（Phase 6 起唯一来源 = assets/products/claims.yaml）
+NUMERIC_CLAIM_POINTS: frozenset[str] = _numeric_claim_points()
 
 
 def _clamp(value: float) -> float:
@@ -73,6 +95,9 @@ def score_dna(dna: CreativeDNA, *, structure: dict | None = None,
     if st.get("shot_pattern") and st["shot_pattern"] in (day.get("shot_patterns") or []):
         novelty -= 0.25
         counts_note.append("同日同镜头结构")
+    if dna.genre and dna.genre in (day.get("genres") or []):
+        novelty -= 0.18
+        counts_note.append("同日同片型")
     if dna.hook_type in (day.get("hooks") or []):
         novelty -= 0.20
         counts_note.append("同日同钩子")
@@ -132,7 +157,7 @@ def score_dna(dna: CreativeDNA, *, structure: dict | None = None,
 
     # ⑨ ClaimRisk（负向）：数值承诺待核验 → 分低
     claim_risk = 0.45 if (CLAIM_RISK_FLAG in dna.risk_flags or dna.sales_point in claim_points) else 1.0
-    reasons["ClaimRisk"] = ("含数值/认证类承诺，Phase 6 Claims Registry 前不得当事实念"
+    reasons["ClaimRisk"] = ("含数值/认证类承诺，须经 Claims Registry 核验后才可对外使用"
                             if claim_risk < 1.0 else "无未核验数值承诺")
 
     # ⑩ EstimatedCost（负向）：骨架成本系数取反

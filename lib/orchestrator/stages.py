@@ -18,6 +18,9 @@ from contextlib import suppress
 from pathlib import Path
 
 from .errors import (
+    CLAIM_FORBIDDEN,
+    CLAIM_NEEDS_VERIFICATION,
+    CLAIM_UNMAPPED,
     COMPOSE_FAILED,
     GENERATION_FAILED,
     MISSING_INPUT,
@@ -69,11 +72,60 @@ def _creative_artifacts(spec_path: Path) -> list[dict]:
     paths = (_spec_doc(spec_path).get("creative") or {}).get("artifacts") or {}
     out: list[dict] = []
     for type_, key in (("research", "research"), ("creative_dna", "dna"),
-                       ("creative_scores", "scores")):
+                       ("creative_scores", "scores"), ("claims", "claims")):
         path = paths.get(key)
         if path and Path(path).is_file():
             out.append({"type": type_, "path": path})
     return out
+
+
+def _spec_claim_text(doc: dict) -> str:
+    """spec 里所有"会对外出现"的文案（合规门只扫这些）。"""
+    creative = doc.get("creative") or {}
+    dna = creative.get("dna") or {}
+    story = doc.get("story_spec") or {}
+    chunks = [str(doc.get("title") or "")]
+    for key in ("payoff", "ending", "CTA", "hook_type"):
+        chunks.append(str(dna.get(key) or ""))
+    chunks.append(str(story.get("prompt") or ""))
+    for shot in (story.get("shots") or []):
+        if isinstance(shot, dict):
+            for key in ("line", "dialogue", "text", "beat"):
+                chunks.append(str(shot.get(key) or ""))
+    return "\n".join(c for c in chunks if c)
+
+
+def _claims_gate(spec_path: Path, channel: str = "script") -> tuple[str, str, dict]:
+    """Phase 6 合规门：数值/认证/质保/疗效/绝对化表述必须映射到**可用**的 claim。
+
+    返回 (error_code, message, metrics)；error_code 为空表示通过。
+    """
+    from .. import claims as claims_mod
+
+    doc = _spec_doc(spec_path)
+    text = _spec_claim_text(doc)
+    if not text:
+        return "", "", {"claims_gate": "empty"}
+    try:
+        result = claims_mod.gate(text, channel)
+    except claims_mod.RegistryError as exc:
+        return (CLAIM_UNMAPPED, f"Claims Registry 不可用，无法完成合规校验：{exc}",
+                {"claims_gate": "registry_error"})
+    claim_ids = doc.get("claim_ids") or (doc.get("creative") or {}).get("claim_ids") or []
+    metrics = {"claims_gate": "pass" if result.ok else "block",
+               "claim_ids": result.claim_ids or list(claim_ids),
+               "unmapped": len(result.unmapped), "blocked": len(result.blocked)}
+    if result.ok:
+        return "", "", metrics
+    kinds = {f.kind for f in result.unmapped} | {f.kind for f in result.blocked}
+    forbidden_hit = any("forbidden" in (f.blocked_reason or "") for f in result.blocked)
+    if "forbidden_rewrite" in kinds or forbidden_hit:
+        code = CLAIM_FORBIDDEN
+    elif result.unmapped:
+        code = CLAIM_UNMAPPED
+    else:
+        code = CLAIM_NEEDS_VERIFICATION
+    return code, f"产品合规 Gate 不通过：{result.message()}", metrics
 
 
 def _plan_for(ctx: StageContext):
@@ -143,6 +195,11 @@ def stage_preflight(ctx: StageContext) -> StageResult:
                 "StorySpec 已就绪，但 H3 提示词尚未编译（Phase 7 PromptCompiler）——"
                 "为不浪费付费额度，本次不进入生成。可先人工审阅 StorySpec 与 CreativeDNA。",
                 metrics={"plan_only": True, "prompt_ready": bool(doc.get("prompt_ready"))})
+        # Phase 6 合规门：文案里的产品承诺必须映射到可用 claim，否则绝不放行到付费生成
+        code, claim_msg, claim_metrics = _claims_gate(Path(ctx.spec))
+        if code:
+            return StageResult.fail("preflight", code, claim_msg, metrics=claim_metrics)
+        metrics.update(claim_metrics)
 
     uid = _spec_uid(ctx)
     try:

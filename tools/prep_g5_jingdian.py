@@ -6,7 +6,7 @@
   · ACTING    → `hg.acting_block(eye=False)` 拼入表演层；主档案 `assets/cast/acting/{elder,son}.md`，
                 本片用其场景改写版 `scene_G5_*.md`（ACTING §8：改写而非粘贴）
 
-四池组合：核心卡司组 / 卖点 load_100 承重100kg / 角度 B11 景点打卡 / 片型 G5 情感故事
+四池组合：核心卡司组 / 卖点 load_100（口径以 Claims Registry 为准） / 角度 B11 景点打卡 / 片型 G5 情感故事
 台词：docs/onetake_lines_G5_jingdian.txt（70 纯汉字，撞车检查 0 拦截）
 
 ⚠️ 长度纪律：H3 prompt 硬上限 10000 字符（安全线 9800）。本脚本已按压缩五招裁剪；

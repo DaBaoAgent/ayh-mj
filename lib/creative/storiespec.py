@@ -44,6 +44,7 @@ class StorySpec:
     prompt_ready: bool = False
     rationale: dict = field(default_factory=dict)
     creative_paths: dict = field(default_factory=dict)
+    claim_ids: list = field(default_factory=list)   # Phase 6：本条视频实际引用的产品 claim
 
     # ── 序列化 ─────────────────────────────────────────────────
     def to_dict(self) -> dict:
@@ -57,6 +58,7 @@ class StorySpec:
             "ref_images": list(self.ref_images), "ref_audios": list(self.ref_audios),
             "shots": [dict(s) for s in self.shots], "prompt": self.prompt,
             "prompt_ready": self.prompt_ready,
+            "claim_ids": list(self.claim_ids),
         }
 
     def to_spec_json(self) -> dict:
@@ -72,6 +74,7 @@ class StorySpec:
             "prompt": self.prompt,
             "prompt_ready": self.prompt_ready,
             "plan_only": not self.prompt_ready,
+            "claim_ids": list(self.claim_ids),
             "ref_images": list(self.ref_images),
             "ref_audios": list(self.ref_audios),
             "creative": {
@@ -81,6 +84,7 @@ class StorySpec:
                 "hotspot": dict(self.hotspot),
                 "rationale": dict(self.rationale),
                 "artifacts": dict(self.creative_paths),
+                "claim_ids": list(self.claim_ids),
             },
             "story_spec": self.to_dict(),
         }
@@ -110,6 +114,7 @@ def build_shots(structure: dict, dna: CreativeDNA) -> list[dict]:
 def build_story_spec(*, uid: str, structure: dict, dna: CreativeDNA, hotspot: dict,
                      research_refs: dict, rationale: dict, title: str,
                      creative_paths: dict | None = None,
+                     claim_ids: list | None = None,
                      duration: int = DEFAULT_DURATION,
                      resolution: str = DEFAULT_RESOLUTION,
                      workflow: str = DEFAULT_WORKFLOW) -> StorySpec:
@@ -121,6 +126,7 @@ def build_story_spec(*, uid: str, structure: dict, dna: CreativeDNA, hotspot: di
         fallback_workflows=[w for w in FALLBACK_WORKFLOWS if w != workflow],
         shots=build_shots(structure, dna), rationale=dict(rationale or {}),
         creative_paths=dict(creative_paths or {}),
+        claim_ids=list(claim_ids or []),
     )
 
 
