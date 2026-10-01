@@ -79,6 +79,30 @@ def tmp_state(tmp_path, monkeypatch) -> Path:
     import lib.creative.cast_groups as cast_groups
     monkeypatch.setattr(cast_groups, "GROUPS_STATE", state / "groups_used.json", raising=False)
 
+    # Planner 现在恢复“先写完整文案再编译”的 9/26 合同。单元/集成测试必须 0 联网，
+    # 所以在临时 state fixture 里给 StoryWriter 一个结构感知的假 JSON 回复。
+    import re
+
+    import lib.creative.writer as writer_mod
+
+    def fake_story_chat(messages, **_kwargs):
+        system = str(messages[0].get("content") or "")
+        m_lines = re.search(r"共 (\d+) 句", system)
+        m_shots = re.search(r"镜头数：(\d+)", system)
+        n = int(m_lines.group(1)) if m_lines else 4
+        shots = int(m_shots.group(1)) if m_shots else 4
+        width = 11 if n == 6 else (12 if n <= 4 else (10 if n <= 5 else 8))
+        seeds = list("甲乙丙丁戊己庚辛壬癸")
+        lines = [seeds[i % len(seeds)] * width for i in range(n)]
+        if n == 8:
+            # 65 个纯汉字、每句唯一，避免静态门禁 R4“重复台词”。
+            lines = ["爸今天就想自己走走", "我就在旁边陪着您", "累了咱就坐车歇会", "这车轻巧出门方便",
+                     "前面有坡慢点走吧", "松手就停不用慌张", "到家我自己收起来", "今天这趟走得踏实"]
+        return {"title": "测试短片", "goal": "测试自然故事目标", "payoff": "测试自然落点",
+                "ending": "测试自然收尾", "cta": "轻轻收尾",
+                "lines": lines, "shot_notes": [f"shot {i+1}" for i in range(shots)]}
+
+    monkeypatch.setattr(writer_mod, "chat_json", fake_story_chat)
     return state
 
 

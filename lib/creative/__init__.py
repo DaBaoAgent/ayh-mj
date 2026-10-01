@@ -38,7 +38,7 @@ from .scoring import (
     score_dna,
 )
 from .storiespec import SPEC_VERSION, StorySpec, build_story_spec, summarize_research
-from .structures import STORY_STRUCTURES, structure_by_id
+from .structures import STORY_STRUCTURES, compatible_genres, line_plan_for, structure_by_id
 from .workflow import (
     MAX_CHAIN,
     Requirement,
@@ -50,11 +50,13 @@ from .workflow import (
     route_for_spec,
     validate_chain,
 )
+from .writer import StoryDraft, StoryWriter, StoryWritingError, validate_lines
 
 __all__ = [
     "CreativeDNA", "Hotspot", "normalize_hotspot", "SOURCE_TYPES", "NORMALIZED_FIELDS",
-    "STORY_STRUCTURES", "structure_by_id", "StorySpec", "SPEC_VERSION", "build_story_spec",
-    "summarize_research",
+    "STORY_STRUCTURES", "structure_by_id", "compatible_genres", "line_plan_for",
+    "StorySpec", "SPEC_VERSION", "build_story_spec", "summarize_research",
+    "StoryDraft", "StoryWriter", "StoryWritingError", "validate_lines",
     "SCORE_DIMENSIONS", "DIMENSION_WEIGHTS", "score_dna",
     "HISTORICAL_DIMENSION", "DEFAULT_HISTORY_WEIGHT",
     "CreativeDirector", "ScoredDNA", "CreativePlanner", "PlannedJob",

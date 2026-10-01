@@ -91,6 +91,46 @@ TEMPLATE_FIT = {
     "T10": ["auto_stop", "anti_flip", "plane_ok"],                         # 安全/认证
 }
 
+# vNext StorySpec 的场景-卖点兼容表。它延续 9/26 TEMPLATE_FIT 的原则：
+# 先限定“这个故事能自然讲什么”，再在兼容卖点里做保新/评分，绝不全池乱配。
+STRUCTURE_FIT: dict[str, tuple[str, ...]] = {
+    "S_duo_conflict": ("auto_stop", "anti_flip", "remote_15m", "joystick_360", "light_13.8"),
+    "S_solo_vlog": ("light_13.8", "small_boot", "range_39", "cushion_comfy", "recline_145"),
+    "S_street_interview": ("light_13.8", "fold_1s", "small_boot", "remote_15m", "joystick_360"),
+    "S_suspense_reveal": ("fold_1s", "small_boot", "light_13.8", "remote_15m", "recline_145"),
+    "S_magic_loop": ("fold_1s", "remote_15m", "joystick_360", "light_13.8"),
+    "S_product_test": ("auto_stop", "anti_flip", "shock_18", "range_39", "light_13.8", "load_100"),
+    "S_pov_first": ("auto_stop", "joystick_360", "remote_15m", "shock_18", "cushion_comfy"),
+    "S_silent_slapstick": ("fold_1s", "light_13.8", "small_boot"),
+    "S_emotional_story": ("cushion_comfy", "recline_145", "shock_18", "light_13.8", "range_39", "auto_stop"),
+    "S_comment_reply": tuple(pid for pid, _ in _POINT_NAMES),
+}
+
+# 只有当选题本身谈到相应问题时，强语义卖点才可获得高分。
+# 尤其“售后/质保”不能因为使用次数少就硬塞进敬礼、亲情、圆梦等故事。
+HUMAN_STORY_TERMS: tuple[str, ...] = (
+    "老兵", "敬礼", "升旗", "天安门", "纪念", "圆梦", "遗愿", "父亲", "母亲", "爷爷", "奶奶",
+    "陪伴", "亲情", "一家人", "重逢", "生日愿望",
+)
+HUMAN_STORY_POINTS: frozenset[str] = frozenset({
+    "light_13.8", "cushion_comfy", "recline_145", "shock_18", "range_39",
+})
+
+POINT_TOPIC_TERMS: dict[str, tuple[str, ...]] = {
+    "warranty_life": ("售后", "质保", "保修", "维修", "坏了", "故障", "服务保障"),
+    "fold_1s": ("折叠", "收纳", "放车", "后备箱", "搬车"),
+    "small_boot": ("后备箱", "收纳", "空间", "出门", "旅行"),
+    "plane_ok": ("飞机", "高铁", "旅行", "托运", "机场"),
+    "remote_15m": ("遥控", "推车", "接送", "远程"),
+    "recline_145": ("休息", "午睡", "久坐", "躺", "累"),
+    "shock_18": ("颠", "路面", "石子", "过坎", "减震"),
+    "range_39": ("续航", "远行", "里程", "充电", "一整天"),
+    "light_13.8": ("轻", "搬", "提", "出门", "陪伴", "圆梦", "老人", "老兵", "敬礼", "爷爷", "父亲"),
+    "cushion_comfy": ("久坐", "舒服", "舒适", "老人", "老兵", "敬礼", "爷爷", "父亲", "陪伴"),
+    "auto_stop": ("刹车", "坡", "安全", "停", "老人"),
+    "anti_flip": ("坡", "翻", "安全", "上坡", "下坡"),
+}
+
 
 def _used() -> dict:
     if STATE.exists():
@@ -135,6 +175,65 @@ def use_counts() -> dict:
     """每个卖点的使用次数 {point_id: n}（供 Planner 当 novelty 特征，只读不改）。"""
     used = _used()
     return {p["id"]: len(used.get(p["id"], [])) for p in SALES_POINTS}
+
+
+def sales_point_fit(point_id: str, *, topic: str = "", structure_id: str = "",
+                    genre_id: str = "", visual_motif: str = "") -> tuple[float, list[str]]:
+    """返回卖点对当前选题/骨架的语义适配度（0..1）和理由。
+
+    这是 9/26 `TEMPLATE_FIT` 的 vNext 版本：结构匹配是基础，选题语义再加/减分。
+    强语义卖点（质保、飞机、续航等）没有对应上下文时必须低分，不能靠“少用过”入选。
+    """
+    pid = str(point_id or "")
+    text = " ".join((str(topic or ""), str(visual_motif or ""))).lower()
+    fit_ids = STRUCTURE_FIT.get(str(structure_id or ""), ())
+    structure_score = 1.0 if pid in fit_ids else 0.25
+    reasons = ["骨架匹配" if pid in fit_ids else "骨架不匹配"]
+
+    terms = POINT_TOPIC_TERMS.get(pid, ())
+    matched = [term for term in terms if term.lower() in text]
+    if matched:
+        topic_score = min(1.0, 0.72 + 0.09 * len(matched))
+        reasons.append("选题命中：" + "、".join(matched[:4]))
+    elif terms:
+        # 有明确适用语境却完全未命中：只能作为弱备选。质保尤其严格。
+        topic_score = 0.05 if pid == "warranty_life" else 0.32
+        reasons.append("选题未出现该卖点的适用语境")
+    else:
+        topic_score = 0.50
+        reasons.append("通用卖点，无专属关键词")
+
+    # 情感/人物故事中，纯售后承诺若没有售后语境直接判不适配。
+    if genre_id == "G5" and pid == "warranty_life" and not matched:
+        topic_score = 0.0
+        reasons.append("情感故事禁止无缘由硬转售后")
+    score = max(0.0, min(1.0, 0.58 * structure_score + 0.42 * topic_score))
+    return round(score, 4), reasons
+
+
+def compatible_points(*, topic: str, structure_id: str, genre_id: str = "",
+                      visual_motif: str = "", min_score: float = 0.48) -> list[dict]:
+    """按语义适配度返回可用卖点；没有合格项时宁可退回结构兼容池，也不全池乱配。"""
+    used = _used()
+    human_story = any(term in str(topic or "") for term in HUMAN_STORY_TERMS)
+    rows: list[tuple[float, int, dict]] = []
+    for point in SALES_POINTS:
+        if not point.get("usable"):
+            continue
+        if human_story and point["id"] not in HUMAN_STORY_POINTS:
+            continue
+        score, _ = sales_point_fit(point["id"], topic=topic, structure_id=structure_id,
+                                   genre_id=genre_id, visual_motif=visual_motif)
+        if score >= min_score:
+            rows.append((score, len(used.get(point["id"], [])), point))
+    if not rows:
+        allowed = set(STRUCTURE_FIT.get(structure_id, ()))
+        if human_story:
+            allowed &= set(HUMAN_STORY_POINTS)
+        rows = [(0.5, len(used.get(p["id"], [])), p) for p in SALES_POINTS
+                if p.get("usable") and p["id"] in allowed]
+    rows.sort(key=lambda row: (-row[0], row[1], row[2]["id"]))
+    return [dict(point, semantic_fit=score) for score, _, point in rows]
 
 
 def next_point(template_id: str = "") -> dict:

@@ -13,6 +13,7 @@ from __future__ import annotations
 from .. import claims as claims_mod
 from .. import products as products_mod
 from .dna import CLAIM_RISK_FLAG, CreativeDNA
+from .structures import structure_topic_fit
 
 SCORE_DIMENSIONS: tuple[str, ...] = (
     "Novelty", "AudienceFit", "TrendFit", "SalesPointFit", "VisualPotential",
@@ -127,17 +128,20 @@ def score_dna(dna: CreativeDNA, *, structure: dict | None = None,
         trend_fit = 0.72 + 0.28 * relevance
         if freshness is not None:
             trend_fit = 0.6 * trend_fit + 0.4 * float(freshness)
-        reasons["TrendFit"] = f"实时热点（相关性 {relevance:.2f}，新鲜度 {freshness}）"
+        trend_reason = f"实时热点（相关性 {relevance:.2f}，新鲜度 {freshness}）"
     else:
         trend_fit = 0.42 + 0.16 * relevance
-        reasons["TrendFit"] = "常青素材（非实时热点，已标 source_type=evergreen）"
+        trend_reason = "常青素材（非实时热点，已标 source_type=evergreen）"
+    structure_fit, structure_reason = structure_topic_fit(str(st.get("id") or ""), dna.hotspot)
+    trend_fit = 0.62 * trend_fit + 0.38 * structure_fit
+    reasons["TrendFit"] = f"{trend_reason}；{structure_reason}"
 
-    # ④ SalesPointFit：产品角色与骨架一致 + 视觉母题落在演示段
-    sales_fit = 1.0 if st.get("product_role") == dna.product_role else 0.68
-    if st.get("visual_motif") and st["visual_motif"] == dna.visual_motif:
-        sales_fit += 0.12
-    reasons["SalesPointFit"] = (f"产品角色 {dna.product_role}"
-                                + ("，母题与骨架一致" if st.get("visual_motif") == dna.visual_motif else ""))
+    # ④ SalesPointFit：必须真的检查“选题 ↔ 卖点 ↔ 骨架”语义，而不是只看 product_role。
+    # Phase 5 初版只检查 product_role/visual_motif，导致“老兵敬礼 + 终身质保”也能拿 1.00。
+    sales_fit, sales_reasons = products_mod.sales_point_fit(
+        dna.sales_point, topic=dna.hotspot, structure_id=str(st.get("id") or ""),
+        genre_id=dna.genre, visual_motif=dna.visual_motif)
+    reasons["SalesPointFit"] = "；".join(sales_reasons)
 
     # ⑤ VisualPotential：骨架视觉潜力 + 是否给了具体视觉母题
     visual = 0.7 * float(st.get("visual_potential") or 0.5) + (0.3 if dna.visual_motif else 0.0)

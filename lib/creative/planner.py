@@ -43,8 +43,14 @@ from .dna import AUDIENCES, CLAIM_BLOCKED_FLAG, CLAIM_RISK_FLAG, GOALS, VISUAL_M
 from .hotspot import normalize_hotspot
 from .scoring import NUMERIC_CLAIM_POINTS, STRUCTURE_AUDIENCES
 from .storiespec import SPEC_VERSION, build_story_spec, summarize_research
-from .structures import STORY_STRUCTURES
+from .structures import (
+    STORY_STRUCTURES,
+    cast_pattern_for_topic,
+    compatible_genres,
+    structure_allowed_for_topic,
+)
 from .workflow import route_for_spec
+from .writer import StoryWriter, StoryWritingError, needs_text, validate_lines
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DAY_FMT = "%Y-%m-%d"
@@ -127,6 +133,7 @@ class CreativePlanner:
     def __init__(self, *, queue_dir: Path | str | None = None,
                  state_dir: Path | str | None = None, store=None,
                  director: CreativeDirector | None = None,
+                 writer: StoryWriter | None = None,
                  candidate_count: int = 16, seed: str = "",
                  now: datetime | None = None,
                  learn: bool | None = None, explore_ratio: float | None = None,
@@ -136,6 +143,7 @@ class CreativePlanner:
         self.creative_dir = self.state_dir / "creative"
         self.store = store
         self.director = director or CreativeDirector()
+        self.writer = writer or StoryWriter()
         self.candidate_count = max(CANDIDATE_MIN, min(CANDIDATE_MAX, int(candidate_count)))
         self.seed = str(seed or "")
         self._now = now
@@ -160,11 +168,13 @@ class CreativePlanner:
             from ..jobstore import store as default_store
             store = default_store
         day = day or self.today()
-        alive = {"FAILED", "CANCELLED"}
+        excluded = {"FAILED", "CANCELLED", "BLOCKED", "PAUSED", "VOID"}
         count = 0
         for job in store.list_jobs(limit=500):
             created = str(job.get("created_at") or "")[:10]
-            if created == day and str(job.get("status") or "").upper() not in alive:
+            uid = str(job.get("uid") or "")
+            if (created == day and not re.search(r"_shot\d+$", uid)
+                    and str(job.get("status") or "").upper() not in excluded):
                 count += 1
         return count
 
@@ -192,11 +202,6 @@ class CreativePlanner:
         angles_ordered.sort(key=lambda a: (int(used["angle"].get(a["id"], 0)), a["id"]))
         if not angles_ordered:
             raise PlannerError("叙事角度池已耗尽：请先扩充 lib/angles.py 的 ANGLES 再规划")
-        # 口径可用的卖点优先（Phase 6：needs_verification / forbidden 的卖点排到最后，
-        # 避免把未核验参数写进 StorySpec 的 payoff）
-        points_ordered = sorted(products_mod.SALES_POINTS,
-                                key=lambda p: (not p.get("usable"),
-                                               int(used["point"].get(p["id"], 0)), p["id"]))
         groups_ordered = sorted(cast_groups.GROUP_DEFS,
                                 key=lambda g: (int(used["role_group"].get(g["name"], 0)), g["name"]))
 
@@ -209,9 +214,21 @@ class CreativePlanner:
             attempt += 1
             layer = i // len(STORY_STRUCTURES)
             structure = dict(STORY_STRUCTURES[(i + offset) % len(STORY_STRUCTURES)])
-            genre = genres_ordered[(layer + i) % len(genres_ordered)]
+            if not structure_allowed_for_topic(structure["id"], str(trend.get("title") or "")):
+                continue
+            allowed_genres = set(compatible_genres(structure["id"]))
+            genre_pool = [g for g in genres_ordered if not allowed_genres or g["id"] in allowed_genres]
+            if not genre_pool:
+                continue
+            genre = genre_pool[(layer + i) % len(genre_pool)]
             angle = angles_ordered[(layer * 3 + i) % len(angles_ordered)]
-            point = points_ordered[(layer * 5 + i) % len(points_ordered)]
+            point_pool = products_mod.compatible_points(
+                topic=str(trend.get("title") or ""), structure_id=structure["id"],
+                genre_id=genre["id"], visual_motif=str(structure.get("visual_motif") or ""))
+            if not point_pool:
+                continue
+            # 只在语义适配池内做轮换；高适配优先，同分再由使用次数决定。
+            point = point_pool[(layer + i) % min(len(point_pool), 5)]
             group = groups_ordered[(layer + i) % len(groups_ordered)]
             hook = self._pick_hook(structure, used_hooks, layer)
             sig = (genre["id"], hook, structure["shot_pattern"])
@@ -258,7 +275,9 @@ class CreativePlanner:
             audience=audience, goal=GOALS[index % len(GOALS)], hotspot=str(trend.get("title") or ""),
             genre=genre["id"], angle=angle["id"], sales_point=point["id"], hook_type=hook,
             narrative_arc=structure["narrative_arc"], shot_pattern=structure["shot_pattern"],
-            cast_pattern=structure["cast_pattern"], product_role=structure["product_role"],
+            cast_pattern=cast_pattern_for_topic(structure["id"], str(trend.get("title") or ""),
+                                                structure["cast_pattern"]),
+            product_role=structure["product_role"],
             conflict_type=structure["conflict_type"], visual_motif=motif,
             camera_language=structure["camera_language"], dialogue_mode=structure["dialogue_mode"],
             audio_mode=structure["audio_mode"],
@@ -326,7 +345,8 @@ class CreativePlanner:
 
     # ── 规划一个 job ───────────────────────────────────────────
     def plan_for(self, uid: str, *, index: int = 0, goal: str = "", day: str | None = None,
-                 force: bool = False) -> PlannedJob:
+                 force: bool = False, avoid_prescreen: bool = False,
+                 preferred_structures: tuple[str, ...] = ()) -> PlannedJob:
         day = day or self.today()
         if not force:
             existing = self.load_planned(uid)
@@ -354,6 +374,20 @@ class CreativePlanner:
         if hook is not None:
             context["history"] = hook
         ranked = self.director.rank(cands, context=context)
+        if preferred_structures:
+            preferred = [candidate for candidate in ranked
+                         if candidate.structure.get("id") in set(preferred_structures)]
+            if preferred:
+                ranked = preferred
+        if avoid_prescreen:
+            from .prescreen import needs_prescreen
+            ranked = [candidate for candidate in ranked
+                      if candidate.dna.dialogue_mode == "无对白"
+                      and not needs_prescreen({"creative": {
+                          "dna": candidate.dna.to_dict(),
+                          "structure": candidate.structure.get("id", "")}})]
+            if not ranked:
+                raise PlannerError("本轮没有可直接制作的无对白方案；候选需预筛或补充文案，请在任务台处理")
         ratio = (self._explore_ratio if self._explore_ratio is not None
                  else cfg["exploit_ratio"])
         selection = learn_scorer.select(ranked, model, ratio=ratio, rng=self._rng, hook=hook)
@@ -364,9 +398,20 @@ class CreativePlanner:
         dna: CreativeDNA = chosen.dna
         structure = chosen.structure
 
-        title = self._title(dna, structure, hotspot)
         claim_ids = products_mod.claim_ids_for(dna.sales_point)
         claim_facts = _claim_artifact(claim_ids)
+        # 9/26 稳定链的关键顺序：先把完整文案写好并通过字数/句数合同，再造 spec/prompt。
+        # Phase 5 初版把这一层漏掉，只“尝试读取已有 lines 文件”，导致自主任务可带空对白进入编译。
+        try:
+            draft = self.writer.write(hotspot=hotspot.to_dict(), dna=dna,
+                                      structure=structure, research=brief)
+        except StoryWritingError as exc:
+            raise PlannerError(f"文案阶段未通过，禁止进入 AutoDL：{exc}") from exc
+        # CreativeDNA.goal 是受控枚举（用于统计/学习），Writer 的自然语言故事目标不能覆盖它。
+        dna.payoff = draft.payoff or dna.payoff
+        dna.ending = draft.ending or dna.ending
+        dna.CTA = draft.cta or dna.CTA
+        title = draft.title or self._title(dna, structure, hotspot)
         rationale = {
             "rule": decision["rule"], "note": decision["note"],
             "totals": {s.to_dict()["structure"]: s.total for s in ranked[:5]},
@@ -382,9 +427,15 @@ class CreativePlanner:
                 "selection": {k: v for k, v in selection.items() if k != "chosen"},
             },
         }
+        rationale["writer"] = {"source": draft.source, "line_count": len(draft.lines),
+                                "story_goal": draft.goal}
         spec = build_story_spec(uid=uid, structure=structure, dna=dna, hotspot=hotspot.to_dict(),
                                 research_refs=summarize_research(brief), rationale=rationale,
-                                title=title, claim_ids=claim_ids)
+                                title=title, claim_ids=claim_ids, lines=draft.lines)
+        for shot, note in zip(spec.shots, draft.shot_notes, strict=False):
+            if note:
+                shot["note"] = note
+        self._persist_lines(spec)
         # Phase 7：① 补参考素材（角色槽位 → 定妆图/音色 + 产品单元素材）
         #          ② 编译 H3 提示词（PromptCompiler，唯一实现）
         #          ③ 能力感知路由（不再人工固定空 fallback，任务 8/9）
@@ -434,13 +485,34 @@ class CreativePlanner:
                      f"{len(spec.lines)} 句；{spec.workflow}）"),
         )
 
-    def plan_batch(self, count: int, *, goal: str = "", day: str | None = None) -> list[PlannedJob]:
-        """连续规划 N 条：候选按当日台账去重，所以 N 条之间天然互不雷同。"""
+    def plan_batch(self, count: int, *, goal: str = "", day: str | None = None,
+                   avoid_prescreen: bool = False) -> list[PlannedJob]:
+        """连续规划 N 条：语义适配优先，同时给大批次保留关键片型覆盖。"""
         day = day or self.today()
+        total = max(0, int(count))
         out: list[PlannedJob] = []
-        for i in range(max(0, int(count))):
+        # 只对 4 条以上批次启用软覆盖；单条任务永远只按语义/表现评分选最合适方案。
+        coverage_groups: list[tuple[str, ...]] = []
+        if total >= 4 and not avoid_prescreen:
+            coverage_groups = [
+                ("S_solo_vlog",),
+                ("S_suspense_reveal",),
+                ("S_product_test",),
+                ("S_magic_loop", "S_pov_first", "S_silent_slapstick"),
+            ]
+        covered: set[str] = set()
+        for i in range(total):
             uid = self._new_uid(day, goal, i)
-            out.append(self.plan_for(uid, index=i, goal=goal, day=day))
+            preferred: tuple[str, ...] = ()
+            for group in coverage_groups:
+                if not (set(group) & covered):
+                    preferred = group
+                    break
+            planned = self.plan_for(uid, index=i, goal=goal, day=day,
+                                    avoid_prescreen=avoid_prescreen,
+                                    preferred_structures=preferred)
+            out.append(planned)
+            covered.add(str(planned.structure.get("id") or ""))
         return out
 
     # ── 幂等读取 ───────────────────────────────────────────────
@@ -485,18 +557,30 @@ class CreativePlanner:
         }
 
     # ── Phase 7：素材 / 编译 / 路由 ────────────────────────────
-    def _attach_lines(self, spec) -> None:
-        """把已写好的台词稿（docs/onetake_lines_<uid>.txt）装进 spec.lines。
+    def _persist_lines(self, spec) -> None:
+        """同步旧版 `docs/onetake_lines_<uid>.txt`，保留 9/26 工具链兼容性。
 
-        稿子由人工/后续阶段的写作步骤产出；这里只做**搬运 + 与编译器完全一致的分镜**
-        （同一个 `lines_from_file`）。没有稿子就保持空 —— 编译仍然成功（逐镜给动作指令），
-        但 preflight 会因为"要说话的片却没有台词"把任务停住，绝不付费出一条没词的片。
+        docs 跟随 state 的父目录：生产 `ROOT/state -> ROOT/docs`；pytest 的临时
+        `tmp/state -> tmp/docs`。这样测试不会再向真实仓库写一地兼容台词文件。
         """
-        if spec.lines:
+        if not spec.lines:
             return
-        slots = [s for s in str(spec.dna.cast_pattern or "").split("+") if s.strip()]
-        spec.lines = lines_from_file(spec.uid, max(1, len(spec.shots)),
-                                     spec.dna.dialogue_mode, slots)
+        docs_dir = self.state_dir.parent / "docs"
+        path = docs_dir / f"onetake_lines_{spec.uid}.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(str(row.get("text") or "") for row in spec.lines) + "\n",
+                        encoding="utf-8")
+
+    def _attach_lines(self, spec) -> None:
+        """装入兼容旧稿并执行**付费前硬合同**；需要文字的片绝不允许空 lines。"""
+        if not spec.lines:
+            slots = [s for s in str(spec.dna.cast_pattern or "").split("+") if s.strip()]
+            spec.lines = lines_from_file(spec.uid, max(1, len(spec.shots)),
+                                         spec.dna.dialogue_mode, slots)
+        problems = validate_lines(spec.lines, dna=spec.dna,
+                                  structure={"id": spec.structure_id, "shots": len(spec.shots)})
+        if needs_text(spec.dna.dialogue_mode) and problems:
+            raise PlannerError("对白合同未通过，禁止编译/付费生成：" + "；".join(problems))
 
     def _attach_assets(self, spec) -> None:
         """把 StorySpec 的 `@槽位` 解析成真实参考素材（图 + 音色）。
@@ -518,16 +602,37 @@ class CreativePlanner:
                 if p.is_file() and str(p) not in bucket:
                     bucket.append(str(p))
 
-        for shot in spec.shots:
-            ref = str((shot or {}).get("cast_ref") or "")
-            if not ref:
-                continue
+        # Reference image N and reference audio N must describe the same cast slot.
+        # Shot order and first spoken-line order are not reliable cast order.
+        slots = [s.strip() for s in str(spec.dna.cast_pattern or "").split("+") if s.strip()]
+        image_bindings: dict[str, str] = {}
+        voice_bindings: dict[str, str] = {}
+        for ref in slots:
             role = ref
             try:
                 if ref.startswith("@"):
                     role = picked.setdefault(ref, cast_mod._pick_from_slot(ref, spec.uid))
-                _add(cast_mod.resolve_refs([role]), images)
+                refs = cast_mod.resolve_refs([role])
+                _add(refs, images)
+                if refs:
+                    image_bindings[ref] = str(refs[0])
+                voice = cast_mod.resolve_voice(role)
+                if voice and Path(voice).is_file():
+                    audios.append(str(voice))
+                    voice_bindings[ref] = str(voice)
+                else:
+                    warnings.append(f"voice {ref}: missing for {role}")
             except Exception as exc:      # noqa: BLE001 —— 缺图不该炸规划
+                warnings.append(f"{ref}: {type(exc).__name__}: {exc}")
+
+        for shot in spec.shots:
+            ref = str((shot or {}).get("cast_ref") or "")
+            if not ref or ref in slots:
+                continue
+            try:
+                role = picked.setdefault(ref, cast_mod._pick_from_slot(ref, spec.uid)) if ref.startswith("@") else ref
+                _add(cast_mod.resolve_refs([role]), images)
+            except Exception as exc:  # noqa: BLE001
                 warnings.append(f"{ref}: {type(exc).__name__}: {exc}")
 
         # 产品单元素材（有就带上：产品保真的唯一依据是同一条产品参考图）
@@ -535,29 +640,15 @@ class CreativePlanner:
         _add([product_dir / name for name in PRODUCT_REFS
               if (product_dir / name).is_file()], images)
 
-        # 音色：按说话人解析（槽位 → 具体角色 → voice/<id>.mp3）
-        for line in spec.lines:
-            if not isinstance(line, dict):
-                continue
-            speaker = str(line.get("speaker") or "")
-            role = picked.get(speaker, speaker)
-            if not speaker:
-                continue
-            try:
-                voice = cast_mod.resolve_voice(role)
-            except Exception as exc:      # noqa: BLE001
-                warnings.append(f"voice {speaker}: {type(exc).__name__}: {exc}")
-                voice = None
-            if voice and Path(voice).is_file() and str(voice) not in audios:
-                audios.append(str(voice))
-
         spec.ref_images = images[:MAX_REF_IMAGES]
         spec.ref_audios = audios
         if warnings:
             spec.prompt_meta.setdefault("asset_warnings", warnings)
         spec.prompt_meta["assets"] = {"ref_images": len(spec.ref_images),
                                       "ref_audios": len(spec.ref_audios),
-                                      "cast_slots": sorted(picked)}
+                                      "cast_slots": slots,
+                                      "image_bindings": image_bindings,
+                                      "voice_bindings": voice_bindings}
 
     def _compile_prompt(self, spec) -> dict:
         """PromptCompiler：唯一编译入口。失败**不抛**，改标 plan_only 让 preflight 拦。"""

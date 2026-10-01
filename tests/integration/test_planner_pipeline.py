@@ -74,8 +74,11 @@ def test_autonomous_start_produces_job_and_creative_dna(tmp_state):
     assert float(store.get_job(uid)["cost_spent"] or 0) == 0.0
 
 
-def test_high_risk_spec_stops_at_prescreen_before_paid_generation(tmp_state):
-    """Phase 7 边界：自己规划出来的 spec 已编译，但高风险新构图必须**先过预筛**。"""
+def test_high_risk_spec_stops_at_prescreen_before_paid_generation(tmp_state, monkeypatch):
+    """Phase 7 边界：高风险 spec 必须先过预筛；测试显式固定风险，不依赖 Planner 恰好选中哪条。"""
+    monkeypatch.setattr("lib.creative.prescreen.needs_prescreen", lambda _doc: True)
+    monkeypatch.setattr("lib.creative.prescreen.risk_of", lambda _doc: {
+        "level": "high", "score": 0.9, "reasons": [{"label": "fixture", "weight": 0.9}]})
     provider = FakeProvider()
     orch = _orch(tmp_state, provider,
                  _stages(plan=stages_mod.stage_plan, preflight=stages_mod.stage_preflight))

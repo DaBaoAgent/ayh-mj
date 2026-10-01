@@ -114,6 +114,86 @@ STORY_STRUCTURES: tuple[dict, ...] = (
 
 _INDEX = {s["id"]: s for s in STORY_STRUCTURES}
 
+# 片型与 StorySpec 骨架必须语义一致。Phase 5 初版把两池做了笛卡尔积，
+# 曾出现 G5「情感故事」+ S_duo_conflict「打脸对撞」这样的冲突组合。
+STRUCTURE_GENRES: dict[str, tuple[str, ...]] = {
+    "S_duo_conflict": ("G1", "G2", "G8"),
+    "S_solo_vlog": ("G5", "G7"),
+    "S_street_interview": ("G6",),
+    "S_suspense_reveal": ("G4", "G9"),
+    "S_magic_loop": ("G3", "G4", "G8"),
+    "S_product_test": ("G1", "G10"),
+    "S_pov_first": ("G5", "G7"),
+    "S_silent_slapstick": ("G3", "G8"),
+    "S_emotional_story": ("G1", "G5"),
+    "S_comment_reply": ("G4", "G6", "G10"),
+}
+
+# 15 秒对白预算。旧版 2026-09-26 的稳定双人链是 4 镜×2句=8句；
+# 新骨架允许变化，但必须在进入 PromptCompiler 前已有完整文本。
+STRUCTURE_LINE_PLAN: dict[str, tuple[int, ...]] = {
+    "S_duo_conflict": (2, 2, 2, 2),
+    "S_solo_vlog": (1, 1, 1, 1, 2),
+    "S_street_interview": (2, 2, 2, 2),
+    "S_suspense_reveal": (1, 1, 1, 1),
+    "S_magic_loop": (),
+    "S_product_test": (2, 1, 2, 1),
+    "S_pov_first": (2, 1, 2, 1),
+    "S_silent_slapstick": (),
+    "S_emotional_story": (2, 1, 2, 1, 2),
+    "S_comment_reply": (1, 1, 1, 1),
+}
+
+
+SOLEMN_HUMAN_TERMS: tuple[str, ...] = (
+    "老兵", "敬礼", "升旗", "天安门", "纪念", "圆梦", "遗愿", "父亲", "母亲", "爷爷", "奶奶",
+    "陪伴", "亲情", "一家人", "重逢", "生日愿望",
+)
+SOLEMN_STRUCTURES: tuple[str, ...] = ("S_emotional_story", "S_solo_vlog", "S_pov_first")
+
+
+def compatible_genres(structure_id: str) -> tuple[str, ...]:
+    return STRUCTURE_GENRES.get(structure_id, ())
+
+
+def topic_policy(topic: str) -> str:
+    text = str(topic or "")
+    return "solemn_human" if any(term in text for term in SOLEMN_HUMAN_TERMS) else "general"
+
+
+def structure_allowed_for_topic(structure_id: str, topic: str) -> bool:
+    """庄重人物/亲情题材不进入打脸、魔性、街访等消费性骨架。"""
+    if topic_policy(topic) == "solemn_human":
+        return structure_id in SOLEMN_STRUCTURES
+    return True
+
+
+def structure_topic_fit(structure_id: str, topic: str) -> tuple[float, str]:
+    policy = topic_policy(topic)
+    if policy == "solemn_human":
+        if structure_id == "S_emotional_story":
+            return 1.0, "庄重人物题材与情感故事高度匹配"
+        if structure_id in ("S_solo_vlog", "S_pov_first"):
+            return 0.86, "庄重人物题材适合克制的生活流/POV"
+        return 0.10, "庄重人物题材不适合对撞/魔性/街访式骨架"
+    return 0.60, "通用题材，结构无特殊限制"
+
+
+def cast_pattern_for_topic(structure_id: str, topic: str, default: str) -> str:
+    """人物题材保住主角年龄/性别，不让通用骨架覆盖主角。"""
+    text = str(topic or "")
+    if any(term in text for term in ("老兵", "父亲", "爸爸", "爷爷", "老先生")):
+        return "@elder_male+@mid_male" if structure_id == "S_emotional_story" else (
+            "@elder_male" if structure_id in ("S_solo_vlog", "S_pov_first") else default)
+    if any(term in text for term in ("母亲", "妈妈", "奶奶", "老奶奶")):
+        return "@elder_female+@mid_female" if structure_id == "S_emotional_story" else (
+            "@elder_female" if structure_id in ("S_solo_vlog", "S_pov_first") else default)
+    return default
+
+
+def line_plan_for(structure_id: str) -> tuple[int, ...]:
+    return STRUCTURE_LINE_PLAN.get(structure_id, ())
+
 
 def structure_ids() -> tuple[str, ...]:
     return tuple(s["id"] for s in STORY_STRUCTURES)
